@@ -19,24 +19,26 @@ export const inboundRouter = Router();
 // carries metadata only) -> store the reply -> pause reminders -> forward the
 // gist to the owner's inbox.
 inboundRouter.post('/', async (req, res) => {
-  // Verify Resend/Svix webhook signature.
+  // Verify Resend/Svix webhook signature — required, not optional.
   const secret = process.env.RESEND_WEBHOOK_SECRET;
-  if (secret) {
-    try {
-      const wh = new Webhook(secret);
-      const payload = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
-      wh.verify(payload, {
-        'svix-id': Array.isArray(req.headers['svix-id'])
-          ? req.headers['svix-id'][0] : (req.headers['svix-id'] ?? ''),
-        'svix-timestamp': Array.isArray(req.headers['svix-timestamp'])
-          ? req.headers['svix-timestamp'][0] : (req.headers['svix-timestamp'] ?? ''),
-        'svix-signature': Array.isArray(req.headers['svix-signature'])
-          ? req.headers['svix-signature'][0] : (req.headers['svix-signature'] ?? ''),
-      });
-    } catch (err) {
-      console.error('[inbound] signature verification failed', (err as Error).message);
-      return res.status(401).json({ error: 'invalid webhook signature' });
-    }
+  if (!secret) {
+    console.error('[inbound] RESEND_WEBHOOK_SECRET not configured — rejecting webhook');
+    return res.status(500).json({ error: 'webhook not configured' });
+  }
+  try {
+    const wh = new Webhook(secret);
+    const payload = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+    wh.verify(payload, {
+      'svix-id': Array.isArray(req.headers['svix-id'])
+        ? req.headers['svix-id'][0] : (req.headers['svix-id'] ?? ''),
+      'svix-timestamp': Array.isArray(req.headers['svix-timestamp'])
+        ? req.headers['svix-timestamp'][0] : (req.headers['svix-timestamp'] ?? ''),
+      'svix-signature': Array.isArray(req.headers['svix-signature'])
+        ? req.headers['svix-signature'][0] : (req.headers['svix-signature'] ?? ''),
+    });
+  } catch (err) {
+    console.error('[inbound] signature verification failed', (err as Error).message);
+    return res.status(401).json({ error: 'invalid webhook signature' });
   }
 
   const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;

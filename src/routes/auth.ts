@@ -1,17 +1,35 @@
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { PrismaClient } from '@prisma/client';
+import { authLimiter } from '../middleware/rateLimit';
 
 const prisma = new PrismaClient();
-const JWT_SECRET = process.env.JWT_SECRET || process.env.API_TOKEN || 'dev-secret-change-in-production';
+
+const jwtSecret: string = process.env.JWT_SECRET ?? (() => {
+  throw new Error('JWT_SECRET environment variable is required');
+})();
+
+function validatePassword(password: string): { valid: boolean; error?: string } {
+  if (password.length < 12) {
+    return { valid: false, error: 'Password must be at least 12 characters' };
+  }
+  if (!/[A-Z]/.test(password)) {
+    return { valid: false, error: 'Password must contain at least one uppercase letter' };
+  }
+  if (!/[a-z]/.test(password)) {
+    return { valid: false, error: 'Password must contain at least one lowercase letter' };
+  }
+  if (!/[0-9]/.test(password)) {
+    return { valid: false, error: 'Password must contain at least one number' };
+  }
+  return { valid: true };
+}
 
 export function authRouter() {
   const router = Router();
 
-  // ── Stripe OAuth ──
-
-  // GET /auth/stripe/start — redirect to Stripe Connect
   router.get('/stripe/start', (_req: Request, res: Response) => {
     const clientId = process.env.STRIPE_CLIENT_ID;
     const redirectUri = process.env.STRIPE_REDIRECT_URI || 'http://localhost:4000/auth/stripe/callback';
@@ -23,7 +41,6 @@ export function authRouter() {
     res.redirect(url);
   });
 
-  // GET /auth/stripe/callback — handle Stripe OAuth response
   router.get('/stripe/callback', async (req: Request, res: Response) => {
     const { code } = req.query;
     if (!code || typeof code !== 'string') {
@@ -36,34 +53,39 @@ export function authRouter() {
       const connectedAccountId = oauthResp.stripe_user_id;
       const email = oauthResp.email || 'unknown@stripe.com';
 
-      // upsert account
       const account = await prisma.account.upsert({
         where: { stripeAccountId: connectedAccountId },
         update: { email },
         create: { stripeAccountId: connectedAccountId, email },
       });
 
-      // Create a session token and redirect to dashboard
       const token = issueToken(account.id);
-      res.redirect('/dashboard?token=' + token);
+
+      res.cookie('auth_token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+      });
+
+      res.redirect('/dashboard');
     } catch (err: any) {
       console.error('Stripe OAuth error:', err);
       res.status(500).send('Stripe connection failed. Please try again.');
     }
   });
 
-  // ── Email/password auth ──
-
-  // POST /auth/signup — create account + set password
-  router.post('/signup', async (req: Request, res: Response) => {
+  router.post('/signup', authLimiter, async (req: Request, res: Response) => {
     try {
       const { email, password } = req.body;
       if (!email || !password) {
         res.status(400).json({ error: 'Email and password required' });
         return;
       }
-      if (password.length < 6) {
-        res.status(400).json({ error: 'Password must be at least 6 characters' });
+
+      const validation = validatePassword(password);
+      if (!validation.valid) {
+        res.status(400).json({ error: validation.error });
         return;
       }
 
@@ -85,7 +107,7 @@ export function authRouter() {
       } else {
         const account = await prisma.account.create({
           data: {
-            stripeAccountId: 'pending_' + Date.now(),
+            stripeAccountId: 'pending_' + crypto.randomUUID(),
             email,
             passwordHash,
           },
@@ -99,8 +121,7 @@ export function authRouter() {
     }
   });
 
-  // POST /auth/login — sign in
-  router.post('/login', async (req: Request, res: Response) => {
+  router.post('/login', authLimiter, async (req: Request, res: Response) => {
     try {
       const { email, password } = req.body;
       if (!email || !password) {
@@ -109,21 +130,22 @@ export function authRouter() {
       }
 
       const account = await prisma.account.findFirst({ where: { email } });
-      if (!account?.passwordHash) {
-        res.status(401).json({ error: 'No account found with that email.' });
-        return;
-      }
 
-      const valid = await bcrypt.compare(password, account.passwordHash);
-      if (!valid) {
-        res.status(401).json({ error: 'Invalid password.' });
+      const hasValidPassword = account?.passwordHash && await bcrypt.compare(password, account.passwordHash);
+      if (!hasValidPassword) {
+        res.status(401).json({ error: 'Invalid email or password.' });
         return;
       }
 
       const token = issueToken(account.id);
       res.json({
         token,
-        account: { id: account.id, email: account.email, businessName: account.businessName, stripeConnected: !account.stripeAccountId.startsWith('pending_') },
+        account: {
+          id: account.id,
+          email: account.email,
+          businessName: account.businessName,
+          stripeConnected: !account.stripeAccountId.startsWith('pending_'),
+        },
       });
     } catch (err: any) {
       console.error('Login error:', err);
@@ -131,7 +153,6 @@ export function authRouter() {
     }
   });
 
-  // GET /auth/me — check current session
   router.get('/me', async (req: Request, res: Response) => {
     const auth = req.headers.authorization;
     const token = auth?.startsWith('Bearer ') ? auth.slice(7) : null;
@@ -140,7 +161,7 @@ export function authRouter() {
       return;
     }
     try {
-      const payload = jwt.verify(token, JWT_SECRET) as { accountId: string };
+      const payload = jwt.verify(token, jwtSecret) as unknown as { accountId: string };
       const account = await prisma.account.findUnique({ where: { id: payload.accountId } });
       if (!account) { res.status(401).json({ error: 'Account not found' }); return; }
       res.json({
@@ -158,5 +179,5 @@ export function authRouter() {
 }
 
 function issueToken(accountId: string): string {
-  return jwt.sign({ accountId }, JWT_SECRET, { expiresIn: '7d' });
+  return jwt.sign({ accountId }, jwtSecret, { expiresIn: '7d' }) as unknown as string;
 }

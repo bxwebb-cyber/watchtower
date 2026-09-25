@@ -1,0 +1,31 @@
+# Secrets
+.env
+.env.local
+.env.*.local
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Prisma
+prisma/migrations/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Extension build artifacts (icons are generated)
+extension/icon-*.png

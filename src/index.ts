@@ -3,6 +3,7 @@ import path from 'path';
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import jwt from 'jsonwebtoken';
+import cookieParser from 'cookie-parser';
 import { webhookRouter } from './routes/webhook';
 import { authRouter } from './routes/auth';
 import { invoicesRouter } from './routes/invoices';
@@ -12,15 +13,25 @@ import { settingsRouter } from './routes/settings';
 import { clientsRouter } from './routes/clients';
 import { inboundRouter } from './routes/inbound';
 import { authMiddleware } from './middleware/auth';
+import { apiLimiter } from './middleware/rateLimit';
 
 const app = express();
 
-// Webhook route needs the RAW body for Stripe signature verification,
-// so it gets its own express.raw() instance BEFORE the json parser.
-app.use('/webhooks/stripe', express.raw({ type: 'application/json' }), webhookRouter);
+const jwtSecret: string = process.env.JWT_SECRET ?? (() => {
+  throw new Error('JWT_SECRET environment variable is required');
+})();
 
-app.use(cors());
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'http://localhost:4000').split(',').map(o => o.trim());
+app.use(cors({
+  origin: ALLOWED_ORIGINS,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+}));
+
+app.use(cookieParser());
 app.use(express.json());
+
+app.use('/webhooks/stripe', express.raw({ type: 'application/json' }), webhookRouter);
 
 app.get('/health', (_req, res) => {
   res.json({ ok: true, service: 'watchtower' });
@@ -28,47 +39,35 @@ app.get('/health', (_req, res) => {
 
 app.use('/auth', authRouter);
 
-// Auth gate: protect API routes with a bearer token when API_TOKEN is set.
 app.use(authMiddleware);
 
-app.use('/invoices', invoicesRouter);
-app.use('/reports', reportsRouter);
-app.use('/templates', templatesRouter);
-app.use('/settings', settingsRouter);
-app.use('/clients', clientsRouter);
-// Inbound email (Resend): client replies to reminders land here.
-// Needs raw body for Svix signature verification.
+app.use('/invoices', apiLimiter, invoicesRouter);
+app.use('/reports', apiLimiter, reportsRouter);
+app.use('/templates', apiLimiter, templatesRouter);
+app.use('/settings', apiLimiter, settingsRouter);
+app.use('/clients', apiLimiter, clientsRouter);
 app.use('/webhooks/resend/inbound', express.raw({ type: 'application/json' }), inboundRouter);
 
-// Auth pages (no auth required).
 app.get('/login', (_req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, '../public/login.html'));
 });
 
-const JWT_SECRET = process.env.JWT_SECRET || process.env.API_TOKEN || 'dev-secret-change-in-production';
-
-// The dashboard (authenticated).
 app.use('/dashboard', (req: Request, res: Response, _next: NextFunction) => {
-  // Allow access if ?token= is provided (from Stripe OAuth callback redirect)
   const authHeader = req.headers.authorization || '';
-  const token = (req.query.token as string) || (authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '');
+  const token = req.cookies?.auth_token || (authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '');
   if (token) {
     try {
-      const payload = jwt.verify(token, JWT_SECRET) as { accountId: string };
+      const payload = jwt.verify(token, jwtSecret) as unknown as { accountId: string };
       (req as any).accountId = payload.accountId;
-      // Serve the file
       res.sendFile(path.join(__dirname, '../public/dashboard.html'));
       return;
     } catch {}
   }
-  // No valid token → redirect to landing page
   res.redirect('/');
 });
 
-// The landing page (marketing site, no auth).
 app.use(express.static(path.join(__dirname, '../public')));
 
-// Default: serve landing page
 app.get('/', (_req, res) => {
   res.sendFile(path.join(__dirname, '../public/index.html'));
 });
