@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dunn · At a Glance</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0a0f0a;
+    color: #e4e8e4;
+    padding: 24px;
+    min-height: 100vh;
+  }
+  .glance-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    max-width: 800px;
+    margin: 0 auto;
+  }
+  .card {
+    background: #141914;
+    border: 1px solid #1f261f;
+    border-radius: 12px;
+    padding: 20px;
+  }
+  .card__label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #7a887a;
+    margin-bottom: 8px;
+  }
+  .card__value {
+    font-size: 28px;
+    font-weight: 600;
+    line-height: 1;
+  }
+  .card__sub {
+    font-size: 13px;
+    color: #7a887a;
+    margin-top: 4px;
+  }
+  .card--danger .card__value { color: #e86a6a; }
+  .card--ok .card__value { color: #6ae8a0; }
+  .card--warn .card__value { color: #e8b26a; }
+  .card--neutral .card__value { color: #e4e8e4; }
+  h1 {
+    font-size: 16px;
+    font-weight: 600;
+    text-align: center;
+    margin-bottom: 24px;
+    color: #7a887a;
+    letter-spacing: 0.3px;
+  }
+  .loading {
+    text-align: center;
+    padding: 40px;
+    color: #7a887a;
+  }
+  .invoices-list {
+    max-width: 800px;
+    margin: 24px auto 0;
+    display: none;
+  }
+  .invoices-list.visible { display: block; }
+  .invoices-list h2 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #7a887a;
+    margin-bottom: 12px;
+  }
+  .invoice-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid #1f261f;
+    font-size: 14px;
+  }
+  .invoice-row .client { color: #e4e8e4; }
+  .invoice-row .amount { color: #e86a6a; font-weight: 500; }
+  .invoice-row .days { color: #7a887a; font-size: 12px; }
+</style>
+</head>
+<body>
+  <h1>Dunn — at a glance</h1>
+  <div class="glance-grid" id="kpis">
+    <div class="loading">Loading...</div>
+  </div>
+  <div class="invoices-list" id="overdue-list">
+    <h2>Overdue invoices needing attention</h2>
+    <div id="overdue-rows"></div>
+  </div>
+<script>
+async function loadWidget() {
+  try {
+    const [invoicesRes, reportsRes] = await Promise.all([
+      fetch('/invoices', { headers: { 'Authorization': 'Bearer ' + (localStorage.getItem('token') || '') } }),
+      fetch('/reports/revenue', { headers: { 'Authorization': 'Bearer ' + (localStorage.getItem('token') || '') } })
+    ]);
+    const invoices = await invoicesRes.json();
+    const reports = await reportsRes.json();
+
+    const now = new Date();
+    const overdue = (invoices.invoices || []).filter(i => i.status === 'open' && new Date(i.due) < now);
+    const dueSoon = (invoices.invoices || []).filter(i => i.status === 'open' && new Date(i.due) > now && (now - new Date(i.due)) < 7);
+    const paidCount = (invoices.invoices || []).filter(i => i.status === 'paid').length;
+    const overdueTotal = overdue.reduce((sum, i) => sum + parseFloat(i.amount.replace('$','')||'0'), 0);
+
+    const collected = reports?.totalCollected ?? reports?.revenue?.totalCollected ?? 0;
+    const feeRevenue = reports?.feeRevenue ?? reports?.revenue?.feeRevenue ?? 0;
+
+    document.getElementById('kpis').innerHTML = `
+      <div class="card card--danger">
+        <div class="card__label">Overdue</div>
+        <div class="card__value">${overdue.length}</div>
+        <div class="card__sub">$${overdueTotal.toFixed(2)} owed</div>
+      </div>
+      <div class="card card--ok">
+        <div class="card__label">Collected</div>
+        <div class="card__value">$${collected.toFixed(0)}</div>
+        <div class="card__sub">${paidCount} paid this month</div>
+      </div>
+      <div class="card card--warn">
+        <div class="card__label">Fee revenue</div>
+        <div class="card__value">$${feeRevenue.toFixed(0)}</div>
+        <div class="card__sub">Watchtower recovered</div>
+      </div>
+      <div class="card card--neutral">
+        <div class="card__label">Due soon</div>
+        <div class="card__value">${dueSoon.length}</div>
+        <div class="card__sub">within 7 days</div>
+      </div>
+    `;
+
+    if (overdue.length > 0) {
+      const list = document.getElementById('overdue-list');
+      list.classList.add('visible');
+      document.getElementById('overdue-rows').innerHTML = overdue.map(i => `
+        <div class="invoice-row">
+          <span class="client">${i.client || 'Unknown'}</span>
+          <span>
+            <span class="amount">${i.amount}</span>
+            <span class="days"> · ${Math.round((now - new Date(i.due)) / 86400000)} days late</span>
+          </span>
+        </div>
+      `).join('');
+    }
+  } catch (e) {
+    document.getElementById('kpis').innerHTML = '<div class="card" style="grid-column:1/-1;color:#e86a6a;">Failed to load — check connection</div>';
+  }
+}
+loadWidget();
+</script>
+</body>
+</html>

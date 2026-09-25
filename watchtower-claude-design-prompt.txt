@@ -1,0 +1,95 @@
+Design Watchtower — an invoice-reminder agent for small businesses. Build a complete landing page PLUS its product surface (the "who owes me" view) in one self-contained HTML artifact. Start from a blank screen.
+
+== THE ONE-LINER ==
+Dark, calm, and warm: a near-black sea at night, with a hand-drawn woodcut lighthouse as the single glowing point of light. "We keep watch so you don't have to."
+
+== WHAT WATCHTOWER IS ==
+An agent that watches a business's invoices. It reminds clients BEFORE an invoice is late, applies the late fee the owner already agreed to (per invoice, per client), and keeps the proof. Tone is warm, calm, trustworthy — NEVER threatening, NEVER debt-collector, NEVER corporate.
+
+== REFERENCE 1 — the discipline (a dark minimal tool UI) ==
+Lift the DISCIPLINE of a dark, desaturated, minimal tool UI:
+- Near-black base, no pure white anywhere.
+- Surfaces slightly lighter than base, separated by faint low-opacity borders — not heavy shadows or cards.
+- Monochrome thin-stroke iconography (1.5–2px), one icon = one idea.
+- ONE saturated accent, used sparingly.
+- Clean grid, generous whitespace, small precise type, strict alignment.
+- No glassmorphism, no gradient wash, no rainbow, no oversized rounded rectangles used as fake hierarchy.
+
+== REFERENCE 2 — the character system (clay.global/work/cornerstone) ==
+Steal the ARCHITECTURE, not the rendering:
+- ONE consistent cast of brand characters, placed THROUGHOUT the site — not a logo parked in the corner.
+- Each section gets its OWN character in the same style, so the whole site reads as one object collection.
+- Assets feel physical, weighty, "inviting" — soft shadows, tactile.
+- Methodical motion: the cast comes alive, subtly.
+
+IMPORTANT: Clay renders these as smooth 3D "clay-render" vinyl toys. Do NOT do that. Watchtower is WOODCUT — hand-drawn, ink-pressed, printmaking. Tactility comes from PAPER GRAIN, INK BLEED, hand-carved block weight, soft paper shadow. No 3D, no soft-body, no vinyl, no clay-render. Woodcut is the whole point.
+
+== THE BRAND (locked — do not drift) ==
+- Mascot: a woodcut / tattoo-flash lighthouse — bold black ink linework, red-and-white striped tower, kind face, tiny waves + sailboat at base, warm glowing lantern, small flag. Hand-drawn. NOT Sanrio-kawaii, NOT flat vector, NOT 3D.
+  - Final asset: ~/Desktop/watchtower-mascot-v5-woodcut-noboat.png (no boat)
+  - Animated beam: ~/Desktop/watchtower-lighthouse-beam.gif (rotating beam + lantern pulse)
+- Tagline: "We keep watch so you don't have to."
+- The cast (the whole world): lighthouse / lantern / tiny wave / sailboat / small flag. Build the ENTIRE site from this family, the way Clay builds from its family of toys.
+
+== DESIGN TOKENS ==
+
+Color
+- Base: deep warm near-black #0A0A0A–#101010 (neutral, NOT blue-black).
+- Surface: #151515–#1A1A1A.
+- Borders/dividers: rgba(255,255,255,0.07).
+- Text: #E8E6E1 primary, #9A9890 muted.
+- Accent — lantern gold: #C9A84C → #E8C96A gradient (key numbers, CTAs, focus, hover).
+- Accent — tower red: deep brick #B23A2E / #C0392B — ONLY for the lighthouse's stripes and tiny marks (badges, one-word emphasis). Do not spread red across the UI.
+- Status — paid: muted sea-green #4E9E7D (money-status only).
+
+Typography
+- Headings / tagline / key numbers: Playfair Display.
+- Body / UI / labels: Inter.
+- Key numbers (recovered $, price, stats): large, Playfair, gold — they are the hero.
+- Type as hierarchy first; add color and borders only after the type already works.
+
+Shape & spacing
+- Radii 8–12px, never pill-everything, never fully-round buttons.
+- Buttons: one primary (gold filled, dark text) + one ghost (faint border, light text). Hit targets 44px min.
+- Generous spacing; sections breathe; feature grid dense; hero airy.
+- Icons: thin light strokes, monochrome, woodcut-inked lighthouse-world glyphs — NOT generic line-icon sets.
+
+Motion
+- Scroll-reveal fade-up, spring easing, subtle.
+- Cast comes alive: rotating beam + pulsing lantern in hero, tiny waves rolling in one section, fluttering flag in another. ONE moving element per section at most.
+- Respect prefers-reduced-motion.
+
+== PAGE STRUCTURE (landing) ==
+The cast appears in every section — each section introduced by its own small woodcut member.
+1. Hero — dark sea, woodcut lighthouse, faint rotating beam. Eyebrow → tagline large in Playfair → one-line sub ("Watchtower reminds your clients before an invoice is late, applies the fee you agreed, and keeps the proof.") → one gold CTA ("Start watching") + one ghost ("See how it works"). Scroll hint.
+2. The problem — the night. Calm facts, not alarm: "14 hours a week chasing invoices. $17,500 owed per business, on average. 85% of freelancers paid late." The little sailboat lost in dark waves is the character here.
+3. How it works — the watch. 4 steps, each with its own woodcut glyph: Watch (the lantern) → Remind (the wave) → Fee (the flag) → Proof (the lighthouse, steady). Warm, never threatening.
+4. The differentiator — "Who's always late." The per-client lateness view. Show "Watchtower recovered $X this month" in large gold Playfair.
+5. Pricing — $29.99/mo per business. "One late fee recovered covers the month."
+6. Email strip — a sample reminder email, warm, lighthouse mascot in it (the tone IS the product).
+7. Final CTA + footer.
+
+== PART TWO — THE COMMAND CENTER (product surface) ==
+Do NOT build a "dashboard" (a wall of charts labeled "Insights / Growth / Optimize" — banned). Build a WORKING SURFACE — the "who owes me" view. A small-business owner opens it and in three seconds knows: who's paid, who owes me, who might be late. The list is the meal; the charts are the garnish.
+
+Three views, not thirty:
+1. The Watch (today) — "needs attention" list: invoices due soon, overdue, fees pending approval. One visible action per row (remind now / apply fee / approve).
+2. Clients — the differentiator: per-client "who's always late" (how often + how many days late) + total outstanding.
+3. Recovered — "Watchtower recovered $X this month" in large gold Playfair. The hero of the surface.
+
+The empty state is the onboarding (the most important screen): a brand-new user sees zero data and the surface tells them ONE next action — "Connect Stripe" → "Create your first invoice." No chart-shaped holes, no demo data. Charts populate from the customer's own real usage — the first chart anyone ever sees is their own cash, their own late client, their own recovered dollar.
+
+Status colors (money-status only): paid #4E9E7D · open/owes neutral off-white · late-risk #C9A84C · overdue #B23A2E.
+
+Same woodcut world: each view introduced by its own cast member (lantern for The Watch, sailboat for Clients, lighthouse for Recovered). Dense-but-calm, one idea per row, actions visible not buried. Speed of comprehension over decoration.
+
+== ANTI-SLOP (non-negotiable) ==
+- No stock photos. No fake dashboard crammed with invented numbers.
+- No generic SaaS feature grid with icon-in-a-box everywhere.
+- No aggressive gradients, no glassmorphism, no rainbow palette.
+- No emoji. No vague labels ("Insights", "Scale", "Optimize").
+- Every element earns its place. One idea per section.
+- The ONLY illustrations are the woodcut lighthouse-world cast. No decorative SVG pretending to be product imagery, no generic icon sets.
+
+== DELIVERABLE ==
+One polished, self-contained HTML artifact: the landing page + the command center, one coherent woodcut/dark/gold system throughout. Dark, warm, calm — the lighthouse is the single light. If you add anything not in this brief, it must make the lighthouse keep watch better. Otherwise leave it out.

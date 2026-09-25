@@ -1,0 +1,26 @@
+<!--
+  Paste into public/index.html: the footer of your invoice form, left side, next to Cancel / Create invoice.
+  Requires watchtower.css. On click, send the owner to recurring.html with the form values in the query string
+  (client_name, client_email, amount, grace_days, fee_type, fee_flat, fee_pct), and open the recurring modal pre-filled.
+-->
+<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-top:22px">
+  <a class="wt-btn wt-btn--link" href="recurring.html?new=1" data-make-recurring>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 2l4 4-4 4M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4M21 13v2a3 3 0 0 1-3 3H3"/></svg>
+    <span>Bill this on a schedule? Make it recurring</span>
+  </a>
+  <div style="display:flex; gap:10px">
+    <button class="wt-btn wt-btn--secondary" type="button">Cancel</button>
+    <button class="wt-btn wt-btn--primary" type="submit">Create invoice</button>
+  </div>
+</div>
+
+<!-- Also add both notices to your form (from the design): -->
+
+<!-- 1) Returning-client notice, under the email fields. Show it when the email is recognized on blur and terms are prefilled. -->
+<div class="wt-note wt-note--green" style="margin-top:10px">Returning client. Terms from WT-2236 prefilled — change them if you like.</div>
+
+<!-- 2) Live fee preview, at the bottom of the fee section.
+     none → Your client sees: No late fee.
+     flat → Your client sees: "A $50 late fee applies if unpaid by October 30."   (due date + grace days)
+     pct  → Your client sees: "A 5% late fee ($60.00) applies if unpaid by October 30." -->
+<div class="wt-fee-panel__preview" aria-live="polite">Your client sees: "A $50 late fee applies if unpaid by October 30."</div>

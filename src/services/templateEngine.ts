@@ -1,0 +1,198 @@
+import { PrismaClient } from '@prisma/client';
+import { createInvoice, stripeConfigured } from './invoiceCreator';
+import { notifyOwner } from './notify';
+
+const prisma = new PrismaClient();
+
+// Run daily: find every active template whose nextRunDate is today or past,
+// create the invoice, advance the schedule, log it.
+export async function runTemplateJob(now = new Date()): Promise<number> {
+  if (!stripeConfigured()) {
+    console.warn('[job] Stripe not configured — templates skipped');
+    return 0;
+  }
+
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  const templates = await prisma.invoiceTemplate.findMany({
+    where: { active: true, nextRunDate: { lte: today } },
+    include: { account: true },
+  });
+
+  let created = 0;
+  for (const tmpl of templates) {
+    try {
+      // Due date: N days from the run date.
+      const dueDate = new Date(today);
+      dueDate.setDate(dueDate.getDate() + tmpl.dueDays);
+
+      const result = await createInvoice({
+        clientName: tmpl.clientName,
+        clientEmail: tmpl.clientEmail,
+        amountCents: tmpl.amount,
+        currency: tmpl.currency,
+        dueDate,
+        fee:
+          tmpl.feeKind !== 'none'
+            ? { kind: tmpl.feeKind as 'flat' | 'percent', amount: tmpl.feeAmount, graceDays: tmpl.graceDays }
+            : undefined,
+      });
+
+      if (!result.ok) {
+        console.error(`[template] failed for ${tmpl.id}: ${result.message}`);
+        await prisma.invoiceTemplate.update({
+          where: { id: tmpl.id },
+          data: { lastRunAt: now, lastRunOk: false, lastError: result.message },
+        });
+        await prisma.auditEvent.create({
+          data: {
+            invoiceId: '__template__',
+            event: 'template_error',
+            detail: `Template ${tmpl.clientName}: ${result.message}`,
+          },
+        });
+        continue;
+      }
+
+      // Advance the schedule.
+      const nextRun = advanceRunDate(tmpl.nextRunDate, tmpl.frequency, tmpl.customDay ?? undefined);
+
+      await prisma.invoiceTemplate.update({
+        where: { id: tmpl.id },
+        data: {
+          nextRunDate: nextRun,
+          lastRunAt: now,
+          lastRunOk: true,
+          lastError: null,
+          sentCount: { increment: 1 },
+          lastInvoiceId: result.invoice.id,
+        },
+      });
+
+      await prisma.auditEvent.create({
+        data: {
+          invoiceId: result.invoice.id,
+          event: 'template_invoice_created',
+          detail: `From template ${tmpl.id}: ${result.invoice.amount} due ${result.invoice.dueDate}`,
+        },
+      });
+
+      // Notify owner that a recurring invoice was sent.
+      await notifyOwner(
+        tmpl.accountId,
+        `Recurring invoice sent to ${tmpl.clientName}`,
+        `A recurring invoice for $${(tmpl.amount / 100).toFixed(2)} was created from your "${tmpl.clientName}" template and sent to ${tmpl.clientEmail}.`
+      );
+
+      created++;
+    } catch (err) {
+      console.error(`[template] error processing ${tmpl.id}`, err);
+      await prisma.invoiceTemplate.update({
+        where: { id: tmpl.id },
+        data: { lastRunAt: now, lastRunOk: false, lastError: (err as Error).message },
+      });
+      await notifyOwner(
+        tmpl.accountId,
+        `Recurring invoice failed: ${tmpl.clientName}`,
+        `Could not create the recurring invoice for ${tmpl.clientName} (${tmpl.clientEmail}). Reason: ${(err as Error).message}. The template is still active and will retry next cycle.`
+      );
+    }
+  }
+
+  console.log(`[job] template run: ${created} invoices created from templates`);
+  return created;
+}
+
+// Advance the nextRunDate based on frequency.
+export function advanceRunDate(current: Date, frequency: string, customDay?: number): Date {
+  const next = new Date(current);
+
+  switch (frequency) {
+    case 'monthly': {
+      // Use UTC to avoid local-timezone day drift.
+      const y = next.getUTCFullYear();
+      const m = next.getUTCMonth() + 1; // 1-indexed for arithmetic
+      const d = next.getUTCDate();
+      // Move to next month, then clamp day to the month length.
+      const targetMonth = m + 1; // 1-indexed, may be 13
+      const yearOffset = Math.floor((targetMonth - 1) / 12);
+      const mm = ((targetMonth - 1) % 12); // 0-indexed
+      const daysInTarget = new Date(Date.UTC(y + yearOffset, mm + 1, 0)).getUTCDate();
+      const clampedDay = Math.min(d, daysInTarget);
+      next.setUTCFullYear(y + yearOffset, mm, clampedDay);
+      next.setUTCHours(0, 0, 0, 0);
+      break;
+    }
+    case 'weekly': {
+      next.setUTCDate(next.getUTCDate() + 7);
+      break;
+    }
+    case 'biweekly': {
+      next.setUTCDate(next.getUTCDate() + 14);
+      break;
+    }
+    case 'custom': {
+      // Move to next month on the specified customDay.
+      const y = next.getUTCFullYear();
+      const m = next.getUTCMonth(); // 0-indexed
+      const targetMonth = m + 1; // next month (0-indexed, may be 12)
+      const yearOffset = Math.floor(targetMonth / 12);
+      const mm = targetMonth % 12; // 0-indexed
+      const daysInTarget = new Date(Date.UTC(y + yearOffset, mm + 1, 0)).getUTCDate();
+      const clampedDay = Math.min(customDay ?? next.getUTCDate(), daysInTarget);
+      next.setUTCFullYear(y + yearOffset, mm, clampedDay);
+      next.setUTCHours(0, 0, 0, 0);
+      break;
+    }
+  }
+
+  return next;
+}
+
+// Given a start date and frequency, compute the initial nextRunDate.
+// The run fires ON the start date (lte: today), so the first invoice
+// creates on that day. Then advances.
+export function computeInitialNextRun(
+  startDate: Date,
+  frequency: string,
+  customDay?: number
+): Date {
+  if (frequency === 'custom' && customDay) {
+    const start = new Date(startDate);
+    const y = start.getUTCFullYear();
+    const m = start.getUTCMonth(); // 0-indexed
+    const daysInMonth = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+    const candidateDay = Math.min(customDay, daysInMonth);
+    const candidate = new Date(Date.UTC(y, m, candidateDay));
+
+    // If candidate is before the start date, advance to next month.
+    if (candidate < startDate) {
+      const targetMonth = m + 1;
+      const yearOffset = Math.floor(targetMonth / 12);
+      const mm = targetMonth % 12;
+      const nextDaysInMonth = new Date(Date.UTC(y + yearOffset, mm + 1, 0)).getUTCDate();
+      const clamped = Math.min(customDay, nextDaysInMonth);
+      return new Date(Date.UTC(y + yearOffset, mm, clamped));
+    }
+    return candidate;
+  }
+
+  // For monthly/weekly/biweekly, the start date IS the first run date.
+  return new Date(startDate);
+}
+
+// When a paused template is resumed after its nextRunDate has passed,
+// advance it to the next cycle instead of firing immediately.
+export function skipToNextCycle(
+  currentNextRun: Date,
+  frequency: string,
+  customDay?: number,
+  now: Date = new Date()
+): Date {
+  let next = new Date(currentNextRun);
+  // Keep advancing until nextRunDate is in the future.
+  while (next <= now) {
+    next = advanceRunDate(next, frequency, customDay);
+  }
+  return next;
+}

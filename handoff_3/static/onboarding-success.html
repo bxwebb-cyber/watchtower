@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Connected · Watchtower</title>
+<link rel="stylesheet" href="watchtower.css">
+</head>
+<body>
+<!--
+  ONBOARDING SUCCESS: show after the Stripe OAuth callback (/auth/stripe/start → callback → here).
+  Data: counts after the first sync: open_invoices, clients, past_due.
+        Get them from /invoices, or have the callback return them.
+  The header "Create new invoice" button and the sidebar pending badge are hidden until the owner leaves this screen.
+-->
+<div class="wt-app">
+  <aside class="wt-sidebar">
+    <div class="wt-brand">
+      <img class="wt-brand__mark" src="lighthouse-transparent.png" alt="">
+      <div>
+        <div class="wt-brand__name">Watchtower</div>
+        <div class="wt-brand__tag">keeping watch</div>
+      </div>
+    </div>
+    <nav class="wt-nav" aria-label="Main">
+      <a class="wt-nav__item is-active" href="dashboard.html" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v5H3z"/></svg><span class="wt-nav__label">Dashboard</span></a>
+      <a class="wt-nav__item" href="dashboard.html#invoices"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6M8 13h8M8 17h5"/></svg><span class="wt-nav__label">Invoices</span></a>
+      <a class="wt-nav__item" href="recurring.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 2l4 4-4 4M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4M21 13v2a3 3 0 0 1-3 3H3"/></svg><span class="wt-nav__label">Recurring</span></a>
+      <a class="wt-nav__item" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/></svg><span class="wt-nav__label">Clients</span></a>
+      <a class="wt-nav__item" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18M8 17V11M13 17V7M18 17v-4"/></svg><span class="wt-nav__label">Reports</span></a>
+      <a class="wt-nav__item" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 2.9-1.2V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0 1.2 2.9H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span class="wt-nav__label">Settings</span></a>
+    </nav>
+    <div class="wt-profile">
+      <span class="wt-profile__avatar" data-bind="owner_initials">MR</span>
+      <div class="wt-profile__text">
+        <div class="wt-profile__name" data-bind="owner_name">Marta Rivera</div>
+        <div class="wt-profile__email" data-bind="owner_email">marta@riverastudio.co</div>
+      </div>
+    </div>
+  </aside>
+
+  <main class="wt-main">
+    <header class="wt-header">
+      <div class="wt-header__text">
+        <p class="wt-eyebrow">Connected</p>
+        <h1 class="wt-h1">You're all set, <em>the watch has begun.</em></h1>
+      </div>
+    </header>
+
+    <section class="wt-card wt-success" aria-labelledby="success-title">
+      <img class="wt-success__mascot" src="lighthouse-transparent.png" alt="">
+      <div><span class="wt-success__badge">Stripe connected</span></div>
+      <h2 class="wt-success__title" id="success-title">Watchtower is <em>on watch.</em></h2>
+      <p class="wt-success__text">Here's what we found in <span data-bind="business_name">Rivera Studio</span>'s Stripe account. Reminders are scheduled; nothing sends without the terms you set.</p>
+
+      <div class="wt-stats">
+        <div class="wt-stat"><div class="wt-stat__value" data-bind="open_invoices">12</div><div class="wt-stat__label">open invoices</div></div>
+        <div class="wt-stat"><div class="wt-stat__value" data-bind="clients">9</div><div class="wt-stat__label">clients</div></div>
+        <!-- Brick only when > 0; otherwise remove wt-stat__value--alert -->
+        <div class="wt-stat"><div class="wt-stat__value wt-stat__value--alert" data-bind="past_due">2</div><div class="wt-stat__label">already past due</div></div>
+      </div>
+
+      <div class="wt-success__actions">
+        <a class="wt-btn wt-btn--primary" href="dashboard.html">Go to dashboard</a>
+        <a class="wt-btn wt-btn--secondary" href="settings.html#late-fee-defaults">Set default late-fee terms</a>
+      </div>
+    </section>
+  </main>
+</div>
+</body>
+</html>

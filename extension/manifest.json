@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "Dunn — invoice watch",
+  "version": "1.0",
+  "description": "See your Dunn payment status at a glance, in any tab.",
+  "permissions": ["sidePanel", "storage"],
+  "host_permissions": ["http://localhost:4000/*", "https://getdunn.org/*", "https://*.getdunn.org/*"],
+  "action": {
+    "default_title": "Dunn — click to open side panel"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  }
+}

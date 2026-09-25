@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard · Watchtower</title>
+<link rel="stylesheet" href="watchtower.css">
+</head>
+<body>
+<!--
+  DASHBOARD
+  Data: GET /invoices, GET /reports/revenue
+  Elements marked data-bind="…" hold one value; replace their text.
+  Lists have a <template> to clone per row. The sample rows show the finished look; delete them when you render real data.
+  Behavior + events: watchtower-ui.js (wt:filter, wt:search, wt:open-invoice, wt:approve-fee, wt:waive-fee)
+-->
+<div class="wt-app">
+  <aside class="wt-sidebar">
+    <div class="wt-brand">
+      <img class="wt-brand__mark" src="lighthouse-transparent.png" alt="">
+      <div>
+        <div class="wt-brand__name">Watchtower</div>
+        <div class="wt-brand__tag">keeping watch</div>
+      </div>
+    </div>
+    <nav class="wt-nav" aria-label="Main">
+      <a class="wt-nav__item is-active" href="dashboard.html" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v5H3z"/></svg><span class="wt-nav__label">Dashboard</span><span class="wt-nav__badge" data-bind="pending_fee_count">2</span></a>
+      <a class="wt-nav__item" href="dashboard.html#invoices"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6M8 13h8M8 17h5"/></svg><span class="wt-nav__label">Invoices</span></a>
+      <a class="wt-nav__item" href="recurring.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 2l4 4-4 4M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4M21 13v2a3 3 0 0 1-3 3H3"/></svg><span class="wt-nav__label">Recurring</span></a>
+      <a class="wt-nav__item" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/></svg><span class="wt-nav__label">Clients</span></a>
+      <a class="wt-nav__item" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18M8 17V11M13 17V7M18 17v-4"/></svg><span class="wt-nav__label">Reports</span></a>
+      <a class="wt-nav__item" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 2.9-1.2V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0 1.2 2.9H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span class="wt-nav__label">Settings</span></a>
+    </nav>
+    <div class="wt-profile">
+      <span class="wt-profile__avatar" data-bind="owner_initials">MR</span>
+      <div class="wt-profile__text">
+        <div class="wt-profile__name" data-bind="owner_name">Marta Rivera</div>
+        <div class="wt-profile__email" data-bind="owner_email">marta@riverastudio.co</div>
+      </div>
+    </div>
+  </aside>
+
+  <main class="wt-main">
+    <header class="wt-header">
+      <div class="wt-header__text">
+        <p class="wt-eyebrow" data-bind="today_long">Tuesday, September 23</p>
+        <!-- Greeting: "Good morning/afternoon/evening, {first_name}."
+             Italic line rules:
+               overdue>0 && due_soon>0 → "{n} overdue, {m} due this week."
+               overdue>0 only          → "{n} overdue, the rest on watch."
+               due_soon>0 only         → "{m} due this week."
+               neither                 → "All quiet tonight." -->
+        <h1 class="wt-h1"><span data-bind="greeting">Good evening, Marta.</span> <em data-bind="status_line">3 overdue, 2 due this week.</em></h1>
+      </div>
+      <!-- Opens your existing invoice form (public/index.html) -->
+      <a class="wt-btn wt-btn--primary wt-btn--header" href="index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Create new invoice</span></a>
+    </header>
+
+    <div class="wt-stack">
+      <!-- KPI CARDS: order is fixed -->
+      <section class="wt-kpis" aria-label="Summary">
+        <article class="wt-card wt-kpi wt-kpi--overdue">
+          <div class="wt-kpi__top"><span class="wt-kpi__label">Overdue</span><span class="wt-pill wt-pill--sm wt-pill--overdue">Watching</span></div>
+          <!-- count of status overdue + fee-applied -->
+          <div class="wt-kpi__value" data-bind="overdue_count">3</div>
+          <div class="wt-kpi__sub"><span data-bind="overdue_total">$5,971</span> owed, incl. fees</div>
+        </article>
+        <article class="wt-card wt-kpi wt-kpi--collected">
+          <div class="wt-kpi__top"><span class="wt-kpi__label">Collected this month</span><span class="wt-pill wt-pill--sm wt-pill--paid" data-bind="month_short">Sep</span></div>
+          <div class="wt-kpi__value" data-bind="collected_this_month">$4,687</div>
+          <div class="wt-kpi__sub"><span data-bind="paid_count_this_month">2</span> invoices paid in <span data-bind="month_long">September</span></div>
+        </article>
+        <article class="wt-card wt-kpi">
+          <div class="wt-kpi__top"><span class="wt-kpi__label">Fee revenue</span><span class="wt-pill wt-pill--sm wt-pill--neutral">Watchtower</span></div>
+          <!-- fees collected + fees billed (approved, unpaid) -->
+          <div class="wt-kpi__value" data-bind="fee_revenue">$245</div>
+          <div class="wt-kpi__sub"><span data-bind="fees_collected">$125</span> collected · <span data-bind="fees_billed">$120</span> billed</div>
+        </article>
+        <article class="wt-card wt-kpi wt-kpi--pending">
+          <div class="wt-kpi__top"><span class="wt-kpi__label">Pending fees</span><span class="wt-pill wt-pill--sm wt-pill--due-soon">Review</span></div>
+          <!-- When 0: value "$0", sub "Nothing to approve", pill "Clear" -->
+          <div class="wt-kpi__value" data-bind="pending_fees_total">$107</div>
+          <div class="wt-kpi__sub"><span data-bind="pending_fee_count">2</span> awaiting your approval</div>
+        </article>
+      </section>
+
+      <!-- PENDING FEES: render only when count > 0.
+           Approve → wt:approve-fee {invoiceId} → your fee engine. On success, remove the row; the invoice becomes status "fee-applied".
+           Waive   → reveals the note field → wt:waive-fee {invoiceId, note}. Send the note with the request. -->
+      <section class="wt-card wt-fees" aria-labelledby="fees-title">
+        <div class="wt-fees__head">
+          <div class="wt-fees__title">
+            <h2 class="wt-h2" id="fees-title">Fees awaiting your approval</h2>
+            <span class="wt-count" data-bind="pending_fee_count">2</span>
+          </div>
+          <p class="wt-caption" style="margin:0">Nothing is charged until you approve.</p>
+        </div>
+        <div data-list="pending_fees">
+      <div class="wt-fees__row" data-invoice-id="WT-2236">
+        <div>
+          <div class="wt-fees__client">Delacroix Media <span>· WT-2236</span></div>
+          <div class="wt-fees__note">9 days late · 7-day grace period passed · flat fee</div>
+        </div>
+        <div class="wt-fees__amount">$75.00</div>
+        <div class="wt-fees__actions">
+          <button class="wt-btn wt-btn--secondary wt-btn--sm" type="button" data-action="waive-fee">Waive</button>
+          <button class="wt-btn wt-btn--primary wt-btn--sm" type="button" data-action="approve-fee">Approve fee</button>
+        </div>
+        <div class="wt-fees__waive">
+          <label class="wt-sr-only" for="waive-WT-2236">Reason for waiving</label>
+          <input class="wt-input" id="waive-WT-2236" type="text" placeholder="Why are you waiving it? (optional — only you see this)">
+          <button class="wt-btn wt-btn--secondary wt-btn--sm" type="button" data-action="cancel-waive">Cancel</button>
+          <button class="wt-btn wt-btn--primary wt-btn--sm" type="button" data-action="confirm-waive">Waive $75.00</button>
+        </div>
+      </div>
+      <div class="wt-fees__row" data-invoice-id="WT-2231">
+        <div>
+          <div class="wt-fees__client">Bramble Bakery <span>· WT-2231</span></div>
+          <div class="wt-fees__note">9 days late · 7-day grace period passed · 5% fee</div>
+        </div>
+        <div class="wt-fees__amount">$32.00</div>
+        <div class="wt-fees__actions">
+          <button class="wt-btn wt-btn--secondary wt-btn--sm" type="button" data-action="waive-fee">Waive</button>
+          <button class="wt-btn wt-btn--primary wt-btn--sm" type="button" data-action="approve-fee">Approve fee</button>
+        </div>
+        <div class="wt-fees__waive">
+          <label class="wt-sr-only" for="waive-WT-2231">Reason for waiving</label>
+          <input class="wt-input" id="waive-WT-2231" type="text" placeholder="Why are you waiving it? (optional — only you see this)">
+          <button class="wt-btn wt-btn--secondary wt-btn--sm" type="button" data-action="cancel-waive">Cancel</button>
+          <button class="wt-btn wt-btn--primary wt-btn--sm" type="button" data-action="confirm-waive">Waive $32.00</button>
+        </div>
+      </div>
+        </div>
+        <template id="tpl-pending-fee">
+      <div class="wt-fees__row" data-invoice-id="{invoice_id}">
+        <div>
+          <div class="wt-fees__client">{client_name} <span>· {invoice_id}</span></div>
+          <div class="wt-fees__note">{days_late} days late · {grace_days}-day grace period passed · {fee_kind}</div>
+        </div>
+        <div class="wt-fees__amount">{fee_amount}</div>
+        <div class="wt-fees__actions">
+          <button class="wt-btn wt-btn--secondary wt-btn--sm" type="button" data-action="waive-fee">Waive</button>
+          <button class="wt-btn wt-btn--primary wt-btn--sm" type="button" data-action="approve-fee">Approve fee</button>
+        </div>
+        <div class="wt-fees__waive">
+          <label class="wt-sr-only" for="waive-{invoice_id}">Reason for waiving</label>
+          <input class="wt-input" id="waive-{invoice_id}" type="text" placeholder="Why are you waiving it? (optional — only you see this)">
+          <button class="wt-btn wt-btn--secondary wt-btn--sm" type="button" data-action="cancel-waive">Cancel</button>
+          <button class="wt-btn wt-btn--primary wt-btn--sm" type="button" data-action="confirm-waive">Waive {fee_amount}</button>
+        </div>
+      </div>
+        </template>
+      </section>
+
+      <!-- INVOICES -->
+      <section class="wt-card wt-invoices" id="invoices" aria-labelledby="inv-title">
+        <div class="wt-card__head">
+          <h2 class="wt-h2" id="inv-title">Recent invoices <span class="wt-h2__count">(<span data-bind="invoice_result_count">8</span>)</span></h2>
+          <div class="wt-toolbar">
+            <div class="wt-filters" role="group" aria-label="Filter by status">
+              <button class="wt-filter is-active" type="button" data-status="all" aria-pressed="true">All <span class="wt-filter__count" data-count="all">8</span></button>
+              <button class="wt-filter" type="button" data-status="overdue" aria-pressed="false">Overdue <span class="wt-filter__count" data-count="overdue">1</span></button>
+              <button class="wt-filter" type="button" data-status="fee-applied" aria-pressed="false">Fee applied <span class="wt-filter__count" data-count="fee-applied">1</span></button>
+              <button class="wt-filter" type="button" data-status="due-soon" aria-pressed="false">Due soon <span class="wt-filter__count" data-count="due-soon">2</span></button>
+              <button class="wt-filter" type="button" data-status="pending" aria-pressed="false">Pending <span class="wt-filter__count" data-count="pending">2</span></button>
+              <button class="wt-filter" type="button" data-status="paid" aria-pressed="false">Paid <span class="wt-filter__count" data-count="paid">2</span></button>
+            </div>
+            <label class="wt-search">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"/></svg>
+              <span class="wt-sr-only">Search invoices</span>
+              <input type="search" data-search placeholder="Search clients or invoice #">
+            </label>
+          </div>
+        </div>
+
+        <!--
+          Status → pill class         Due text → class
+          pending     wt-pill--pending      "in 19 days"        (none)
+          due-soon    wt-pill--due-soon     "in 4 days"         wt-due--soon      (unpaid, due within 7 days)
+          overdue     wt-pill--overdue      "9 days late"       wt-due--late      (past due, no fee applied)
+          fee-applied wt-pill--fee-applied  "22 days late"      wt-due--late      (past due, fee approved)
+          paid        wt-pill--paid         "Paid Sep 12"       wt-due--paid
+          Avatar: wt-avatar--1…5, rotate by row index. Initials = first letters of the first 2 words.
+        -->
+        <div role="table" aria-label="Invoices">
+          <div class="wt-table__head" role="row">
+            <div role="columnheader">Invoice</div><div role="columnheader">Client</div><div role="columnheader">Due</div><div role="columnheader" class="wt-right">Amount</div><div role="columnheader">Status</div>
+          </div>
+          <div data-list="invoices">
+        <div class="wt-table__row" role="row" data-id="WT-2241" tabindex="0">
+          <div class="wt-inv-id" role="cell">WT-2241</div>
+          <div class="wt-client" role="cell">
+            <span class="wt-avatar wt-avatar--1">HV</span>
+            <div class="wt-client__text">
+              <div class="wt-client__name wt-truncate">Harbor &amp; Vine</div>
+              <div class="wt-client__email wt-truncate">dana@harborvine.com</div>
+            </div>
+          </div>
+          <div class="wt-due " role="cell">in 19 days</div>
+          <div class="wt-money-cell" role="cell">$3,240.00</div>
+          <div role="cell"><span class="wt-pill wt-pill--dot wt-pill--pending">Pending</span></div>
+        </div>
+        <div class="wt-table__row" role="row" data-id="WT-2238" tabindex="0">
+          <div class="wt-inv-id" role="cell">WT-2238</div>
+          <div class="wt-client" role="cell">
+            <span class="wt-avatar wt-avatar--2">KF</span>
+            <div class="wt-client__text">
+              <div class="wt-client__name wt-truncate">Kestrel Foods</div>
+              <div class="wt-client__email wt-truncate">ap@kestrelfoods.com</div>
+            </div>
+          </div>
+          <div class="wt-due wt-due--late" role="cell">22 days late</div>
+          <div class="wt-money-cell" role="cell">$2,766.00</div>
+          <div role="cell"><span class="wt-pill wt-pill--dot wt-pill--fee-applied">Fee applied</span></div>
+        </div>
+        <div class="wt-table__row" role="row" data-id="WT-2236" tabindex="0">
+          <div class="wt-inv-id" role="cell">WT-2236</div>
+          <div class="wt-client" role="cell">
+            <span class="wt-avatar wt-avatar--3">DM</span>
+            <div class="wt-client__text">
+              <div class="wt-client__name wt-truncate">Delacroix Media</div>
+              <div class="wt-client__email wt-truncate">finance@delacroix.tv</div>
+            </div>
+          </div>
+          <div class="wt-due wt-due--late" role="cell">9 days late</div>
+          <div class="wt-money-cell" role="cell">$1,425.60</div>
+          <div role="cell"><span class="wt-pill wt-pill--dot wt-pill--overdue">Overdue</span></div>
+        </div>
+        <div class="wt-table__row" role="row" data-id="WT-2233" tabindex="0">
+          <div class="wt-inv-id" role="cell">WT-2233</div>
+          <div class="wt-client" role="cell">
+            <span class="wt-avatar wt-avatar--4">NB</span>
+            <div class="wt-client__text">
+              <div class="wt-client__name wt-truncate">Northline Build</div>
+              <div class="wt-client__email wt-truncate">sam@northline.build</div>
+            </div>
+          </div>
+          <div class="wt-due wt-due--soon" role="cell">in 4 days</div>
+          <div class="wt-money-cell" role="cell">$1,749.60</div>
+          <div role="cell"><span class="wt-pill wt-pill--dot wt-pill--due-soon">Due soon</span></div>
+        </div>
+        <div class="wt-table__row" role="row" data-id="WT-2229" tabindex="0">
+          <div class="wt-inv-id" role="cell">WT-2229</div>
+          <div class="wt-client" role="cell">
+            <span class="wt-avatar wt-avatar--5">OC</span>
+            <div class="wt-client__text">
+              <div class="wt-client__name wt-truncate">Ostergaard Co.</div>
+              <div class="wt-client__email wt-truncate">lena@ostergaard.co</div>
+            </div>
+          </div>
+          <div class="wt-due wt-due--paid" role="cell">Paid Sep 12</div>
+          <div class="wt-money-cell" role="cell">$3,456.00</div>
+          <div role="cell"><span class="wt-pill wt-pill--dot wt-pill--paid">Paid</span></div>
+        </div>
+          </div>
+        </div>
+        <template id="tpl-invoice-row">
+        <div class="wt-table__row" role="row" data-id="{id}" tabindex="0">
+          <div class="wt-inv-id" role="cell">{id}</div>
+          <div class="wt-client" role="cell">
+            <span class="wt-avatar wt-avatar--{1-5}">{initials}</span>
+            <div class="wt-client__text">
+              <div class="wt-client__name wt-truncate">{client_name}</div>
+              <div class="wt-client__email wt-truncate">{client_email}</div>
+            </div>
+          </div>
+          <div class="wt-due {due_class}" role="cell">{due_text}</div>
+          <div class="wt-money-cell" role="cell">{amount_total}</div>
+          <div role="cell"><span class="wt-pill wt-pill--dot {pill_class}">{status_label}</span></div>
+        </div>
+        </template>
+
+        <!-- Show when the filter/search returns nothing -->
+        <div class="wt-empty" data-empty="invoices" hidden>
+          <img src="lighthouse-transparent.png" alt="">
+          <div class="wt-empty__title">Nothing on the horizon.</div>
+          <div class="wt-empty__text">No invoices match that search. <a href="#" data-clear-filters>Clear filters</a></div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+<script src="watchtower-ui.js"></script>
+<script src="api.js"></script>
+</body>
+</html>

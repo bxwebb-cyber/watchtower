@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in — Watchtower</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:ital@0;1&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; height:100%; background:#F3F0E8; font-family:Inter,system-ui,sans-serif; color:#16302E; }
+  .wt-page { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
+  .wt-auth-card { background:#FDFCF8; border-radius:18px; width:100%; max-width:400px; padding:36px 32px 28px; box-shadow:0 20px 60px -16px rgba(15,48,46,.4); }
+  .wt-auth-logo { display:flex; align-items:center; gap:10px; margin-bottom:4px; }
+  .wt-auth-logo img { width:34px; height:34px; mix-blend-mode:multiply; }
+  .wt-auth-logo span { font-family:'Playfair Display',serif; font-size:18px; color:#0F302E; }
+  .wt-auth-title { font-family:'Playfair Display',serif; font-size:24px; font-weight:400; color:#0F302E; margin:20px 0 4px; }
+  .wt-auth-sub { font-size:13.5px; color:#7C8B88; margin:0 0 24px; }
+  .field { margin-bottom:16px; }
+  label { display:block; font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:#8A7A55; margin-bottom:5px; font-weight:600; }
+  input { width:100%; padding:10px 12px; font-size:15px; font-family:inherit; border:1px solid rgba(15,48,46,.18); border-radius:9px; background:#FFFFFF; color:#16302E; outline:none; transition:border-color .15s; height:42px; }
+  input:focus { border-color:#0F302E; box-shadow:0 0 0 2px rgba(15,48,46,.1); }
+  .wt-btn-primary { width:100%; height:44px; border:none; border-radius:10px; font-size:14px; font-weight:600; font-family:inherit; cursor:pointer; transition:all .15s; color:#fff; background:#0F302E; }
+  .wt-btn-primary:hover { background:#164543; transform:translateY(-1px); }
+  .wt-btn-primary:disabled { background:#9AA5A2; cursor:not-allowed; transform:none; }
+  .wt-auth-alt { text-align:center; font-size:13px; color:#7C8B88; margin-top:16px; }
+  .wt-auth-alt a { color:#0F302E; font-weight:500; text-decoration:none; }
+  .wt-auth-alt a:hover { color:#B23A2E; }
+  .wt-auth-error { background:rgba(178,58,46,.07); border:1px solid rgba(178,58,46,.3); border-radius:9px; padding:10px 14px; font-size:13px; color:#B23A2E; margin-bottom:16px; display:none; }
+  .wt-spinner { display:inline-block; width:16px; height:16px; border:2px solid rgba(255,255,255,.3); border-top-color:#fff; border-radius:50%; animation:spin .6s linear; vertical-align:middle; margin-right:6px; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="wt-page">
+<div class="wt-auth-card">
+  <div class="wt-auth-logo">
+    <img src="/lighthouse-transparent.png" alt="">
+    <span>Watchtower</span>
+  </div>
+  <h1 class="wt-auth-title" id="form-title">Sign in</h1>
+  <p class="wt-auth-sub" id="form-sub">Access your dashboard and invoices.</p>
+  <div id="error-box" class="wt-auth-error"></div>
+  <form id="auth-form" novalidate>
+    <div class="field">
+      <label for="email">Email</label>
+      <input type="email" id="email" placeholder="you@business.com" required autofocus>
+    </div>
+    <div class="field">
+      <label for="password">Password</label>
+      <input type="password" id="password" placeholder="Enter your password" required minlength="6">
+    </div>
+    <button type="submit" class="wt-btn-primary" id="submit-btn">Sign in</button>
+  </form>
+  <div class="wt-auth-alt">
+    <span id="toggle-text">Don't have an account?</span>
+    <a href="#" id="toggle-link">Create one</a>
+  </div>
+</div>
+</div>
+<script>
+const form = document.getElementById('auth-form');
+const emailInput = document.getElementById('email');
+const passwordInput = document.getElementById('password');
+const submitBtn = document.getElementById('submit-btn');
+const errorBox = document.getElementById('error-box');
+const formTitle = document.getElementById('form-title');
+const formSub = document.getElementById('form-sub');
+const toggleText = document.getElementById('toggle-text');
+const toggleLink = document.getElementById('toggle-link');
+
+let mode = 'login';
+
+function setMode(m) {
+  mode = m;
+  if (m === 'login') {
+    formTitle.textContent = 'Sign in';
+    formSub.textContent = 'Access your dashboard and invoices.';
+    submitBtn.textContent = 'Sign in';
+    toggleText.textContent = "Don't have an account?";
+    toggleLink.textContent = 'Create one';
+  } else {
+    formTitle.textContent = 'Create account';
+    formSub.textContent = 'Set up your Watchtower dashboard.';
+    submitBtn.textContent = 'Create account';
+    toggleText.textContent = 'Already have an account?';
+    toggleLink.textContent = 'Sign in';
+  }
+  errorBox.style.display = 'none';
+}
+
+toggleLink.addEventListener('click', (e) => {
+  e.preventDefault();
+  setMode(mode === 'login' ? 'signup' : 'login');
+});
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = emailInput.value.trim();
+  const password = passwordInput.value;
+
+  if (!email || !password) {
+    showError('Please fill in both fields.');
+    return;
+  }
+  if (mode === 'signup' && password.length < 6) {
+    showError('Password must be at least 6 characters.');
+    return;
+  }
+
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = '<span class="wt-spinner"></span> ' + (mode === 'login' ? 'Signing in\u2026' : 'Creating account\u2026');
+  errorBox.style.display = 'none';
+
+  try {
+    const res = await fetch('/auth/' + mode, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showError(data.error || 'Something went wrong.');
+      submitBtn.disabled = false;
+      submitBtn.textContent = mode === 'login' ? 'Sign in' : 'Create account';
+      return;
+    }
+
+    // Store token and redirect to dashboard
+    localStorage.setItem('wt_token', data.token);
+    window.location.href = '/dashboard?token=' + encodeURIComponent(data.token);
+  } catch (err) {
+    showError('Could not reach the server. Is it running?');
+    submitBtn.disabled = false;
+    submitBtn.textContent = mode === 'login' ? 'Sign in' : 'Create account';
+  }
+});
+
+function showError(msg) {
+  errorBox.textContent = msg;
+  errorBox.style.display = 'block';
+}
+</script>
+</body>
+</html>
