@@ -1,0 +1,10 @@
+<script>
+(function() {
+  var bar = document.createElement('div');
+  bar.id = 'wt-nav-bar';
+  bar.style.cssText = 'position:fixed;top:16px;right:24px;z-index:9999;display:flex;gap:10px;align-items:center;';
+  bar.innerHTML = '<a href="/login" style="padding:8px 18px;border:1.5px solid #0F302E;border-radius:8px;color:#0F302E;font-size:14px;font-weight:500;text-decoration:none;background:transparent;font-family:Inter,sans-serif;">Sign in</a>' +
+    '<a href="/login" style="padding:8px 18px;border:0;border-radius:8px;color:#fff;font-size:14px;font-weight:500;text-decoration:none;background:#0F302E;font-family:Inter,sans-serif;">Get started</a>';
+  document.body.appendChild(bar);
+})();
+</script>

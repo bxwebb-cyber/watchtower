@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import path from 'path';
+import fs from 'fs';
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import jwt from 'jsonwebtoken';
@@ -73,7 +74,10 @@ app.use('/dashboard', (req: Request, res: Response, _next: NextFunction) => {
 app.use(express.static(path.join(__dirname, '../public')));
 
 app.get('/', (_req, res) => {
-  res.sendFile(path.join(__dirname, '../public/index.html'));
+  const html = fs.readFileSync(path.join(__dirname, '../public/index.html'), 'utf-8');
+  const navScript = '<script>fetch("/nav-overlay.html").then(r=>r.text()).then(t=>{var d=document.createElement("div");d.innerHTML=t;document.body.appendChild(d.firstElementChild)})</script>';
+  const injected = html.replace('</body>', navScript + '</body>');
+  res.type('html').send(injected);
 });
 
 const port = Number(process.env.PORT || 4000);
