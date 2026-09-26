@@ -14,8 +14,12 @@ import { clientsRouter } from './routes/clients';
 import { inboundRouter } from './routes/inbound';
 import { authMiddleware } from './middleware/auth';
 import { apiLimiter } from './middleware/rateLimit';
+import { httpsRedirect } from './middleware/https';
 
 const app = express();
+
+// HTTPS redirect must come before EVERYTHING else in production.
+app.use(httpsRedirect);
 
 const jwtSecret: string = process.env.JWT_SECRET ?? (() => {
   throw new Error('JWT_SECRET environment variable is required');

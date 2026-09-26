@@ -179,5 +179,5 @@ export function authRouter() {
 }
 
 function issueToken(accountId: string): string {
-  return jwt.sign({ accountId }, jwtSecret, { expiresIn: '7d' }) as unknown as string;
+  return jwt.sign({ accountId }, jwtSecret, { expiresIn: '7d' });
 }
