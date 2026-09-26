@@ -74,10 +74,12 @@ app.use('/dashboard', (req: Request, res: Response, _next: NextFunction) => {
 app.use(express.static(path.join(__dirname, '../public')));
 
 app.get('/', (_req, res) => {
-  const html = fs.readFileSync(path.join(__dirname, '../public/index.html'), 'utf-8');
-  const navScript = '<script>fetch("/nav-overlay.html").then(r=>r.text()).then(t=>{var d=document.createElement("div");d.innerHTML=t;document.body.appendChild(d.firstElementChild)})</script>';
-  const injected = html.replace('</body>', navScript + '</body>');
-  res.type('html').send(injected);
+  res.sendFile(path.join(__dirname, '../public/landing.html'));
+});
+
+// Demo dashboard (sample data, no API calls).
+app.get('/demo', (_req, res) => {
+  res.sendFile(path.join(__dirname, '../public/demo.html'));
 });
 
 const port = Number(process.env.PORT || 4000);
