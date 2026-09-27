@@ -192,8 +192,10 @@ form.addEventListener('submit', async (e) => {
       return;
     }
 
-    // Session is held in an http-only cookie now; go straight to the dashboard.
-    window.location.href = '/dashboard';
+    // Session is held in an http-only cookie now.
+    // New signups go through onboarding (connect Stripe + set default fee);
+    // returning users go straight to the dashboard.
+    window.location.href = mode === 'signup' ? '/onboarding' : '/dashboard';
   } catch (err) {
     showError('Could not reach the server. Is it running?');
     submitBtn.disabled = false;

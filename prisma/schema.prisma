@@ -155,6 +155,10 @@ model Settings {
   alertFeeApproval Boolean @default(true)  // a late fee needs my approval
   alertOverdue     Boolean @default(true)  // an invoice goes overdue
   alertPayment     Boolean @default(false) // a client pays
+  // Default late-fee terms — prefill the invoice form + recurring templates.
+  defaultFeeKind   String  @default("none") // "none" | "flat" | "percent"
+  defaultFeeAmount Float   @default(0)      // flat: dollars; percent: 0-100
+  defaultGraceDays Int     @default(7)      // days after due before the fee applies
   createdAt    DateTime @default(now())
 }
 

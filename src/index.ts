@@ -84,6 +84,11 @@ app.get('/demo', (_req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, '../public/demo.html'));
 });
 
+// First-run onboarding (connect Stripe + set default late-fee terms).
+app.get('/onboarding', (_req: Request, res: Response) => {
+  res.sendFile(path.join(__dirname, '../public/onboarding.html'));
+});
+
 app.use(express.static(path.join(__dirname, '../public')));
 
 const port = Number(process.env.PORT || 4000);

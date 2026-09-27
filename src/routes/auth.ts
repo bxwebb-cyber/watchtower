@@ -80,18 +80,7 @@ export function authRouter() {
 
       setAuthCookie(res, issueToken(accountId!));
 
-      // Onboarding success screen — the counts the design §3.8 needs.
-      const [openInvoices, clientCount, pastDue] = await Promise.all([
-        prisma.invoice.count({ where: { accountId: accountId!, status: 'open' } }),
-        prisma.client.count({ where: { accountId: accountId! } }),
-        prisma.invoice.count({
-          where: { accountId: accountId!, status: 'open', dueDate: { lt: new Date() } },
-        }),
-      ]);
-
-      res.redirect(
-        `/onboarding-success.html?open_invoices=${openInvoices}&clients=${clientCount}&past_due=${pastDue}`
-      );
+      res.redirect('/onboarding?connected=1');
     } catch (err: any) {
       console.error('Stripe OAuth error:', err);
       res.status(500).send('Stripe connection failed. Please try again.');

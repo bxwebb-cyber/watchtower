@@ -26,7 +26,10 @@ settingsRouter.get('/', async (req, res) => {
     alertOverdue: settings.alertOverdue,
     alertPayment: settings.alertPayment,
     businessName: account.businessName,
-    stripeConnected: true,
+    stripeConnected: !!account.stripeAccountId && !account.stripeAccountId.startsWith('pending_'),
+    defaultFeeKind: settings.defaultFeeKind,
+    defaultFeeAmount: settings.defaultFeeAmount,
+    defaultGraceDays: settings.defaultGraceDays,
   });
 });
 
@@ -49,6 +52,9 @@ settingsRouter.put('/', async (req, res) => {
   if (req.body.alertFeeApproval !== undefined) data.alertFeeApproval = Boolean(req.body.alertFeeApproval);
   if (req.body.alertOverdue !== undefined) data.alertOverdue = Boolean(req.body.alertOverdue);
   if (req.body.alertPayment !== undefined) data.alertPayment = Boolean(req.body.alertPayment);
+  if (req.body.defaultFeeKind !== undefined) data.defaultFeeKind = String(req.body.defaultFeeKind);
+  if (req.body.defaultFeeAmount !== undefined) data.defaultFeeAmount = Number(req.body.defaultFeeAmount);
+  if (req.body.defaultGraceDays !== undefined) data.defaultGraceDays = Number(req.body.defaultGraceDays);
 
   const settings = await prisma.settings.upsert({
     where: { accountId: account.id },
@@ -62,6 +68,9 @@ settingsRouter.put('/', async (req, res) => {
     alertFeeApproval: settings.alertFeeApproval,
     alertOverdue: settings.alertOverdue,
     alertPayment: settings.alertPayment,
+    defaultFeeKind: settings.defaultFeeKind,
+    defaultFeeAmount: settings.defaultFeeAmount,
+    defaultGraceDays: settings.defaultGraceDays,
   });
 });
 
@@ -72,5 +81,6 @@ settingsRouter.get('/status', async (req, res) => {
     connected: !!account,
     businessName: account?.businessName ?? null,
     stripeAccountId: account?.stripeAccountId ?? null,
+    stripeConnected: !!account?.stripeAccountId && !account.stripeAccountId.startsWith('pending_'),
   });
 });
