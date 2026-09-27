@@ -2,6 +2,7 @@
    Toggles classes and fires CustomEvents. Listen for the events and call your API from there.
 
    Events (all bubble from document):
+     wt:view          { view }                   sidebar view changed (dashboard | invoices | recurring | clients | reports | settings)
      wt:filter        { status }                 invoice filter tab clicked ("all" | "overdue" | "fee-applied" | "due-soon" | "pending" | "paid")
      wt:search        { query }                  invoice search input (debounced 200ms)
      wt:open-invoice  { id }                     invoice row clicked
@@ -11,6 +12,8 @@
      wt:recurring-edit   { id }                  Edit clicked (open the modal and fill it from your data)
      wt:recurring-delete { id }                  Delete confirmed
      wt:recurring-save   { data }                Recurring form submitted (plain object of the form fields)
+     wt:report-month  { month }                  reports.html: month picked ("YYYY-MM")
+     wt:settings-save { data }                   settings.html: form submitted
 */
 (function () {
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
@@ -149,4 +152,18 @@
   });
 
   $$('.wt-fee-panel').forEach(syncFeePanel);
+
+  /* ---------- Views (one-file dashboard, hash routing) ---------- */
+  const VIEWS = ['dashboard', 'invoices', 'recurring', 'clients', 'reports', 'settings'];
+  function showView() {
+    if (!document.querySelector('[data-views]')) return;
+    const h = location.hash.slice(1);
+    const view = VIEWS.includes(h) ? h : 'dashboard';
+    $$('[data-views]').forEach(el => { el.hidden = !el.dataset.views.split(' ').includes(view); });
+    $$('[data-nav]').forEach(a => { const on = a.dataset.nav === view; a.classList.toggle('is-active', on); if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+    window.scrollTo(0, 0);
+    emit('wt:view', { view });
+  }
+  window.addEventListener('hashchange', showView);
+  showView();
 })();

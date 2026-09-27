@@ -1,264 +1,473 @@
-// Watchtower API connector — binds data to the UI and handles custom events.
-// Load after watchtower-ui.js on every page.
+// Watchtower API connector — binds backend data to the designer's dashboard markup.
+// Loaded after watchtower-ui.js. The UI fires wt:* events and this file does the real API work.
 
 const API_BASE = '';
 
 async function api(method, path, body) {
-  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  const opts = { method, headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin' };
   if (body) opts.body = JSON.stringify(body);
   const res = await fetch(API_BASE + path, opts);
+  if (res.status === 401) { window.location.href = '/'; throw new Error('Not signed in.'); }
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(err.error || `HTTP ${res.status}`);
+    const e = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(e.error || ('HTTP ' + res.status));
   }
-  return res.json();
+  const ct = res.headers.get('content-type') || '';
+  return ct.includes('json') ? res.json() : res.text();
 }
 
-// Fill all [data-bind] elements with values from a map.
+function money(cents) { return '$' + ((cents || 0) / 100).toFixed(2); }
+
+// Fill every [data-bind] element with a mapped value.
 function bind(data) {
   document.querySelectorAll('[data-bind]').forEach(el => {
     const key = el.getAttribute('data-bind');
-    if (key in data) {
-      el.textContent = data[key];
-    }
+    if (key in data) el.textContent = data[key];
   });
 }
 
-// Render a data-list: clone the template for each item, replace {placeholders}, delete samples.
-function renderList(listName, items, renderFn) {
-  const container = document.querySelector(`[data-list="${listName}"]`);
-  if (!container) return;
-  const tpl = document.getElementById(`tpl-${listName}`);
-  if (!tpl) return;
-  // Remove sample rows (non-template children)
-  Array.from(container.children).forEach(child => {
-    if (child !== tpl) child.remove();
-  });
-  for (const item of items) {
-    const clone = tpl.content.cloneNode(true);
-    renderFn(clone, item);
+// Replace {placeholder} tokens inside a cloned <template> element.
+function fillTpl(clone, map) {
+  clone.innerHTML = clone.innerHTML.replace(/\{([a-z_0-9]+)\}/g, (m, k) => (k in map ? map[k] : ''));
+}
+
+// Render a <template> per item into a [data-list] container.
+function renderList(listName, items, mapFn) {
+  const container = document.querySelector('[data-list="' + listName + '"]');
+  const tpl = document.getElementById('tpl-' + listName);
+  if (!container || !tpl) return;
+  Array.from(container.children).forEach(c => { if (c !== tpl) c.remove(); });
+  items.forEach((item, i) => {
+    const clone = tpl.content.firstElementChild.cloneNode(true);
+    fillTpl(clone, mapFn(item, i) || {});
     container.appendChild(clone);
-  }
+  });
+  const empty = document.querySelector('[data-empty="' + listName + '"]');
+  if (empty) empty.hidden = items.length > 0;
 }
 
-// --- Dashboard ---
+function initials(name) {
+  if (!name) return '—';
+  const parts = name.trim().split(/\s+/).slice(0, 2);
+  return parts.map(p => p[0]).join('').toUpperCase();
+}
+
+// ---- Invoice status model (designer §3.3) ----
+// pending · due-soon · overdue · fee-applied · paid
+function invoiceStatus(inv, now) {
+  if (inv.status === 'paid') {
+    return { key: 'paid', pill: 'wt-pill--paid', label: 'Paid', dueClass: '', dueText: inv.paidAt ? 'Paid ' + new Date(inv.paidAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Paid' };
+  }
+  if (inv.feeApplied) {
+    return { key: 'fee-applied', pill: 'wt-pill--fee-applied', label: 'Fee applied', dueClass: 'wt-due--late', dueText: '' };
+  }
+  const due = new Date(inv.due + 'T00:00:00');
+  const days = Math.round((due.getTime() - now.getTime()) / 86400000);
+  if (days < 0) {
+    return { key: 'overdue', pill: 'wt-pill--overdue', label: 'Overdue', dueClass: 'wt-due--late', dueText: Math.abs(days) + ' days late' };
+  }
+  if (days <= 7) {
+    return { key: 'due-soon', pill: 'wt-pill--due-soon', label: 'Due soon', dueClass: 'wt-due--soon', dueText: days === 0 ? 'due today' : 'in ' + days + ' day' + (days === 1 ? '' : 's') };
+  }
+  return { key: 'pending', pill: 'wt-pill--pending', label: 'Pending', dueClass: '', dueText: 'in ' + days + ' days' };
+}
+
+// ---- Shared: invoices (dashboard + invoices views) ----
+let state = { invoices: [], filter: 'all', query: '' };
+
+function renderInvoices() {
+  const now = new Date();
+  const list = state.invoices.filter(inv => {
+    if (state.filter !== 'all') {
+      const s = invoiceStatus(inv, now);
+      if (state.filter === 'fee-applied' && s.key !== 'fee-applied') return false;
+      if (state.filter !== 'fee-applied' && s.key !== state.filter) return false;
+    }
+    if (state.query) {
+      const hay = ((inv.client || '') + ' ' + (inv.id || '') + ' ' + (inv.stripeNumber || '') + ' ' + (inv.clientEmail || '')).toLowerCase();
+      if (!hay.includes(state.query.toLowerCase())) return false;
+    }
+    return true;
+  });
+
+  renderList('invoices', list, (inv, i) => {
+    const s = invoiceStatus(inv, now);
+    return {
+      id: inv.stripeNumber || inv.id,
+      avatar: String((i % 5) + 1),
+      initials: initials(inv.client),
+      client_name: inv.client || '—',
+      client_email: inv.clientEmail || '',
+      due_class: s.dueClass,
+      due_text: _dueText(inv, s),
+      amount_total: inv.amount,
+      pill_class: s.pill,
+      status_label: s.label,
+    };
+  });
+
+  // Update the filter counts
+  document.querySelectorAll('.wt-filter').forEach(btn => {
+    const status = btn.dataset.status;
+    const countEl = btn.querySelector('[data-count="' + status + '"]');
+    if (!countEl) return;
+    const n = state.invoices.filter(inv => {
+      const s = invoiceStatus(inv, now);
+      return status === 'all' ? true : s.key === status;
+    }).length;
+    countEl.textContent = String(n);
+  });
+}
+
+function _dueText(inv, s) {
+  if (inv.status === 'paid') return s.dueText;
+  const due = new Date(inv.due + 'T00:00:00');
+  const days = Math.round((due.getTime() - Date.now()) / 86400000);
+  if (inv.feeApplied) return Math.abs(days) + ' days late';
+  return s.dueText;
+}
+
+// ---- Dashboard ----
 async function loadDashboard() {
-  const [reports, invoicesData, settings] = await Promise.all([
-    api('GET', '/reports/revenue'),
+  const [invData, reports, settings] = await Promise.all([
     api('GET', '/invoices'),
+    api('GET', '/reports/revenue'),
     api('GET', '/settings').catch(() => ({})),
   ]);
+  state.invoices = invData.invoices || [];
 
-  const invoices = invoicesData.invoices || [];
   const now = new Date();
-  const todayStr = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-  const hour = now.getHours();
-  const period = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
-  const ownerName = settings.owner_name || 'there';
-  const firstName = ownerName.split(/\s+/)[0] || 'there';
+  const period = now.getHours() < 12 ? 'morning' : now.getHours() < 17 ? 'afternoon' : 'evening';
+  const bizName = settings.businessName || 'there';
 
-  // Compute statuses
-  const overdue = invoices.filter(i => i.status === 'open' && new Date(i.due) < now && !i.feeApplied);
-  const dueSoon = invoices.filter(i => {
-    if (i.status !== 'open') return false;
+  const overdue = state.invoices.filter(i => i.status !== 'paid' && new Date(i.due) < now && !i.feeApplied);
+  const feeApplied = state.invoices.filter(i => i.status !== 'paid' && i.feeApplied);
+  const dueSoon = state.invoices.filter(i => {
+    if (i.status === 'paid') return false;
     const d = new Date(i.due);
     return d >= now && d <= new Date(now.getTime() + 7 * 86400000);
   });
-  const feeApplied = invoices.filter(i => i.feeApplied && i.status === 'open');
-  const pendingFees = invoices.filter(i => i.feeStatus === 'open');
+  const pendingFees = state.invoices.filter(i => i.feeStatus === 'open');
 
   let statusLine;
-  if (overdue.length > 0 && dueSoon.length > 0) statusLine = `${overdue.length} overdue, ${dueSoon.length} due this week.`;
-  else if (overdue.length > 0) statusLine = `${overdue.length} overdue, the rest on watch.`;
-  else if (dueSoon.length > 0) statusLine = `${dueSoon.length} due this week.`;
+  if (overdue.length && dueSoon.length) statusLine = overdue.length + ' overdue, ' + dueSoon.length + ' due this week.';
+  else if (overdue.length) statusLine = overdue.length + ' overdue, the rest on watch.';
+  else if (dueSoon.length) statusLine = dueSoon.length + ' due this week.';
   else statusLine = 'All quiet tonight.';
 
-  const monthShort = now.toLocaleDateString('en-US', { month: 'short' });
-  const monthLong = now.toLocaleDateString('en-US', { month: 'long' });
+  const overdueCents = overdue.concat(feeApplied).reduce((s, i) => s + (i.amountCents || 0), 0);
+  const sum = reports.summary || {};
+  const feesBilled = state.invoices.filter(i => i.feeStatus === 'open').reduce((s, i) => s + (i.feeAmountCents || 0), 0);
 
   bind({
-    today_long: todayStr,
-    greeting: `Good ${period}, ${firstName}.`,
+    today_long: now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }),
+    greeting: 'Good ' + period + '.',
     status_line: statusLine,
     overdue_count: overdue.length + feeApplied.length,
-    overdue_total: `$${(overdue.reduce((s, i) => s + i.amount_cents, 0) + feeApplied.reduce((s, i) => s + i.amount_cents, 0)) / 100}`,
-    collected_this_month: reports.moneyIn || '$0',
-    paid_count_this_month: reports.invoiceCount || '0',
-    month_short: monthShort,
-    month_long: monthLong,
-    fee_revenue: reports.feeRevenue || '$0',
-    fees_collected: reports.feeRevenue || '$0',
-    fees_billed: '$0',
-    pending_fees_total: `$${(pendingFees.reduce((s, i) => s + i.feeAmountCents, 0) / 100).toFixed(2)}`,
+    overdue_total: money(overdueCents),
+    collected_this_month: money(sum.moneyInCents || 0),
+    paid_count_this_month: String(sum.invoicesPaid || 0),
+    month_short: now.toLocaleDateString('en-US', { month: 'short' }),
+    month_long: now.toLocaleDateString('en-US', { month: 'long' }),
+    fee_revenue: money(sum.feeRevenueCents || 0),
+    fees_collected: money(sum.feeRevenueCents || 0),
+    fees_billed: money(feesBilled),
+    pending_fees_total: money(pendingFees.reduce((s, i) => s + (i.feeAmountCents || 0), 0)),
     pending_fee_count: pendingFees.length,
-    owner_name: ownerName,
+    owner_name: bizName,
     owner_email: settings.ownerEmail || '',
-    owner_initials: (firstName[0] + (ownerName.split(/\s+/)[1]?.[0] || '')).toUpperCase(),
+    owner_initials: initials(bizName),
   });
 
-  // Invoice list
-  renderList('invoices', invoices, (clone, inv) => {
-    const due = new Date(inv.due);
-    const nowMs = now.getTime();
-    const diffDays = Math.round((due.getTime() - nowMs) / 86400000);
-    let dueText, statusClass, statusText;
-    if (inv.status === 'paid') {
-      dueText = `Paid ${inv.paidAt ? new Date(inv.paidAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}`;
-      statusClass = 'wt-pill--paid';
-      statusText = 'Paid';
-    } else if (inv.feeApplied) {
-      dueText = `${diffDays >= 0 ? 'in ' : ''}${Math.abs(diffDays)} days`;
-      statusClass = 'wt-pill--fee-applied';
-      statusText = 'Fee applied';
-    } else if (diffDays < 0) {
-      dueText = `${Math.abs(diffDays)} days late`;
-      statusClass = 'wt-pill--overdue';
-      statusText = 'Overdue';
-    } else if (diffDays <= 7) {
-      dueText = `in ${diffDays} day${diffDays === 1 ? '' : 's'}`;
-      statusClass = 'wt-pill--due-soon';
-      statusText = 'Due soon';
-    } else {
-      dueText = `in ${diffDays} days`;
-      statusClass = 'wt-pill--pending';
-      statusText = 'Pending';
-    }
+  renderInvoices();
 
-    clone.querySelector('[data-field="id"]').textContent = inv.id;
-    clone.querySelector('[data-field="client"]').textContent = inv.client || '—';
-    clone.querySelector('[data-field="due"]').textContent = dueText;
-    clone.querySelector('[data-field="amount"]').textContent = inv.amount;
-    const pill = clone.querySelector('.wt-pill');
-    pill.className = `wt-pill ${statusClass}`;
-    pill.textContent = statusText;
-    clone.querySelector('[data-field="invoice-id"]').value = inv.id;
-  });
-
-  // Pending fees
-  renderList('pending_fees', pendingFees, (clone, inv) => {
-    clone.querySelector('[data-field="client"]').textContent = inv.client || '—';
-    clone.querySelector('[data-field="invoice-link"]').textContent = inv.id;
-    clone.querySelector('[data-field="fee-reason"]').textContent = '7-day grace period passed';
-    clone.querySelector('[data-field="fee-amount"]').textContent = inv.fee || '$0';
-    const row = clone.querySelector('.wt-fees__row');
-    if (row) row.dataset.invoiceId = inv.id;
+  renderList('pending_fees', pendingFees, (inv) => {
+    const days = Math.round((new Date(inv.due).getTime() - Date.now()) / 86400000);
+    const feeKindLabel = inv.feeKind === 'percent' ? 'percentage fee' : inv.feeKind === 'flat' ? 'flat fee' : 'no fee';
+    return {
+      invoice_id: inv.stripeNumber || inv.id,
+      client_name: inv.client || '—',
+      days_late: Math.abs(days),
+      grace_days: inv.graceDays || 7,
+      fee_kind: feeKindLabel,
+      fee_amount: inv.feeKind === 'percent' ? (inv.feeAmountCents ? (inv.feeAmountCents / (inv.amountCents || 1) * 100).toFixed(0) + '%' : '0%') : money(inv.feeAmountCents || 0),
+    };
   });
 }
 
-// --- Recurring invoices ---
+// ---- Recurring ----
 async function loadRecurring() {
-  const data = await api('GET', '/templates');
+  const data = await api('GET', '/templates').catch(() => ({ templates: [] }));
   const templates = data.templates || [];
+  bind({ recurring_count: templates.length });
+  renderList('recurring', templates, (t) => {
+    const freq = t.frequency === 'monthly' ? 'Monthly' : t.frequency === 'weekly' ? 'Weekly' : t.frequency === 'biweekly' ? 'Every 2 weeks' : ('Monthly, ' + (t.customDay || '') + (t.customDay === 1 ? 'st' : t.customDay === 2 ? 'nd' : t.customDay === 3 ? 'rd' : 'th'));
+    const feeLabel = t.feeKind === 'none' ? 'No late fee' : t.feeKind === 'percent' ? (t.feeAmount + '% late fee') : ('$' + t.feeAmount + ' late fee');
+    return {
+      id: t.id,
+      client_name: t.clientName,
+      amount: money(t.amount),
+      fee_label: feeLabel,
+      frequency_label: freq,
+      schedule_sub: t.active ? ('Next ' + new Date(t.nextRunDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })) : 'Paused',
+      last_run_date: t.lastRunAt ? new Date(t.lastRunAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'None yet',
+      result_class: !t.lastRunAt ? 'wt-result--none' : (t.lastRunOk ? 'wt-result--sent' : 'wt-result--failed'),
+      result_label: !t.lastRunAt ? '' : (t.lastRunOk ? 'Sent' : 'Failed, will retry'),
+      sent_count: t.sentCount || 0,
+      status_label: t.active ? 'Active' : 'Paused',
+    };
+  });
 
-  renderList('recurring', templates, (clone, t) => {
-    clone.querySelector('[data-field="client"]').textContent = t.clientName;
-    clone.querySelector('[data-field="amount-fee"]').textContent = `$${(t.amount / 100).toFixed(2)} · ${t.feeKind === 'none' ? 'No late fee' : `${t.feeKind === 'flat' ? '$' : ''}${t.feeAmount}${t.feeKind === 'percent' ? '%' : ''} late fee`}`;
-    clone.querySelector('[data-field="schedule"]').textContent = `${t.frequency === 'monthly' ? 'Monthly' : t.frequency === 'weekly' ? 'Weekly' : t.frequency === 'biweekly' ? 'Every 2 weeks' : `Monthly, ${t.customDay || ''}th`} · Next ${new Date(t.nextRunDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
-    clone.querySelector('[data-field="last-invoice"]').textContent = t.lastRunAt ? `${new Date(t.lastRunAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · ${t.lastRunOk ? 'Sent' : 'Failed, will retry'}` : 'None yet';
-    const statusPill = clone.querySelector('[data-field="status"]');
-    if (t.active) {
-      statusPill.className = 'wt-pill wt-pill--paid';
-      statusPill.textContent = 'Active';
-    } else {
-      statusPill.className = 'wt-pill wt-pill--paused';
-      statusPill.textContent = 'Paused';
-    }
-    clone.querySelector('[data-field="edit"]').dataset.id = t.id;
-    clone.querySelector('[data-field="toggle"]').dataset.id = t.id;
-    clone.querySelector('[data-field="delete"]').dataset.id = t.id;
-    const item = clone.querySelector('.wt-recurring__item');
-    if (item) item.dataset.id = t.id;
+  // Apply paused dimming to rendered rows (watchtower-ui.js handles the rest).
+  document.querySelectorAll('[data-list="recurring"] .wt-recurring__item').forEach(row => {
+    const id = row.dataset.id;
+    const t = templates.find(x => x.id === id);
+    if (t && !t.active) row.classList.add('is-paused');
   });
 }
 
-// --- Event handlers ---
-document.addEventListener('wt:approve-fee', async e => {
-  try {
-    await api('POST', `/invoices/${e.detail.invoiceId}/fee/approve`);
-    loadDashboard();
-  } catch (err) {
-    alert('Approve failed: ' + err.message);
+// ---- Clients ----
+async function loadClients() {
+  const data = await api('GET', '/clients').catch(() => ({ clients: [] }));
+  const rows = (data.clients || []).sort((a, b) => b.lateRatio - a.lateRatio);
+  renderList('clients', rows, (c, i) => {
+    const tone = c.lateRatio >= 50 ? 'high' : c.lateRatio >= 20 ? 'mid' : 'low';
+    return {
+      avatar: String((i % 5) + 1),
+      initials: initials(c.name),
+      client_name: c.name,
+      client_sub: 'Client since ' + (c.clientSinceYear || '—'),
+      late_class: tone,
+      late_pct: String(c.lateRatio),
+      late_count: c.lateCount,
+      invoice_count: c.totalInvoices,
+      avg_days_late: c.avgDaysLate,
+      fees_paid: money(c.feesPaidCents),
+      open_balance: money(c.openBalanceCents),
+    };
+  });
+}
+
+// ---- Reports ----
+async function loadReports(month) {
+  const yyyymm = month || new Date().toISOString().slice(0, 7);
+  const data = await api('GET', '/reports/revenue?month=' + yyyymm + '&months=12').catch(() => ({}));
+  const s = data.summary || {};
+  const trend = data.trend || [];
+
+  // delta vs previous month
+  let delta = '';
+  if (trend.length >= 2) {
+    const cur = trend[trend.length - 1], prev = trend[trend.length - 2];
+    if (prev.totalCents > 0) {
+      const pct = Math.round((cur.totalCents - prev.totalCents) / prev.totalCents * 100);
+      const prevLabel = (prev.label || '').split(' ')[0];
+      delta = (pct >= 0 ? '↑ ' : '↓ ') + Math.abs(pct) + '% vs ' + prevLabel;
+    }
   }
+  const feeShare = s.totalCollectedCents > 0 ? (s.feeRevenueCents / s.totalCollectedCents * 100).toFixed(1) : '0.0';
+  const shareNote = (s.feeRevenueCents || 0) > 0 ? ('Late fees were ' + feeShare + '% of what came in.') : 'No late fees this month.';
+
+  // fees collected count from the current trend month
+  let feeCount = 0;
+  if (trend.length) feeCount = trend[trend.length - 1].feeCount || 0;
+
+  bind({
+    invoice_revenue: money(s.moneyInCents || 0),
+    fee_revenue: money(s.feeRevenueCents || 0),
+    total_collected: money(s.totalCollectedCents || 0),
+    delta: delta,
+    share_note: shareNote,
+    invoices_paid_count: String(s.invoicesPaid || 0),
+    fees_collected_count: String(feeCount),
+    fees_waived_amount: money(s.feesWaivedCents || 0),
+  });
+
+  renderTrend(trend);
+}
+
+function renderTrend(trend) {
+  const bars = document.querySelector('.wt-bars');
+  const labels = document.querySelector('.wt-bar-labels');
+  const select = document.querySelector('[data-report-month]');
+  if (!bars || !labels) return;
+  if (!trend.length) { bars.innerHTML = ''; labels.innerHTML = ''; return; }
+
+  const max = Math.max.apply(null, trend.map(t => t.totalCents).concat([1]));
+  const monthLabels = ['O','N','D','J','F','M','A','M','J','J','A','S'];
+  const currentMonth = new Date().getMonth();
+
+  bars.innerHTML = trend.map((t, i) => {
+    const invH = max ? (t.moneyInCents / max * 100).toFixed(1) : 0;
+    const feeH = max ? (t.feeRevenueCents / max * 100).toFixed(1) : 0;
+    const sel = t.month === trend[trend.length - 1].month ? ' is-selected' : '';
+    return '<button class="wt-bar' + sel + '" type="button" data-month="' + t.month + '" title="' + t.label + ': ' + money(t.moneyInCents) + ' + ' + money(t.feeRevenueCents) + ' fees"><span class="wt-bar__fee" style="height:' + feeH + '%"></span><span class="wt-bar__inv" style="height:' + invH + '%"></span></button>';
+  }).join('');
+
+  labels.innerHTML = trend.map(t => {
+    const d = new Date(t.month + '-01');
+    const letter = d.toLocaleDateString('en-US', { month: 'short' })[0];
+    const sel = t.month === trend[trend.length - 1].month ? ' is-selected' : '';
+    return '<span class="' + sel + '">' + letter + '</span>';
+  }).join('');
+
+  if (select) {
+    select.innerHTML = trend.slice().reverse().map(t => '<option value="' + t.month + '"' + (t.month === trend[trend.length - 1].month ? ' selected' : '') + '>' + t.label + '</option>').join('');
+  }
+}
+
+// ---- Settings ----
+async function loadSettings() {
+  const [settings, status] = await Promise.all([
+    api('GET', '/settings').catch(() => ({})),
+    api('GET', '/settings/status').catch(() => ({})),
+  ]);
+
+  const form = document.querySelector('[data-settings-form]');
+  if (form) {
+    form.querySelector('[name="owner_email"]').value = settings.ownerEmail || '';
+    form.querySelector('[name="alert_approve"]').checked = settings.alertFeeApproval !== false;
+    form.querySelector('[name="alert_overdue"]').checked = settings.alertOverdue !== false;
+    form.querySelector('[name="alert_paid"]').checked = !!settings.alertPayment;
+
+    // default fee terms
+    const feeKind = settings.defaultFeeKind === 'percent' ? 'pct' : (settings.defaultFeeKind === 'flat' ? 'flat' : 'none');
+    form.querySelector('[name="grace_days"]').value = settings.defaultGraceDays != null ? settings.defaultGraceDays : 7;
+    setFeeOption(form, feeKind);
+    if (feeKind === 'flat') form.querySelector('[name="fee_flat"]').value = settings.defaultFeeAmount || '';
+    if (feeKind === 'pct') form.querySelector('[name="fee_pct"]').value = settings.defaultFeeAmount || '';
+  }
+
+  // Stripe connection state
+  const connected = status.stripeConnected;
+  const accountId = status.stripeAccountId || '';
+  const shortId = accountId.startsWith('acct_') ? accountId.slice(0, 9) + '…' + accountId.slice(-3) : accountId;
+  bind({
+    stripe_account_name: settings.businessName || 'Stripe account',
+    stripe_account_id: shortId,
+  });
+  document.querySelectorAll('[data-stripe]').forEach(el => {
+    const want = el.getAttribute('data-stripe');
+    el.hidden = (want === 'connected') !== connected;
+  });
+
+  // Plan
+  const plan = settings.plan || 'solo';
+  bind({
+    plan_label: plan === 'business' ? 'Unlimited invoices · $59' : 'Up to 10 invoices / month · $39',
+    plan_usage: plan === 'business' ? 'Unlimited invoices' : 'Usage tracked on your next invoice',
+  });
+}
+
+function setFeeOption(form, kind) {
+  form.querySelectorAll('[data-fee]').forEach(b => {
+    const on = b.getAttribute('data-fee') === kind;
+    b.classList.toggle('is-selected', on);
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+  form.querySelectorAll('[data-fee-input]').forEach(inp => {
+    inp.hidden = inp.getAttribute('data-fee-input') !== kind;
+  });
+}
+
+// ---- Event handlers ----
+document.addEventListener('wt:view', e => {
+  const view = e.detail.view;
+  if (view === 'dashboard' || view === 'invoices') loadDashboard();
+  else if (view === 'recurring') loadRecurring();
+  else if (view === 'clients') loadClients();
+  else if (view === 'reports') loadReports();
+  else if (view === 'settings') loadSettings();
 });
 
+document.addEventListener('wt:filter', e => { state.filter = e.detail.status; renderInvoices(); });
+document.addEventListener('wt:search', e => { state.query = e.detail.query; renderInvoices(); });
+
+document.addEventListener('wt:approve-fee', async e => {
+  try { await api('POST', '/invoices/' + e.detail.invoiceId + '/fee/approve'); }
+  catch (err) { alert('Approve failed: ' + err.message); return; }
+  loadDashboard();
+});
 document.addEventListener('wt:waive-fee', async e => {
-  try {
-    await api('POST', `/invoices/${e.detail.invoiceId}/waive`, { note: e.detail.note || '' });
-    loadDashboard();
-  } catch (err) {
-    alert('Waive failed: ' + err.message);
-  }
+  try { await api('POST', '/invoices/' + e.detail.invoiceId + '/waive', { note: e.detail.note || '' }); }
+  catch (err) { alert('Waive failed: ' + err.message); return; }
+  loadDashboard();
 });
 
 document.addEventListener('wt:recurring-save', async e => {
   const d = e.detail.data;
+  const feeKind = d.fee_type === 'pct' ? 'percent' : (d.fee_type === 'flat' ? 'flat' : 'none');
   const body = {
     clientName: d.client_name,
     clientEmail: d.client_email,
     amount: parseFloat(d.amount),
     frequency: d.frequency,
-    customDay: d.custom_day === 'last' ? 28 : parseInt(d.custom_day),
+    customDay: d.custom_day === 'last' ? 28 : (parseInt(d.custom_day) || undefined),
     startDate: d.next_invoice_date,
-    feeKind: d.fee_type === 'none' ? 'none' : d.fee_type === 'flat' ? 'flat' : 'percent',
-    feeAmount: d.fee_type === 'flat' ? parseFloat(d.fee_flat) : d.fee_type === 'pct' ? parseFloat(d.fee_pct) : 0,
+    feeKind,
+    feeAmount: feeKind === 'flat' ? (parseFloat(d.fee_flat) || 0) : feeKind === 'percent' ? (parseFloat(d.fee_pct) || 0) : 0,
     graceDays: parseInt(d.grace_days) || 7,
   };
   try {
-    if (d.id) {
-      await api('PATCH', `/templates/${d.id}`, body);
-    } else {
-      await api('POST', '/templates', body);
-    }
+    if (d.id) { await api('PATCH', '/templates/' + d.id, body); }
+    else { await api('POST', '/templates', body); }
     loadRecurring();
-    WatchtowerUI.closeModal();
-  } catch (err) {
-    alert('Save failed: ' + err.message);
-  }
+    if (window.WatchtowerUI) WatchtowerUI.closeModal();
+  } catch (err) { alert('Save failed: ' + err.message); }
 });
 
 document.addEventListener('wt:recurring-toggle', async e => {
-  try {
-    await api('PATCH', `/templates/${e.detail.id}`, { active: e.detail.active });
-    loadRecurring();
-  } catch (err) {
-    alert('Toggle failed: ' + err.message);
-  }
+  try { await api('PATCH', '/templates/' + e.detail.id, { active: e.detail.active }); loadRecurring(); }
+  catch (err) { alert('Toggle failed: ' + err.message); }
 });
-
 document.addEventListener('wt:recurring-delete', async e => {
+  try { await api('DELETE', '/templates/' + e.detail.id); loadRecurring(); }
+  catch (err) { alert('Delete failed: ' + err.message); }
+});
+document.addEventListener('wt:recurring-edit', async e => {
+  // Open the modal pre-filled. The form's data is loaded on save; edit prefill is light here.
+  const data = await api('GET', '/templates').catch(() => ({ templates: [] }));
+  const t = (data.templates || []).find(x => x.id === e.detail.id);
+  if (!t) return;
+  const form = document.querySelector('[data-recurring-form]');
+  if (form) {
+    form.querySelector('[name="id"]').value = t.id;
+    form.querySelector('[name="client_name"]').value = t.clientName;
+    form.querySelector('[name="client_email"]').value = t.clientEmail;
+    form.querySelector('[name="amount"]').value = (t.amount / 100).toFixed(2);
+    form.querySelector('[name="frequency"]').value = t.frequency;
+    form.querySelector('[name="custom_day"]').value = t.customDay || 1;
+    form.querySelector('[name="next_invoice_date"]').value = (t.nextRunDate || '').slice(0, 10);
+    form.querySelector('[name="grace_days"]').value = t.graceDays || 7;
+    if (t.feeKind === 'flat') { form.querySelector('[name="fee_flat"]').value = t.feeAmount; }
+    if (t.feeKind === 'percent') { form.querySelector('[name="fee_pct"]').value = t.feeAmount; }
+    setFeeOption(form, t.feeKind === 'percent' ? 'pct' : t.feeKind);
+    document.querySelector('[data-edit-only]').hidden = false;
+  }
+});
+
+document.addEventListener('wt:settings-save', async e => {
+  const d = e.detail.data;
+  const feeKind = d.fee_type === 'pct' ? 'percent' : (d.fee_type === 'flat' ? 'flat' : 'none');
+  const body = {
+    ownerEmail: d.owner_email,
+    alertFeeApproval: !!d.alert_approve,
+    alertOverdue: !!d.alert_overdue,
+    alertPayment: !!d.alert_paid,
+    defaultFeeKind: feeKind,
+    defaultFeeAmount: feeKind === 'flat' ? (parseFloat(d.fee_flat) || 0) : feeKind === 'percent' ? (parseFloat(d.fee_pct) || 0) : 0,
+    defaultGraceDays: parseInt(d.grace_days) || 7,
+  };
   try {
-    await api('DELETE', `/templates/${e.detail.id}`);
-    loadRecurring();
-  } catch (err) {
-    alert('Delete failed: ' + err.message);
-  }
+    await api('PUT', '/settings', body);
+    const note = document.querySelector('[data-save-note]');
+    if (note) { note.textContent = 'Saved. Alerts go to ' + (d.owner_email || 'your email'); setTimeout(() => { note.textContent = ''; }, 4000); }
+  } catch (err) { alert('Save failed: ' + err.message); }
 });
 
-document.addEventListener('wt:filter', e => {
-  // The page will re-render; the API connector can filter the already-loaded list
-  // or the watchtower-ui.js handles filter visual state.
-});
-
-document.addEventListener('wt:search', e => {
-  // Could re-fetch or filter client-side; for now no-op.
-});
-
-// --- Page init ---
+// ---- Init ----
 document.addEventListener('DOMContentLoaded', () => {
-  const path = window.location.pathname;
-  if (path.includes('dashboard') || path === '/') {
-    loadDashboard();
-  }
-  if (path.includes('recurring')) {
-    loadRecurring();
-  }
-  // Onboarding success: data is passed in URL params by the callback
-  if (path.includes('onboarding-success')) {
-    const params = new URLSearchParams(window.location.search);
-    bind({
-      open_invoices: params.get('open_invoices') || '0',
-      clients: params.get('clients') || '0',
-      past_due: params.get('past_due') || '0',
-    });
-  }
+  // Load whatever view the current hash points at (watchtower-ui.js fires wt:view on load too).
+  const view = (window.location.hash || '').replace('#', '') || 'dashboard';
+  document.dispatchEvent(new CustomEvent('wt:view', { detail: { view } }));
 });

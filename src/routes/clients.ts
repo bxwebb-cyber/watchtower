@@ -57,6 +57,7 @@ clientsRouter.get('/', async (req, res) => {
       id: client.id,
       name: client.name,
       email: client.email,
+      clientSinceYear: client.createdAt.getFullYear(),
       totalInvoices: total,
       lateCount,
       lateRatio: total > 0 ? Math.round((lateCount / total) * 100) : 0,

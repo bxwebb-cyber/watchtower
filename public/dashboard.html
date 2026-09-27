@@ -8,11 +8,50 @@
 </head>
 <body>
 <!--
-  DASHBOARD
-  Data: GET /invoices, GET /reports/revenue
+  WATCHTOWER APP: one file, six views. Serve it at /dashboard.
+  The sidebar switches views by URL hash: #dashboard (default) · #invoices · #recurring · #clients · #reports · #settings
+  Any element with data-views="a b" shows only in those views; watchtower-ui.js handles it and fires wt:view { view }
+  so you can load that view's data. /dashboard#settings opens Settings directly (used by onboarding).
   Elements marked data-bind="…" hold one value; replace their text.
   Lists have a <template> to clone per row. The sample rows show the finished look; delete them when you render real data.
-  Behavior + events: watchtower-ui.js (wt:filter, wt:search, wt:open-invoice, wt:approve-fee, wt:waive-fee)
+
+  ── DASHBOARD + INVOICES ── Data: GET /invoices, GET /reports/revenue
+     Events: wt:filter, wt:search, wt:open-invoice, wt:approve-fee, wt:waive-fee
+  ── RECURRING ── (UI name; backend can stay "templates")
+    Data: your templates endpoints. Per row the design needs:
+      client_name, amount, fee_type/fee_value, frequency, custom_day, next_invoice_date,
+      last_run_at, last_run_ok, last_error, status (active|paused), sent_count
+    Behavior + events: watchtower-ui.js (wt:recurring-edit / -toggle / -delete / -save)
+  
+    Frequency label:  monthly → "Monthly" · biweekly → "Every 2 weeks" · weekly → "Weekly"
+                      custom  → "Monthly, 15th" / "Monthly, last day"
+    Schedule sub:     active → "Next Oct 1"   paused → "Paused"
+    Last invoice:     date + result: wt-result--sent "Sent" | wt-result--failed "Failed, will retry" | wt-result--none "First Oct 23" (no runs yet; date shows "None yet")
+    Paused row:       add .is-paused to .wt-recurring__item; the toggle icon becomes play, label "Resume"
+  
+  ── CLIENTS ──: WHO'S ALWAYS LATE
+    Data: GET /clients/lateness (proposed). Per client: name, industry, client_since, late_count, invoice_count,
+          avg_days_late, fees_paid, open_balance. Sort by late share, highest first.
+    Bar: width = late_count / invoice_count. Tone class:
+          >= 50%  wt-late__bar--high (brick) · 20–49%  wt-late__bar--mid (amber) · < 20%  wt-late__bar--low (green)
+    The bar width is the one inline style; set it from the data.
+  
+  ── REPORTS ──
+    Data: GET /reports/revenue?month=YYYY-MM for the selected month; the 12-month trend uses the same endpoint
+          (or one call returning 12 months). Per month: invoice_revenue, fee_revenue, invoices_paid_count,
+          fees_collected_count, fees_waived_amount.
+    Month select + bar click both fire wt:report-month { month: "YYYY-MM" }. Re-render the stats and breakdown for that month.
+    Bars: each segment's height = value / (max month total) × 100%. That height is the one inline style; set it from the data.
+    Delta: "↑ 10% vs Aug" / "↓ 4% vs Aug" / hide when there's no previous month.
+    Share note: "Late fees were {fee/total, 1 decimal}% of what came in." / "No late fees this month." when fee = 0.
+    CSV: a plain link to /reports/export.csv. Columns: Month, Invoices paid, Invoice revenue, Late fees collected, Fee revenue, Fees waived, Total.
+  
+  ── SETTINGS ──
+    Data: GET/PUT /settings → { owner_email, alerts: { approve, overdue, paid }, default_fee: { grace_days, fee_type, fee_value } }
+          Stripe status from your session / account. Plan from your billing record.
+    The onboarding "Set default late-fee terms" button links to /dashboard#settings. The late-fee section has id="late-fee-defaults" if you want to scroll to it.
+    Save fires wt:settings-save { data } (FormData as an object). On success, show the save note: "Saved. Alerts go to {owner_email}".
+  
 -->
 <div class="wt-app">
   <aside class="wt-sidebar">
@@ -24,12 +63,12 @@
       </div>
     </div>
     <nav class="wt-nav" aria-label="Main">
-      <a class="wt-nav__item is-active" href="dashboard.html" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v5H3z"/></svg><span class="wt-nav__label">Dashboard</span><span class="wt-nav__badge" data-bind="pending_fee_count">2</span></a>
-      <a class="wt-nav__item" href="dashboard.html#invoices"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6M8 13h8M8 17h5"/></svg><span class="wt-nav__label">Invoices</span></a>
-      <a class="wt-nav__item" href="recurring.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 2l4 4-4 4M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4M21 13v2a3 3 0 0 1-3 3H3"/></svg><span class="wt-nav__label">Recurring</span></a>
-      <a class="wt-nav__item" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/></svg><span class="wt-nav__label">Clients</span></a>
-      <a class="wt-nav__item" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18M8 17V11M13 17V7M18 17v-4"/></svg><span class="wt-nav__label">Reports</span></a>
-      <a class="wt-nav__item" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 2.9-1.2V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0 1.2 2.9H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span class="wt-nav__label">Settings</span></a>
+      <a class="wt-nav__item is-active" href="#dashboard" data-nav="dashboard" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v5H3z"/></svg><span class="wt-nav__label">Dashboard</span><span class="wt-nav__badge" data-bind="pending_fee_count">2</span></a>
+      <a class="wt-nav__item" href="#invoices" data-nav="invoices"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6M8 13h8M8 17h5"/></svg><span class="wt-nav__label">Invoices</span></a>
+      <a class="wt-nav__item" href="#recurring" data-nav="recurring"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 2l4 4-4 4M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4M21 13v2a3 3 0 0 1-3 3H3"/></svg><span class="wt-nav__label">Recurring</span></a>
+      <a class="wt-nav__item" href="#clients" data-nav="clients"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/></svg><span class="wt-nav__label">Clients</span></a>
+      <a class="wt-nav__item" href="#reports" data-nav="reports"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18M8 17V11M13 17V7M18 17v-4"/></svg><span class="wt-nav__label">Reports</span></a>
+      <a class="wt-nav__item" href="#settings" data-nav="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 2.9-1.2V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0 1.2 2.9H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span class="wt-nav__label">Settings</span></a>
     </nav>
     <div class="wt-profile">
       <span class="wt-profile__avatar" data-bind="owner_initials">MR</span>
@@ -41,6 +80,9 @@
   </aside>
 
   <main class="wt-main">
+    <!-- ===== DASHBOARD ===== -->
+    <div data-views="dashboard">
+
     <header class="wt-header">
       <div class="wt-header__text">
         <p class="wt-eyebrow" data-bind="today_long">Tuesday, September 23</p>
@@ -55,8 +97,21 @@
       <!-- Opens your existing invoice form (public/index.html) -->
       <a class="wt-btn wt-btn--primary wt-btn--header" href="index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Create new invoice</span></a>
     </header>
+    </div>
 
-    <div class="wt-stack">
+    <!-- ===== INVOICES ===== -->
+    <div data-views="invoices" hidden>
+    <header class="wt-header">
+      <div class="wt-header__text">
+        <p class="wt-eyebrow">Invoices</p>
+        <h1 class="wt-h1">Every invoice, <em>on watch.</em></h1>
+      </div>
+      <a class="wt-btn wt-btn--primary wt-btn--header" href="index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Create new invoice</span></a>
+    </header>
+    </div>
+
+    <div class="wt-stack" data-views="dashboard invoices">
+      <div class="wt-stack" data-views="dashboard">
       <!-- KPI CARDS: order is fixed -->
       <section class="wt-kpis" aria-label="Summary">
         <article class="wt-card wt-kpi wt-kpi--overdue">
@@ -151,9 +206,10 @@
       </div>
         </template>
       </section>
+      </div>
 
       <!-- INVOICES -->
-      <section class="wt-card wt-invoices" id="invoices" aria-labelledby="inv-title">
+      <section class="wt-card wt-invoices" data-views="dashboard invoices" aria-labelledby="inv-title">
         <div class="wt-card__head">
           <h2 class="wt-h2" id="inv-title">Recent invoices <span class="wt-h2__count">(<span data-bind="invoice_result_count">8</span>)</span></h2>
           <div class="wt-toolbar">
@@ -258,7 +314,7 @@
         <div class="wt-table__row" role="row" data-id="{id}" tabindex="0">
           <div class="wt-inv-id" role="cell">{id}</div>
           <div class="wt-client" role="cell">
-            <span class="wt-avatar wt-avatar--{1-5}">{initials}</span>
+            <span class="wt-avatar wt-avatar--{avatar}">{initials}</span>
             <div class="wt-client__text">
               <div class="wt-client__name wt-truncate">{client_name}</div>
               <div class="wt-client__email wt-truncate">{client_email}</div>
@@ -278,8 +334,640 @@
         </div>
       </section>
     </div>
+
+    <!-- ===== RECURRING ===== -->
+    <div data-views="recurring" hidden>
+    <header class="wt-header">
+      <div class="wt-header__text">
+        <p class="wt-eyebrow">Recurring</p>
+        <h1 class="wt-h1">Recurring invoices, <em>set once.</em></h1>
+      </div>
+      <button class="wt-btn wt-btn--primary wt-btn--header" type="button" data-open-modal="wt-recurring-modal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>New recurring invoice</span></button>
+    </header>
+
+    <div class="wt-stack">
+      <!-- FAILURE BANNER: one per ACTIVE template whose last run failed (last_run_ok = false) -->
+      <div class="wt-banner wt-banner--error" role="alert">
+        <span class="wt-banner__dot"></span>
+        <div class="wt-banner__text">
+          <div class="wt-banner__title">Quill &amp; Anchor's invoice couldn't be created on Sep 18, 2026.</div>
+          <div>Stripe account disconnected. It stays active and retries on Oct 2, 2026. We logged it and emailed you at marta@riverastudio.co.</div>
+        </div>
+        <a class="wt-btn wt-btn--secondary wt-btn--sm" href="#settings">Check Stripe connection</a>
+      </div>
+
+      <section class="wt-card wt-recurring" aria-labelledby="rec-title">
+        <div class="wt-card__head">
+          <div>
+            <h2 class="wt-h2" id="rec-title">Recurring invoices <span class="wt-h2__count">(<span data-bind="recurring_count">5</span>)</span></h2>
+            <p class="wt-caption">Set up once. Watchtower creates and sends each one on schedule, with the same late-fee terms.</p>
+          </div>
+        </div>
+        <div role="table" aria-label="Recurring invoices">
+          <div class="wt-table__head" role="row">
+            <div role="columnheader">Client</div><div role="columnheader">Schedule</div><div role="columnheader">Last invoice</div><div role="columnheader">Status</div><div role="columnheader" class="wt-right">Actions</div>
+          </div>
+          <div data-list="recurring">
+          <div class="wt-recurring__item" data-id="T-1">
+            <div class="wt-table__row" role="row">
+              <div role="cell" style="min-width:0">
+                <div class="wt-client__name wt-truncate">Harbor &amp; Vine</div>
+                <div class="wt-rec-amount"><span class="wt-rec-amount__value">$1,200.00</span><span class="wt-rec-amount__fee">$50 late fee</span></div>
+              </div>
+              <div role="cell" style="min-width:0">
+                <div class="wt-cell-main wt-truncate">Monthly, 1st</div>
+                <div class="wt-cell-sub wt-truncate">Next Oct 1</div>
+              </div>
+              <div role="cell" style="min-width:0">
+                <div class="wt-cell-main wt-truncate">Sep 1</div>
+                <div class="wt-result wt-result--sent">Sent</div>
+              </div>
+              <div role="cell"><span class="wt-pill wt-pill--active">Active</span></div>
+              <div class="wt-actions" role="cell">
+                <button class="wt-icon-btn" type="button" data-action="recurring-edit" title="Edit" aria-label="Edit recurring invoice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>
+                <button class="wt-icon-btn" type="button" data-action="recurring-toggle" title="Pause" aria-label="Pause recurring invoice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5v14M15 5v14"/></svg></button>
+                <button class="wt-icon-btn wt-icon-btn--danger" type="button" data-action="recurring-delete" title="Delete" aria-label="Delete recurring invoice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>
+              </div>
+            </div>
+            <div class="wt-confirm">
+              <span class="wt-confirm__text">Delete the Harbor &amp; Vine recurring invoice? The 9 invoices already sent stay exactly as they are.</span>
+              <button class="wt-btn wt-btn--secondary wt-btn--sm" type="button" data-action="recurring-keep">Keep it</button>
+              <button class="wt-btn wt-btn--danger wt-btn--sm" type="button" data-action="recurring-confirm-delete">Delete recurring invoice</button>
+            </div>
+          </div>
+          <div class="wt-recurring__item" data-id="T-2">
+            <div class="wt-table__row" role="row">
+              <div role="cell" style="min-width:0">
+                <div class="wt-client__name wt-truncate">Fernwood Dental</div>
+                <div class="wt-rec-amount"><span class="wt-rec-amount__value">$450.00</span><span class="wt-rec-amount__fee">No late fee</span></div>
+              </div>
+              <div role="cell" style="min-width:0">
+                <div class="wt-cell-main wt-truncate">Monthly</div>
+                <div class="wt-cell-sub wt-truncate">Next Oct 10</div>
+              </div>
+              <div role="cell" style="min-width:0">
+                <div class="wt-cell-main wt-truncate">Sep 10</div>
+                <div class="wt-result wt-result--sent">Sent</div>
+              </div>
+              <div role="cell"><span class="wt-pill wt-pill--active">Active</span></div>
+              <div class="wt-actions" role="cell">
+                <button class="wt-icon-btn" type="button" data-action="recurring-edit" title="Edit" aria-label="Edit recurring invoice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>
+                <button class="wt-icon-btn" type="button" data-action="recurring-toggle" title="Pause" aria-label="Pause recurring invoice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5v14M15 5v14"/></svg></button>
+                <button class="wt-icon-btn wt-icon-btn--danger" type="button" data-action="recurring-delete" title="Delete" aria-label="Delete recurring invoice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>
+              </div>
+            </div>
+            <div class="wt-confirm">
+              <span class="wt-confirm__text">Delete the Fernwood Dental recurring invoice? The 6 invoices already sent stay exactly as they are.</span>
+              <button class="wt-btn wt-btn--secondary wt-btn--sm" type="button" data-action="recurring-keep">Keep it</button>
+              <button class="wt-btn wt-btn--danger wt-btn--sm" type="button" data-action="recurring-confirm-delete">Delete recurring invoice</button>
+            </div>
+          </div>
+          <div class="wt-recurring__item" data-id="T-3">
+            <div class="wt-table__row" role="row">
+              <div role="cell" style="min-width:0">
+                <div class="wt-client__name wt-truncate">Quill &amp; Anchor</div>
+                <div class="wt-rec-amount"><span class="wt-rec-amount__value">$380.00</span><span class="wt-rec-amount__fee">2% late fee</span></div>
+              </div>
+              <div role="cell" style="min-width:0">
+                <div class="wt-cell-main wt-truncate">Every 2 weeks</div>
+                <div class="wt-cell-sub wt-truncate">Next Oct 2</div>
+              </div>
+              <div role="cell" style="min-width:0">
+                <div class="wt-cell-main wt-truncate">Sep 18</div>
+                <div class="wt-result wt-result--failed">Failed, will retry</div>
+              </div>
+              <div role="cell"><span class="wt-pill wt-pill--active">Active</span></div>
+              <div class="wt-actions" role="cell">
+                <button class="wt-icon-btn" type="button" data-action="recurring-edit" title="Edit" aria-label="Edit recurring invoice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>
+                <button class="wt-icon-btn" type="button" data-action="recurring-toggle" title="Pause" aria-label="Pause recurring invoice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5v14M15 5v14"/></svg></button>
+                <button class="wt-icon-btn wt-icon-btn--danger" type="button" data-action="recurring-delete" title="Delete" aria-label="Delete recurring invoice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>
+              </div>
+            </div>
+            <div class="wt-confirm">
+              <span class="wt-confirm__text">Delete the Quill &amp; Anchor recurring invoice? The 14 invoices already sent stay exactly as they are.</span>
+              <button class="wt-btn wt-btn--secondary wt-btn--sm" type="button" data-action="recurring-keep">Keep it</button>
+              <button class="wt-btn wt-btn--danger wt-btn--sm" type="button" data-action="recurring-confirm-delete">Delete recurring invoice</button>
+            </div>
+          </div>
+          <div class="wt-recurring__item" data-id="T-4">
+            <div class="wt-table__row" role="row">
+              <div role="cell" style="min-width:0">
+                <div class="wt-client__name wt-truncate">Bramble Bakery</div>
+                <div class="wt-rec-amount"><span class="wt-rec-amount__value">$120.00</span><span class="wt-rec-amount__fee">No late fee</span></div>
+              </div>
+              <div role="cell" style="min-width:0">
+                <div class="wt-cell-main wt-truncate">Weekly</div>
+                <div class="wt-cell-sub wt-truncate">Next Sep 30</div>
+              </div>
+              <div role="cell" style="min-width:0">
+                <div class="wt-cell-main wt-truncate">Sep 23</div>
+                <div class="wt-result wt-result--sent">Sent</div>
+              </div>
+              <div role="cell"><span class="wt-pill wt-pill--active">Active</span></div>
+              <div class="wt-actions" role="cell">
+                <button class="wt-icon-btn" type="button" data-action="recurring-edit" title="Edit" aria-label="Edit recurring invoice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>
+                <button class="wt-icon-btn" type="button" data-action="recurring-toggle" title="Pause" aria-label="Pause recurring invoice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5v14M15 5v14"/></svg></button>
+                <button class="wt-icon-btn wt-icon-btn--danger" type="button" data-action="recurring-delete" title="Delete" aria-label="Delete recurring invoice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>
+              </div>
+            </div>
+            <div class="wt-confirm">
+              <span class="wt-confirm__text">Delete the Bramble Bakery recurring invoice? The 21 invoices already sent stay exactly as they are.</span>
+              <button class="wt-btn wt-btn--secondary wt-btn--sm" type="button" data-action="recurring-keep">Keep it</button>
+              <button class="wt-btn wt-btn--danger wt-btn--sm" type="button" data-action="recurring-confirm-delete">Delete recurring invoice</button>
+            </div>
+          </div>
+          <div class="wt-recurring__item is-paused" data-id="T-5">
+            <div class="wt-table__row" role="row">
+              <div role="cell" style="min-width:0">
+                <div class="wt-client__name wt-truncate">Studio Palomar</div>
+                <div class="wt-rec-amount"><span class="wt-rec-amount__value">$900.00</span><span class="wt-rec-amount__fee">$40 late fee</span></div>
+              </div>
+              <div role="cell" style="min-width:0">
+                <div class="wt-cell-main wt-truncate">Monthly, 15th</div>
+                <div class="wt-cell-sub wt-truncate">Paused</div>
+              </div>
+              <div role="cell" style="min-width:0">
+                <div class="wt-cell-main wt-truncate">Sep 15</div>
+                <div class="wt-result wt-result--sent">Sent</div>
+              </div>
+              <div role="cell"><span class="wt-pill wt-pill--paused">Paused</span></div>
+              <div class="wt-actions" role="cell">
+                <button class="wt-icon-btn" type="button" data-action="recurring-edit" title="Edit" aria-label="Edit recurring invoice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>
+                <button class="wt-icon-btn" type="button" data-action="recurring-toggle" title="Resume" aria-label="Resume recurring invoice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4l13 8-13 8z"/></svg></button>
+                <button class="wt-icon-btn wt-icon-btn--danger" type="button" data-action="recurring-delete" title="Delete" aria-label="Delete recurring invoice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>
+              </div>
+            </div>
+            <div class="wt-confirm">
+              <span class="wt-confirm__text">Delete the Studio Palomar recurring invoice? The 4 invoices already sent stay exactly as they are.</span>
+              <button class="wt-btn wt-btn--secondary wt-btn--sm" type="button" data-action="recurring-keep">Keep it</button>
+              <button class="wt-btn wt-btn--danger wt-btn--sm" type="button" data-action="recurring-confirm-delete">Delete recurring invoice</button>
+            </div>
+          </div>
+          </div>
+        </div>
+        <template id="tpl-recurring-row">
+          <div class="wt-recurring__item" data-id="{id}">
+            <div class="wt-table__row" role="row">
+              <div role="cell" style="min-width:0">
+                <div class="wt-client__name wt-truncate">{client_name}</div>
+                <div class="wt-rec-amount"><span class="wt-rec-amount__value">{amount}</span><span class="wt-rec-amount__fee">{fee_label}</span></div>
+              </div>
+              <div role="cell" style="min-width:0">
+                <div class="wt-cell-main wt-truncate">{frequency_label}</div>
+                <div class="wt-cell-sub wt-truncate">{schedule_sub}</div>
+              </div>
+              <div role="cell" style="min-width:0">
+                <div class="wt-cell-main wt-truncate">{last_run_date}</div>
+                <div class="wt-result {result_class}">{result_label}</div>
+              </div>
+              <div role="cell"><span class="wt-pill wt-pill--active">Active</span></div>
+              <div class="wt-actions" role="cell">
+                <button class="wt-icon-btn" type="button" data-action="recurring-edit" title="Edit" aria-label="Edit recurring invoice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>
+                <button class="wt-icon-btn" type="button" data-action="recurring-toggle" title="Pause" aria-label="Pause recurring invoice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5v14M15 5v14"/></svg></button>
+                <button class="wt-icon-btn wt-icon-btn--danger" type="button" data-action="recurring-delete" title="Delete" aria-label="Delete recurring invoice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>
+              </div>
+            </div>
+            <div class="wt-confirm">
+              <span class="wt-confirm__text">Delete the {client_name} recurring invoice? The {sent_count} invoices already sent stay exactly as they are.</span>
+              <button class="wt-btn wt-btn--secondary wt-btn--sm" type="button" data-action="recurring-keep">Keep it</button>
+              <button class="wt-btn wt-btn--danger wt-btn--sm" type="button" data-action="recurring-confirm-delete">Delete recurring invoice</button>
+            </div>
+          </div>
+        </template>
+
+        <div class="wt-empty" data-empty="recurring" hidden>
+          <img src="lighthouse-transparent.png" alt="">
+          <div class="wt-empty__title">No recurring invoices yet.</div>
+          <div class="wt-empty__text" style="margin-bottom:18px">Retainers and monthly services are a good place to start.</div>
+          <button class="wt-btn wt-btn--primary" type="button" data-open-modal="wt-recurring-modal">New recurring invoice</button>
+        </div>
+      </section>
+    </div>
+    </div>
+
+    <!-- ===== CLIENTS ===== -->
+    <div data-views="clients" hidden>
+    <header class="wt-header">
+      <div class="wt-header__text">
+        <p class="wt-eyebrow">Clients</p>
+        <h1 class="wt-h1">Who's <em>always late.</em></h1>
+      </div>
+    </header>
+
+    <section class="wt-card wt-clients" aria-labelledby="clients-title">
+      <div class="wt-card__head">
+        <div>
+          <h2 class="wt-h2" id="clients-title">Who's always late</h2>
+          <p class="wt-caption">Ranked by how often they pay past the due date. Use it to set terms or deposits.</p>
+        </div>
+      </div>
+      <div role="table" aria-label="Client lateness">
+        <div class="wt-table__head" role="row">
+          <div role="columnheader">Client</div><div role="columnheader">Paid late</div><div role="columnheader" class="wt-right">Avg late</div><div role="columnheader" class="wt-right">Fees paid</div><div role="columnheader" class="wt-right">Open</div>
+        </div>
+        <div data-list="clients">
+          <div class="wt-table__row" role="row">
+            <div class="wt-client" role="cell">
+              <span class="wt-avatar wt-avatar--1">KF</span>
+              <div class="wt-client__text">
+                <div class="wt-client__name wt-truncate">Kestrel Foods</div>
+                <div class="wt-client__email wt-truncate">Food service · since 2023</div>
+              </div>
+            </div>
+            <div class="wt-late" role="cell">
+              <span class="wt-late__track"><span class="wt-late__bar wt-late__bar--high" style="width:89%"></span></span>
+              <span class="wt-late__label">8 of 9</span>
+            </div>
+            <div class="wt-num" role="cell">19 days</div>
+            <div class="wt-num" role="cell">$480</div>
+            <div class="wt-num" role="cell">$2,769</div>
+          </div>
+          <div class="wt-table__row" role="row">
+            <div class="wt-client" role="cell">
+              <span class="wt-avatar wt-avatar--2">DM</span>
+              <div class="wt-client__text">
+                <div class="wt-client__name wt-truncate">Delacroix Media</div>
+                <div class="wt-client__email wt-truncate">Production · since 2024</div>
+              </div>
+            </div>
+            <div class="wt-late" role="cell">
+              <span class="wt-late__track"><span class="wt-late__bar wt-late__bar--high" style="width:71%"></span></span>
+              <span class="wt-late__label">5 of 7</span>
+            </div>
+            <div class="wt-num" role="cell">11 days</div>
+            <div class="wt-num" role="cell">$375</div>
+            <div class="wt-num" role="cell">$1,501</div>
+          </div>
+          <div class="wt-table__row" role="row">
+            <div class="wt-client" role="cell">
+              <span class="wt-avatar wt-avatar--3">NB</span>
+              <div class="wt-client__text">
+                <div class="wt-client__name wt-truncate">Northline Build</div>
+                <div class="wt-client__email wt-truncate">Construction · since 2024</div>
+              </div>
+            </div>
+            <div class="wt-late" role="cell">
+              <span class="wt-late__track"><span class="wt-late__bar wt-late__bar--mid" style="width:38%"></span></span>
+              <span class="wt-late__label">3 of 8</span>
+            </div>
+            <div class="wt-num" role="cell">6 days</div>
+            <div class="wt-num" role="cell">$100</div>
+            <div class="wt-num" role="cell">$1,750</div>
+          </div>
+          <div class="wt-table__row" role="row">
+            <div class="wt-client" role="cell">
+              <span class="wt-avatar wt-avatar--4">FD</span>
+              <div class="wt-client__text">
+                <div class="wt-client__name wt-truncate">Fernwood Dental</div>
+                <div class="wt-client__email wt-truncate">Healthcare · since 2025</div>
+              </div>
+            </div>
+            <div class="wt-late" role="cell">
+              <span class="wt-late__track"><span class="wt-late__bar wt-late__bar--mid" style="width:33%"></span></span>
+              <span class="wt-late__label">2 of 6</span>
+            </div>
+            <div class="wt-num" role="cell">5 days</div>
+            <div class="wt-num" role="cell">$50</div>
+            <div class="wt-num" role="cell">$0</div>
+          </div>
+          <div class="wt-table__row" role="row">
+            <div class="wt-client" role="cell">
+              <span class="wt-avatar wt-avatar--5">OC</span>
+              <div class="wt-client__text">
+                <div class="wt-client__name wt-truncate">Ostergaard Co.</div>
+                <div class="wt-client__email wt-truncate">Publishing · since 2022</div>
+              </div>
+            </div>
+            <div class="wt-late" role="cell">
+              <span class="wt-late__track"><span class="wt-late__bar wt-late__bar--mid" style="width:20%"></span></span>
+              <span class="wt-late__label">2 of 10</span>
+            </div>
+            <div class="wt-num" role="cell">4 days</div>
+            <div class="wt-num" role="cell">$0</div>
+            <div class="wt-num" role="cell">$0</div>
+          </div>
+          <div class="wt-table__row" role="row">
+            <div class="wt-client" role="cell">
+              <span class="wt-avatar wt-avatar--1">HV</span>
+              <div class="wt-client__text">
+                <div class="wt-client__name wt-truncate">Harbor &amp; Vine</div>
+                <div class="wt-client__email wt-truncate">Hospitality · since 2021</div>
+              </div>
+            </div>
+            <div class="wt-late" role="cell">
+              <span class="wt-late__track"><span class="wt-late__bar wt-late__bar--low" style="width:8%"></span></span>
+              <span class="wt-late__label">1 of 12</span>
+            </div>
+            <div class="wt-num" role="cell">2 days</div>
+            <div class="wt-num" role="cell">$0</div>
+            <div class="wt-num" role="cell">$3,240</div>
+          </div>
+        </div>
+      </div>
+      <template id="tpl-client-row">
+          <div class="wt-table__row" role="row">
+            <div class="wt-client" role="cell">
+              <span class="wt-avatar wt-avatar--{avatar}">{initials}</span>
+              <div class="wt-client__text">
+                <div class="wt-client__name wt-truncate">{client_name}</div>
+                <div class="wt-client__email wt-truncate">{client_sub}</div>
+              </div>
+            </div>
+            <div class="wt-late" role="cell">
+              <span class="wt-late__track"><span class="wt-late__bar wt-late__bar--{late_class}" style="width:{late_pct}%"></span></span>
+              <span class="wt-late__label">{late_count} of {invoice_count}</span>
+            </div>
+            <div class="wt-num" role="cell">{avg_days_late} days</div>
+            <div class="wt-num" role="cell">{fees_paid}</div>
+            <div class="wt-num" role="cell">{open_balance}</div>
+          </div>
+      </template>
+      <div class="wt-empty" data-empty="clients" hidden>
+        <img src="lighthouse-transparent.png" alt="">
+        <div class="wt-empty__title">No clients yet.</div>
+        <div class="wt-empty__text">Clients appear here after their first invoice.</div>
+      </div>
+    </section>
+    </div>
+
+    <!-- ===== REPORTS ===== -->
+    <div data-views="reports" hidden>
+    <header class="wt-header">
+      <div class="wt-header__text">
+        <p class="wt-eyebrow">Reports</p>
+        <h1 class="wt-h1">Revenue, <em>month by month.</em></h1>
+      </div>
+    </header>
+
+    <div class="wt-stack">
+      <section class="wt-card wt-report" aria-labelledby="report-title">
+        <div class="wt-report__head">
+          <div class="wt-report__title">
+            <h2 class="wt-h2" id="report-title">Monthly revenue</h2>
+            <label class="wt-sr-only" for="report-month">Month</label>
+            <select class="wt-select" id="report-month" data-report-month>
+              <option value="2025-10">Oct 2025</option>
+              <option value="2025-11">Nov 2025</option>
+              <option value="2025-12">Dec 2025</option>
+              <option value="2026-01">Jan 2026</option>
+              <option value="2026-02">Feb 2026</option>
+              <option value="2026-03">Mar 2026</option>
+              <option value="2026-04">Apr 2026</option>
+              <option value="2026-05">May 2026</option>
+              <option value="2026-06">Jun 2026</option>
+              <option value="2026-07">Jul 2026</option>
+              <option value="2026-08">Aug 2026</option>
+              <option value="2026-09" selected>Sep 2026</option>
+            </select>
+          </div>
+          <a class="wt-btn wt-btn--primary wt-btn--sm" href="/reports/export.csv" download>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M4 19h16"/></svg>
+            <span>Download CSV</span>
+          </a>
+        </div>
+
+        <div class="wt-rstats">
+          <div class="wt-rstat"><div class="wt-rstat__label"><span class="wt-swatch wt-swatch--inv"></span>Invoice revenue</div><div class="wt-rstat__value" data-bind="invoice_revenue">$12,900</div></div>
+          <div class="wt-rstat wt-rstat--fee"><div class="wt-rstat__label"><span class="wt-swatch wt-swatch--fee"></span>Fee revenue</div><div class="wt-rstat__value" data-bind="fee_revenue">$325</div></div>
+          <div class="wt-rstat wt-rstat--total"><div class="wt-rstat__label">Total collected</div><div class="wt-rstat__value"><span data-bind="total_collected">$13,225</span><span class="wt-rstat__delta" data-bind="delta">↑ 9% vs Aug</span></div></div>
+        </div>
+
+        <div class="wt-split" aria-hidden="true">
+          <span class="wt-split__inv" style="width:97.5%"></span>
+          <span class="wt-split__fee" style="width:2.5%"></span>
+        </div>
+        <div class="wt-split__note" data-bind="share_note">Late fees were 2.5% of what came in.</div>
+
+        <div class="wt-breakdown"><div><div class="wt-breakdown__label">Invoices paid</div><div class="wt-breakdown__sub"><span data-bind="invoices_paid_count">15</span> invoices</div></div><div class="wt-breakdown__value" data-bind="invoice_revenue">$12,900</div></div>
+        <div class="wt-breakdown"><div><div class="wt-breakdown__label">Late fees collected</div><div class="wt-breakdown__sub"><span data-bind="fees_collected_count">4</span> fees</div></div><div class="wt-breakdown__value wt-breakdown__value--fee" data-bind="fee_revenue">$325</div></div>
+        <div class="wt-breakdown"><div><div class="wt-breakdown__label">Fees waived</div><div class="wt-breakdown__sub">Not counted as revenue</div></div><div class="wt-breakdown__value wt-breakdown__value--muted" data-bind="fees_waived_amount">$32</div></div>
+        <div class="wt-breakdown wt-breakdown--total"><div><div class="wt-breakdown__label">Total collected</div></div><div class="wt-breakdown__value" data-bind="total_collected">$13,225</div></div>
+        <p class="wt-footnote">The CSV has all 12 months and imports into QuickBooks, Xero, or Wave.</p>
+      </section>
+
+      <section class="wt-card wt-trend" aria-labelledby="trend-title">
+        <div class="wt-trend__head">
+          <div>
+            <h2 class="wt-h2" id="trend-title">12-month trend</h2>
+            <p class="wt-caption">Click a month to see its breakdown</p>
+          </div>
+          <div class="wt-legend"><span><span class="wt-swatch wt-swatch--inv"></span>Invoices</span><span><span class="wt-swatch wt-swatch--fee"></span>Late fees</span></div>
+        </div>
+        <div class="wt-bars" data-list="trend">
+          <button class="wt-bar" type="button" data-month="2025-10" title="Oct 2025: $8,200 + $0 fees"><span class="wt-bar__fee" style="height:0.0%"></span><span class="wt-bar__inv" style="height:62.0%"></span></button>
+          <button class="wt-bar" type="button" data-month="2025-11" title="Nov 2025: $9,100 + $0 fees"><span class="wt-bar__fee" style="height:0.0%"></span><span class="wt-bar__inv" style="height:68.8%"></span></button>
+          <button class="wt-bar" type="button" data-month="2025-12" title="Dec 2025: $7,400 + $0 fees"><span class="wt-bar__fee" style="height:0.0%"></span><span class="wt-bar__inv" style="height:56.0%"></span></button>
+          <button class="wt-bar" type="button" data-month="2026-01" title="Jan 2026: $8,800 + $0 fees"><span class="wt-bar__fee" style="height:0.0%"></span><span class="wt-bar__inv" style="height:66.5%"></span></button>
+          <button class="wt-bar" type="button" data-month="2026-02" title="Feb 2026: $9,600 + $0 fees"><span class="wt-bar__fee" style="height:0.0%"></span><span class="wt-bar__inv" style="height:72.6%"></span></button>
+          <button class="wt-bar" type="button" data-month="2026-03" title="Mar 2026: $10,200 + $0 fees"><span class="wt-bar__fee" style="height:0.0%"></span><span class="wt-bar__inv" style="height:77.1%"></span></button>
+          <button class="wt-bar" type="button" data-month="2026-04" title="Apr 2026: $9,900 + $150 fees"><span class="wt-bar__fee" style="height:1.1%"></span><span class="wt-bar__inv" style="height:74.9%"></span></button>
+          <button class="wt-bar" type="button" data-month="2026-05" title="May 2026: $11,400 + $275 fees"><span class="wt-bar__fee" style="height:2.1%"></span><span class="wt-bar__inv" style="height:86.2%"></span></button>
+          <button class="wt-bar" type="button" data-month="2026-06" title="Jun 2026: $10,800 + $320 fees"><span class="wt-bar__fee" style="height:2.4%"></span><span class="wt-bar__inv" style="height:81.7%"></span></button>
+          <button class="wt-bar" type="button" data-month="2026-07" title="Jul 2026: $12,100 + $410 fees"><span class="wt-bar__fee" style="height:3.1%"></span><span class="wt-bar__inv" style="height:91.5%"></span></button>
+          <button class="wt-bar" type="button" data-month="2026-08" title="Aug 2026: $11,700 + $380 fees"><span class="wt-bar__fee" style="height:2.9%"></span><span class="wt-bar__inv" style="height:88.5%"></span></button>
+          <button class="wt-bar is-selected" type="button" data-month="2026-09" title="Sep 2026: $12,900 + $325 fees"><span class="wt-bar__fee" style="height:2.5%"></span><span class="wt-bar__inv" style="height:97.5%"></span></button>
+        </div>
+        <div class="wt-bar-labels" aria-hidden="true">
+          <span>O</span>
+          <span>N</span>
+          <span>D</span>
+          <span>J</span>
+          <span>F</span>
+          <span>M</span>
+          <span>A</span>
+          <span>M</span>
+          <span>J</span>
+          <span>J</span>
+          <span>A</span>
+          <span class="is-selected">S</span>
+        </div>
+      </section>
+    </div>
+    </div>
+
+    <!-- ===== SETTINGS ===== -->
+    <div data-views="settings" hidden>
+    <header class="wt-header">
+      <div class="wt-header__text">
+        <p class="wt-eyebrow">Settings</p>
+        <h1 class="wt-h1">Settings <em>&amp; alerts.</em></h1>
+      </div>
+    </header>
+
+    <form class="wt-stack wt-settings" data-settings-form novalidate>
+      <section class="wt-card wt-setting" id="settings-stripe" aria-labelledby="stripe-title">
+        <div class="wt-setting__row">
+          <div class="wt-setting__text">
+            <h2 class="wt-h2" id="stripe-title">Stripe</h2>
+            <!-- Connected state -->
+            <div class="wt-status" data-stripe="connected">Connected as <span data-bind="stripe_account_name">Rivera Studio</span> · <span data-bind="stripe_account_id">acct_1PqR…8xK</span></div>
+            <!-- Not connected state: show this instead, and swap the button to Connect Stripe -->
+            <div class="wt-status wt-status--off" data-stripe="disconnected" hidden>Not connected</div>
+          </div>
+          <button class="wt-btn wt-btn--secondary wt-btn--sm" type="button" data-stripe="connected" data-action="stripe-disconnect">Disconnect</button>
+          <a class="wt-btn wt-btn--primary wt-btn--sm" href="/auth/stripe/start" data-stripe="disconnected" hidden>Connect Stripe</a>
+        </div>
+      </section>
+
+      <section class="wt-card wt-setting" id="settings-plan" aria-labelledby="plan-title">
+        <div class="wt-setting__row">
+          <div class="wt-setting__text">
+            <h2 class="wt-h2" id="plan-title">Plan</h2>
+            <!-- plan "solo" → "Up to 10 invoices / month · $39" · plan "business" → "Unlimited invoices · $59". Never show "solo"/"business". -->
+            <p class="wt-setting__sub"><span data-bind="plan_label">Up to 10 invoices / month · $39</span><br><span data-bind="plan_usage">7 of 10 invoices sent this month</span></p>
+          </div>
+          <!-- POST /billing/portal → redirect to the returned url -->
+          <a class="wt-btn wt-btn--secondary wt-btn--sm" href="/billing/portal" data-billing-portal>Manage plan</a>
+        </div>
+      </section>
+
+      <section class="wt-card wt-setting" id="late-fee-defaults" aria-labelledby="fee-title">
+        <h2 class="wt-h2" id="fee-title">Default late-fee terms</h2>
+        <p class="wt-setting__sub">Prefilled on every new invoice for a new client. Returning clients keep their last terms. You can change it on any invoice.</p>
+        <div class="wt-setting__body">
+          <div class="wt-fee-panel">
+            <input type="hidden" name="fee_type" value="none">
+            <div class="wt-fee-panel__label"><img src="lighthouse-transparent.png" alt="">Default late fee · new invoices</div>
+            <div class="wt-fee-panel__question">
+              <span>If not paid within</span>
+              <input class="wt-fee-panel__grace" name="grace_days" type="number" min="0" value="7" aria-label="Grace days">
+              <span>days of the due date, what's your late fee?</span>
+            </div>
+            <div class="wt-fee-options" role="group" aria-label="Late fee type">
+              <button class="wt-fee-option is-selected" type="button" data-fee="none" aria-pressed="true"><span class="wt-fee-option__title">No fee</span><span class="wt-fee-option__sub">Just the reminders</span></button>
+              <button class="wt-fee-option" type="button" data-fee="flat" aria-pressed="false"><span class="wt-fee-option__title">Flat amount</span><span class="wt-fee-option__sub">e.g. $50</span></button>
+              <button class="wt-fee-option" type="button" data-fee="pct" aria-pressed="false"><span class="wt-fee-option__title">Percentage</span><span class="wt-fee-option__sub">e.g. 5% of invoice</span></button>
+            </div>
+            <label class="wt-fee-input" data-fee-input="flat" hidden>Flat fee <span class="wt-fee-input__box">$<input name="fee_flat" inputmode="decimal" placeholder="50"></span></label>
+            <label class="wt-fee-input" data-fee-input="pct" hidden>Percentage of invoice <span class="wt-fee-input__box"><input name="fee_pct" inputmode="decimal" placeholder="5">%</span></label>
+            <div class="wt-fee-panel__terms">This fee goes into the invoice terms your client sees — never a surprise.</div>
+            <div class="wt-fee-panel__preview" aria-live="polite">Your client sees: No late fee.</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="wt-card wt-setting" id="settings-alerts" aria-labelledby="alerts-title">
+        <h2 class="wt-h2" id="alerts-title">Owner alerts</h2>
+        <p class="wt-setting__sub">Where Watchtower writes to you. Your clients never see this address.</p>
+        <div class="wt-setting__body">
+          <label class="wt-field wt-field--narrow">Owner email<input class="wt-input" type="email" name="owner_email" value="marta@riverastudio.co" required></label>
+          <div style="margin-top:18px">
+            <label class="wt-toggle-row"><input type="checkbox" name="alert_approve" checked><span class="wt-toggle-row__text"><span class="wt-toggle-row__label">A late fee needs my approval</span><span class="wt-toggle-row__sub">So nothing is charged without you</span></span></label>
+            <label class="wt-toggle-row"><input type="checkbox" name="alert_overdue" checked><span class="wt-toggle-row__text"><span class="wt-toggle-row__label">An invoice goes overdue</span><span class="wt-toggle-row__sub">Sent the morning after the due date</span></span></label>
+            <label class="wt-toggle-row"><input type="checkbox" name="alert_paid"><span class="wt-toggle-row__text"><span class="wt-toggle-row__label">A client pays</span><span class="wt-toggle-row__sub">One email per payment</span></span></label>
+          </div>
+        </div>
+      </section>
+
+      <div class="wt-save-row">
+        <button class="wt-btn wt-btn--primary" type="submit">Save settings</button>
+        <span class="wt-save-note" data-save-note aria-live="polite"></span>
+      </div>
+    </form>
+    </div>
   </main>
 </div>
+
+<!-- RECURRING FORM (modal). Same markup for New and Edit.
+     Edit: change the title to "Edit recurring invoice", the subtitle to "{client} · {frequency_label}",
+           unhide [data-edit-only], fill the fields, and set next_invoice_date's data-touched="true" so it isn't recalculated.
+     Next-date default: today + interval; recalculates on frequency/day change until the owner edits it by hand. -->
+<div class="wt-modal" id="wt-recurring-modal" role="dialog" aria-modal="true" aria-labelledby="rec-modal-title" hidden>
+  <div class="wt-modal__backdrop" data-close-modal></div>
+  <form class="wt-modal__panel" data-recurring-form novalidate>
+    <input type="hidden" name="id" value="">
+    <div class="wt-modal__head">
+      <div>
+        <h2 class="wt-modal__title" id="rec-modal-title">New recurring invoice</h2>
+        <p class="wt-modal__sub">Watchtower creates and sends each invoice for you, on schedule.</p>
+      </div>
+      <button class="wt-icon-btn" type="button" data-close-modal aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+
+    <div class="wt-note wt-note--amber" data-edit-only hidden style="margin-bottom:16px">Changes apply to future invoices only. The <span data-bind="sent_count">9</span> already sent stay as they are.</div>
+
+    <div class="wt-grid-2">
+      <label class="wt-field">Client name<input class="wt-input" name="client_name" required placeholder="Harbor &amp; Vine"></label>
+      <label class="wt-field">Client email<input class="wt-input" name="client_email" type="email" required placeholder="billing@harborvine.com"></label>
+      <label class="wt-field">Amount per invoice
+        <span class="wt-input wt-money"><span>$</span><input name="amount" inputmode="decimal" required placeholder="1,200.00"></span>
+      </label>
+      <label class="wt-field">Frequency
+        <select class="wt-select" name="frequency">
+          <option value="monthly">Monthly</option>
+          <option value="biweekly">Every 2 weeks</option>
+          <option value="weekly">Weekly</option>
+          <option value="custom">Custom day of the month</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="wt-custom-day" hidden>
+      <span>Send on the</span>
+      <select class="wt-select" name="custom_day" aria-label="Day of month"><option value="1">1st</option><option value="2">2nd</option><option value="3">3rd</option><option value="4">4th</option><option value="5">5th</option><option value="6">6th</option><option value="7">7th</option><option value="8">8th</option><option value="9">9th</option><option value="10">10th</option><option value="11">11th</option><option value="12">12th</option><option value="13">13th</option><option value="14">14th</option><option value="15">15th</option><option value="16">16th</option><option value="17">17th</option><option value="18">18th</option><option value="19">19th</option><option value="20">20th</option><option value="21">21st</option><option value="22">22nd</option><option value="23">23rd</option><option value="24">24th</option><option value="25">25th</option><option value="26">26th</option><option value="27">27th</option><option value="28">28th</option><option value="last">last day</option></select>
+      <span>of every month</span>
+    </div>
+
+    <div class="wt-grid-2 wt-modal__section" style="align-items:end">
+      <label class="wt-field">Next invoice date<input class="wt-input" name="next_invoice_date" type="date" required></label>
+      <div class="wt-field">Status
+        <input type="hidden" name="status" value="active">
+        <div class="wt-seg" role="group" aria-label="Status">
+          <button class="wt-seg__opt is-active" type="button" data-value="active" aria-pressed="true">Active</button>
+          <button class="wt-seg__opt" type="button" data-value="paused" aria-pressed="false">Paused</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="wt-fee-panel wt-modal__section" style="margin-top:20px">
+      <input type="hidden" name="fee_type" value="none">
+      <div class="wt-fee-panel__label"><img src="lighthouse-transparent.png" alt="">Late fee · every invoice in this series</div>
+      <div class="wt-fee-panel__question">
+        <span>If not paid within</span>
+        <input class="wt-fee-panel__grace" name="grace_days" type="number" min="0" value="7" aria-label="Grace days">
+        <span>days of the due date, what's your late fee?</span>
+      </div>
+      <div class="wt-fee-options" role="group" aria-label="Late fee type">
+        <button class="wt-fee-option is-selected" type="button" data-fee="none" aria-pressed="true"><span class="wt-fee-option__title">No fee</span><span class="wt-fee-option__sub">Just the reminders</span></button>
+        <button class="wt-fee-option" type="button" data-fee="flat" aria-pressed="false"><span class="wt-fee-option__title">Flat amount</span><span class="wt-fee-option__sub">e.g. $50</span></button>
+        <button class="wt-fee-option" type="button" data-fee="pct" aria-pressed="false"><span class="wt-fee-option__title">Percentage</span><span class="wt-fee-option__sub">e.g. 5% of invoice</span></button>
+      </div>
+      <label class="wt-fee-input" data-fee-input="flat" hidden>Flat fee <span class="wt-fee-input__box">$<input name="fee_flat" inputmode="decimal" placeholder="50"></span></label>
+      <label class="wt-fee-input" data-fee-input="pct" hidden>Percentage of invoice <span class="wt-fee-input__box"><input name="fee_pct" inputmode="decimal" placeholder="5">%</span></label>
+      <div class="wt-fee-panel__terms">This fee goes into the invoice terms your client sees — never a surprise.</div>
+      <div class="wt-fee-panel__preview" aria-live="polite">Your client sees: No late fee.</div>
+    </div>
+
+    <div class="wt-modal__foot">
+      <button class="wt-btn wt-btn--secondary" type="button" data-close-modal>Cancel</button>
+      <!-- Keep disabled until: client, valid email, amount > 0, next date, and a fee value if flat/pct -->
+      <button class="wt-btn wt-btn--primary" type="submit">Save recurring invoice</button>
+    </div>
+  </form>
+</div>
+
 <script src="watchtower-ui.js"></script>
+<script>
+(function () {
+  var select = document.querySelector('[data-report-month]');
+  var bars = Array.prototype.slice.call(document.querySelectorAll('.wt-bar'));
+  var labels = Array.prototype.slice.call(document.querySelectorAll('.wt-bar-labels span'));
+  function pick(month) {
+    select.value = month;
+    bars.forEach(function (b, i) { var on = b.dataset.month === month; b.classList.toggle('is-selected', on); labels[i].classList.toggle('is-selected', on); });
+    document.dispatchEvent(new CustomEvent('wt:report-month', { detail: { month: month } }));
+  }
+  select.addEventListener('change', function () { pick(select.value); });
+  bars.forEach(function (b) { b.addEventListener('click', function () { pick(b.dataset.month); }); });
+})();
+</script>
+<script>
+document.querySelector('[data-settings-form]').addEventListener('submit', function (e) {
+  e.preventDefault();
+  var data = Object.fromEntries(new FormData(e.target).entries());
+  document.dispatchEvent(new CustomEvent('wt:settings-save', { detail: { data: data } }));
+});
+</script>
+<script src="api.js"></script>
 </body>
 </html>
