@@ -2,19 +2,20 @@ import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { stripeConfigured } from '../services/invoiceCreator';
 import { computeInitialNextRun, skipToNextCycle } from '../services/templateEngine';
+import { getAccount } from '../lib/account';
 
 const prisma = new PrismaClient();
 export const templatesRouter = Router();
 
 // GET /templates — list all templates for the connected account.
-templatesRouter.get('/', async (_req, res) => {
+templatesRouter.get('/', async (req, res) => {
   if (!stripeConfigured()) {
     return res.status(503).json({ error: 'Stripe not configured' });
   }
 
-  const account = await prisma.account.findFirst();
+  const account = await getAccount(req);
   if (!account) {
-    return res.status(503).json({ error: 'No Stripe account connected' });
+    return res.status(401).json({ error: 'Not authenticated' });
   }
 
   const templates = await prisma.invoiceTemplate.findMany({
@@ -31,9 +32,9 @@ templatesRouter.post('/', async (req, res) => {
     return res.status(503).json({ error: 'Stripe not configured' });
   }
 
-  const account = await prisma.account.findFirst();
+  const account = await getAccount(req);
   if (!account) {
-    return res.status(503).json({ error: 'No Stripe account connected' });
+    return res.status(401).json({ error: 'Not authenticated' });
   }
 
   const {
@@ -95,9 +96,13 @@ templatesRouter.post('/', async (req, res) => {
 
 // PATCH /templates/:id — update a template (pause, edit, etc.).
 templatesRouter.patch('/:id', async (req, res) => {
+  const account = await getAccount(req);
+  if (!account) return res.status(401).json({ error: 'Not authenticated' });
   const { id } = req.params;
 
-  const existing = await prisma.invoiceTemplate.findUnique({ where: { id } });
+  const existing = await prisma.invoiceTemplate.findFirst({
+    where: { id, accountId: account.id },
+  });
   if (!existing) {
     return res.status(404).json({ error: 'Template not found' });
   }
@@ -136,9 +141,13 @@ templatesRouter.patch('/:id', async (req, res) => {
 
 // DELETE /templates/:id — delete a template (doesn't affect past invoices).
 templatesRouter.delete('/:id', async (req, res) => {
+  const account = await getAccount(req);
+  if (!account) return res.status(401).json({ error: 'Not authenticated' });
   const { id } = req.params;
 
-  const existing = await prisma.invoiceTemplate.findUnique({ where: { id } });
+  const existing = await prisma.invoiceTemplate.findFirst({
+    where: { id, accountId: account.id },
+  });
   if (!existing) {
     return res.status(404).json({ error: 'Template not found' });
   }

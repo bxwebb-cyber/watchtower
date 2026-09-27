@@ -29,7 +29,15 @@ _Updated 2026-09-25 (v1.4 — notification escalation + at-a-glance widget) · w
 - `public/lighthouse-transparent.png` — **UPDATED (v1.1):** transparent mascot for emails and dark backgrounds.
 - `public/login.html` — **NEW (v1.3):** sign in / create account page. JWT-based auth, redirects to dashboard. Matches designer's design system.
 - `src/routes/auth.ts` — **UPDATED (v1.3):** Stripe OAuth (start/callback) + email/password login + signup + session check. Issues JWTs, stores passwordHash on Account.
+- `src/lib/account.ts` — **NEW (v1.6):** shared `resolveAccountId(req)` + `getAccount(req)` — resolve the signed-in account from the JWT cookie/Bearer, replacing the old single-account `findFirst()` across the whole API (settings, clients, templates, invoices, reports, billing).
+- `src/routes/billing.ts` — **NEW (v1.6):** subscription billing. GET /billing/status (plan + renewal), POST /billing/checkout (Stripe Checkout for solo/business), POST /billing/portal (Billing Portal). Maps Stripe price IDs to plans via STRIPE_PRICE_SOLO / STRIPE_PRICE_BUSINESS.
+- `src/routes/webhook.ts` — **UPDATED (v1.6):** +3 subscription handlers (checkout.session.completed, customer.subscription.updated, customer.subscription.deleted) writing subscription state back to the Account.
 - `prisma/schema.prisma` — **UPDATED (v1.3):** added passwordHash field on Account model.
+- `prisma/schema.prisma` — **UPDATED (v1.6):** Account subscription-billing fields (stripeCustomerId, plan, stripeSubscriptionId, subscriptionStatus, currentPeriodEnd, cancelAtPeriodEnd).
+- `src/routes/auth.ts` — **UPDATED (v1.6):** signup requires `businessName`; OAuth callback links to the signed-in account (no more orphan account); callback redirects to `/onboarding-success.html` with counts.
+- `src/routes/settings.ts` — **UPDATED (v1.6):** PUT accepts `businessName` (the client-facing email sender name).
+- `src/services/invoiceCreator.ts` — **UPDATED (v1.6):** takes `accountId`; enforces the 10-invoice/mo cap on the Solo tier (`plan_limit`).
+- `src/services/reminderEngine.ts` — **UPDATED (v1.6):** blank-guards on `businessName` (skips send + flags owner once).
 - `research-invoicing-statistics.md` — **NEW (v1.2):** late payment statistics, market data, pain point research (10+ sources)
 - `research-pain-point-validation.md` — **NEW (v1.2):** maps Dunn's features to documented small business pain points
 - `nsf-sbir-strategy.md` — **NEW (v1.2):** strategy memo for NSF SBIR Phase I pitch
@@ -87,6 +95,7 @@ _Updated 2026-09-25 (v1.4 — notification escalation + at-a-glance widget) · w
 7. ✅ **Inbound replies** — DONE 9/23/26: Svix signature verification wired, RESEND_WEBHOOK_SECRET set in .env
 8. **Fee pending-approval UI** — part of dashboard (designer)
 9. ✅ **Auth/sessions** — DONE 9/24/26: bearer token middleware
+10. ⚠️ **Subscription billing** — CODE DONE 9/26/26: billing route + subscription webhooks + Account fields built, typecheck + tests green. REMAINING (config): create $39/$59 Stripe products/prices, set STRIPE_PRICE_SOLO/STRIPE_PRICE_BUSINESS, wire "Start watching" buttons (designer), add JWT_SECRET to local .env.
 
 ## Honest Status
 **Watchtower (Dunn) is ready to ship v1.3.** All backend APIs built and tested (48 tests passing). All designer screens wired: landing page (at /), dashboard, recurring invoices, onboarding, invoice form (at /create), HTML email templates. Auth system live: email/password login + signup + Stripe OAuth. Dashboard protected behind JWT session. Research complete (pain point validation, market data, NSF SBIR pitch drafted). Railway deploy configured with cron.

@@ -9,8 +9,7 @@ node_modules/
 # Build output
 dist/
 
-# Prisma
-prisma/migrations/
+# Prisma (migrations are committed — they're required for `prisma migrate deploy`)
 
 # IDE
 .idea/

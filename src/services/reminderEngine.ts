@@ -56,6 +56,30 @@ export async function runReminderJob(now = new Date()) {
 
   let sent = 0;
   for (const invoice of openInvoices) {
+    // Required: the reminder must be recognizable as coming from the business.
+    // If the owner never set a business name, don't send from a generic sender
+    // (it gets ignored) — skip and flag the owner once.
+    if (!invoice.account?.businessName?.trim()) {
+      const alreadyFlagged = await prisma.auditEvent.findFirst({
+        where: { invoiceId: invoice.id, event: 'missing_business_name' },
+      });
+      if (!alreadyFlagged) {
+        await prisma.auditEvent.create({
+          data: {
+            invoiceId: invoice.id,
+            event: 'missing_business_name',
+            detail: 'Reminder skipped — no business name set on the account',
+          },
+        });
+        await notifyOwner(
+          invoice.accountId,
+          'Reminder skipped — add your business name',
+          `A reminder for ${invoice.client?.name ?? 'a client'} was skipped because no business name is set. Set it in Settings so reminders come from your business, not Watchtower.`
+        );
+      }
+      continue;
+    }
+
     const due = new Date(invoice.dueDate);
     const dueDay = new Date(due.getFullYear(), due.getMonth(), due.getDate());
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());

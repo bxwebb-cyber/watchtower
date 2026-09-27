@@ -3,7 +3,9 @@ _Last updated: 2026-09-25 (v1.4 — notification escalation + extension + widget
 
 ---
 
-## ▶ STATUS — v1.4 ALL BUILD DONE. EXTENSION BUILT. READY TO DEPLOY.
+## ▶ STATUS — v1.5 BUILD DONE. DEPLOYED TO RAILWAY. POLISH REMAINING.
+
+**Current state:** App is deployed and running at Railway (private URL). Postgres connected. Security review completed and fixes applied. Chrome extension built. Notification escalation logic added. Landing page, dashboard, login, recurring invoices, and demo all wired to designer's latest screens. Reminder emails are coded but need a fresh Resend API key to send. Subscription billing (users paying for Dunn) is NOT built yet. Domain getdunn.org is registered but not pointed at Railway.
 
 **What exists:** Everything. Invoice creator, pre-due reminders, late-fee engine with owner-approval gate, per-invoice fee prompts, inbound client replies, recurring invoice templates, dashboard (KPI cards + invoice list with 5 statuses + fee approval), settings (owner email + 3 alert toggles), per-client lateness view, reports (revenue + CSV export), HTML email templates (8 Handlebars, designer-delivered), Stripe Connect OAuth, bearer token auth, 48 passing tests, Railway deploy config with cron. Landing page (designer prototype) at /. Login/signup page at /login. Dashboard protected behind JWT auth. Pain point validation research + NSF SBIR pitch drafted.
 - **Location:** `~/Desktop/watchtower/`
@@ -16,7 +18,7 @@ _Last updated: 2026-09-25 (v1.4 — notification escalation + extension + widget
 - **Tagline (locked 8/21/26): "We keep watch so you don't have to."** The whole pitch in one sentence — the lighthouse keeps watch so the ships don't have to, Watchtower keeps watch so the owner doesn't have to chase.
 - **Mascot (locked 8/21/26): the lighthouse.** Hand-drawn sketch / tattoo-flash style: bold black ink linework, red-and-white striped tower, kind face, tiny waves + sailboat at base, warm glowing lantern, small flag on top. Black ink with sparse red/gold accents, white background, no ground shadow. Drafts: ~/Desktop/watchtower-mascot-dude.png (rejected) and ~/Desktop/watchtower-mascot-lighthouse.png (WINNER). Deliberately NOT TIB style — this brand is sketch/tattoo, not Sanrio-kawaii. Mascot must appear in reminder emails (warm, never threatening) + dashboard logo.
 - **Mascot final (locked 8/21/26, night): WOODCUT version won.** ~/Desktop/watchtower-mascot-v5-woodcut.png (original, with boat) → ~/Desktop/watchtower-mascot-v5-woodcut-noboat.png (FINAL, boat removed, regenerated same style). Animation: ~/Desktop/watchtower-lighthouse-beam.gif (12-frame rotating beam + lantern pulse, 344KB — good for web; need an email-size <150KB version before using in reminder emails).
-- **Price: tiered (locked 9/23/26).** $29/mo Solo (up to 10 invoices/mo), $49/mo Business (unlimited). One late fee applied covers the month — the dashboard must show recovered money ("Watchtower recovered $X this month") to make the price self-evident. Solo undercuts Stripe Dunning Pro's $29 entry; Business targets the agency segment.
+- **Price: tiered, two tiers (locked 9/26/26).** $39/mo Solo (up to 10 invoices/mo), $59/mo Business (unlimited). **The 10-invoice cap is now ENFORCED in `src/services/invoiceCreator.ts`** — a Solo account cannot create an 11th invoice until the calendar month rolls over (returns `plan_limit`, HTTP 402). This sorts buyers by usage, not self-declared "solo vs business" (Bashira's call — identity tiers are unenforceable). Confirmed by pricing research: 10 invoices is the industry's exact small-tier anchor (Invoice Simple Plus, SolidInvoice entry both = 10); FreshBooks tops out by client count (5/50/unlimited). One late fee covers the month — the dashboard must show recovered money to justify the premium over commodity invoice apps ($7–$23/mo) — the premium rests solely on the late-fee/recovery wedge.
 - **The wedge:** reminders BEFORE the invoice is late (nobody else does this — Stripe's built-ins are due/past-due only, ChaseAI chases only after overdue).
 - **Stripe does the invoice; we are the front door + the brain.** User creates the invoice in OUR form (with the fee prompt), we hand it to Stripe via API. Stripe stores, sends, collects. We watch, remind, fee, and keep the proof.
 - **The fee prompt (Bashira's design, the heart of the product):** at invoice creation, the owner is asked "if not paid in N days, what's your late fee?" — flat $, %, or $0/none, per invoice per client. Fee is written into the invoice terms the client sees. Never a surprise, never a global-only setting.
@@ -44,20 +46,21 @@ _Last updated: 2026-09-25 (v1.4 — notification escalation + extension + widget
 - `src/services/feeEngine.ts` — **now alerts the owner on fee-pending-approval AND fee-applied.**
 - `src/routes/webhook.ts` — **now alerts the owner on invoice-paid AND fee-paid.**
 
-## NEXT SESSION — the build order
-1. ✅ **The invoice CREATOR form** — DONE
-2. ✅ **Stripe test-mode setup** — DONE
-3. ✅ **Test connected account + full-loop verification** — DONE 9/23/26
-4. **Dashboard frontend** — being built by designer. APIs ready: GET /invoices (paid/late view), GET /reports/revenue (money-in + fee revenue), GET /reports/export.csv (bookkeeper export). Include fee pending-approval UI (approve/waive flagged fees). Designer has notes on the fee prompt fields.
-5. ✅ **Real sending domain** — DONE 9/23/26: getdunn.org verified in Resend, email sending from reminders@getdunn.org
-6. ✅ **Inbound webhook signature verification** — DONE 9/23/26: Svix verification with RESEND_WEBHOOK_SECRET
-7. ✅ **Auth/sessions** — DONE 9/24/26: bearer token middleware, tests passing
-8. ✅ **Tests** — DONE 9/24/26: 48 tests (reminder math + auth + template schedule)
-9. ✅ **Recurring invoices** — DONE 9/24/26: full backend + designer UI wired
-10. ✅ **Dashboard, onboarding, emails** — DONE 9/24/26: all designer screens integrated
-11. ✅ **Settings, clients, waive, reports** — DONE 9/24/26: all API gaps closed
-12. ✅ **Deploy config** — DONE 9/24/26: railway.json with cron for daily templates job
-13. **Multi-business / accountant seat** — growth feature, not a ship-blocker.
+## NEXT SESSION (Sept 26) — polish & ship
+1. ✅ **All build work** — DONE 9/25/26
+2. **Resend API key** — GitHub secret scanning revoked it. Generate a new key at resend.com, add to Railway env vars, and verify email sending.
+3. **Subscription billing (Stripe Checkout)** — ✅ CODE BUILT 9/26/26. New `src/routes/billing.ts` (GET /billing/status, POST /billing/checkout, POST /billing/portal), Account subscription fields (plan, stripeCustomerId, stripeSubscriptionId, subscriptionStatus, currentPeriodEnd, cancelAtPeriodEnd), 3 new webhook handlers (checkout.session.completed, customer.subscription.updated/deleted). tsc clean + 48 tests pass. REMAINING (config, not code): create the $39/mo + $59/mo products/prices in the Stripe dashboard, set STRIPE_PRICE_SOLO / STRIPE_PRICE_BUSINESS in .env + Railway. **Designer update spec: `designer-spec-pricing-flow.md`.**
+
+**⚠️ CO-DEPENDENCY FIXED 9/26/26 — auth was completely broken.** `app.use('/auth', authRouter)` passed the factory *function* as middleware (never called `next()`), so every `/auth/*` request (login, signup, OAuth, /me) hung forever. Fixed to `app.use('/auth', authRouter())`. Also removed the broken `keyGenerator` from `authLimiter` (express-rate-limit v8 `ERR_ERL_KEY_GEN_IPV6`). Login/signup now set the `auth_token` cookie (previously they only returned the token in the body and the frontend put it in a `?token=` query param — now an httpOnly cookie, consistent with OAuth). Billing routes now resolve the account from the JWT (cookie/Bearer), not `findFirst()`. Verified end-to-end: signup → cookie set → checkout returns the price-config error (auth resolved), no-cookie checkout → 401. `JWT_SECRET` still missing from local `.env` — add it.
+
+**MULTI-ACCOUNT FIXED 9/26/26 — all API routes resolve the signed-in account from the JWT.** Replaced `prisma.account.findFirst()` (single-account assumption) with `getAccount(req)` from `src/lib/account.ts` across settings, clients, templates, invoices (list, waive, escalate, escalations, status, fee-default), and reports (revenue + both CSVs). `createInvoice()` now takes an `accountId` (callers: invoices POST + templateEngine). Verified live with two accounts (Alpha Studio / Beta Co.) — each sees only its own settings, and no-cookie requests return 401. REMAINING single-account spot: `webhook.ts` `onInvoiceCreated` still uses `findFirst()` — it needs Stripe-Connect routing (match the event's connected account id → `Account.stripeAccountId`), which is a separate, deferred fix.
+
+**BUSINESS NAME — required at signup, editable in Settings.** Signup now requires `businessName` (400 without it); stored on the Account and returned on login/signup/me. PUT /settings accepts `businessName`. Wired into the email From line (`clientMailFrom` → "{DBA} via Dunn") and the signature. Reminder engine blank-guards: if `businessName` is empty it skips the send and flags the owner once (`missing_business_name` audit event). This is the fix for "clients ignore emails from a business they don't recognize" — the DBA is the recognition token, so it's captured from the owner rather than guessed from Stripe's legal-entity name.
+4. **Website flow audit** — ✅ AUDITED 9/26/26. Fixed (code): **#8** signup→Connect Stripe created two accounts (now the OAuth callback links to the signed-in account instead of upserting a new one); **#6** OAuth callback now redirects to `/onboarding-success.html?open_invoices=N&clients=N&past_due=N` instead of skipping to `/dashboard`. REMAINING = designer-owned, all consolidated in `designer-spec-pricing-flow.md`: two-tier pricing ($39/10 invoices + $59/unlimited, no "Solo/Business" labels), "Start watching" → `/login?plan=solo|business`, "See how it works" → `/demo`, "Pricing"/"Privacy" nav anchors, "create your first invoice" dead link, and "Set default late-fee terms" → `/dashboard#settings`. Settings/Clients/Reports are tabs inside dashboard.html (Bashira's call), not separate files.
+5. ✅ **Pricing research** — DONE 9/26/26. Locked at **$39/mo Solo / $59/mo Business** (raised from $29/$49). Verdict: $29 priced against ChaseAI's $9 "chase emails" toy while capability matches Paidnice's $69 AR tier. Solo $39 undercuts Paidnice $69 + Chaser $49-$250; Business $59 targets freelancers stepping up from ChaseAI $19 Pro.
+6. **Domain setup** — Add `getdunn.org` as a custom domain in Railway's Networking settings. Add the DNS records Railway provides (at your domain registrar). Get email working at `getdunn.org` (Resend handles sending from reminders@getdunn.org).
+7. **Hobby plan budget alert** — In Railway Settings → Usage, set a notification at $4 spend so you're warned before hitting the $5 threshold.
+8. **Deploy for real** — Once subscription billing, domain, and emails are solid, add the public domain back and ship.
 
 ## DEPLOY (v1.4 — extensions built, ready to ship)
 

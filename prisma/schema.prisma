@@ -20,6 +20,15 @@ model Account {
   passwordHash     String?  // set on first login; null before setup
   createdAt        DateTime @default(now())
 
+  // Subscription billing (what the owner pays Dunn, separate from their
+  // connected Stripe account which is the merchant-of-record for invoices).
+  stripeCustomerId    String?   @unique // Stripe billing Customer (this account as a subscriber)
+  plan                String?   // "solo" | "business" | null
+  stripeSubscriptionId String?  @unique
+  subscriptionStatus  String?   // "active" | "trialing" | "past_due" | "canceled" | "incomplete" | "incomplete_expired" | "unpaid"
+  currentPeriodEnd    DateTime? // when the current billing period ends
+  cancelAtPeriodEnd   Boolean   @default(false)
+
   invoices Invoice[]
   clients  Client[]
   fees     FeePolicy[]

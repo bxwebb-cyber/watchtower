@@ -1,14 +1,15 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
+import { getAccount } from '../lib/account';
 
 const prisma = new PrismaClient();
 export const settingsRouter = Router();
 
 // GET /settings — return owner email + alert toggles for the connected account.
-settingsRouter.get('/', async (_req, res) => {
-  const account = await prisma.account.findFirst();
+settingsRouter.get('/', async (req, res) => {
+  const account = await getAccount(req);
   if (!account) {
-    return res.status(503).json({ error: 'No Stripe account connected' });
+    return res.status(401).json({ error: 'Not authenticated' });
   }
 
   let settings = await prisma.settings.findUnique({ where: { accountId: account.id } });
@@ -31,9 +32,16 @@ settingsRouter.get('/', async (_req, res) => {
 
 // PUT /settings — update owner email and alert toggles.
 settingsRouter.put('/', async (req, res) => {
-  const account = await prisma.account.findFirst();
+  const account = await getAccount(req);
   if (!account) {
-    return res.status(503).json({ error: 'No Stripe account connected' });
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  // businessName is the client-facing sender name; it lives on the Account.
+  let businessName = account.businessName ?? null;
+  if (req.body.businessName !== undefined) {
+    businessName = String(req.body.businessName).trim() || null;
+    await prisma.account.update({ where: { id: account.id }, data: { businessName } });
   }
 
   const data: Record<string, unknown> = {};
@@ -49,6 +57,7 @@ settingsRouter.put('/', async (req, res) => {
   });
 
   res.json({
+    businessName,
     ownerEmail: settings.ownerEmail ?? account.email,
     alertFeeApproval: settings.alertFeeApproval,
     alertOverdue: settings.alertOverdue,
@@ -57,8 +66,8 @@ settingsRouter.put('/', async (req, res) => {
 });
 
 // GET /settings/status — Stripe connection status (for onboarding).
-settingsRouter.get('/status', async (_req, res) => {
-  const account = await prisma.account.findFirst();
+settingsRouter.get('/status', async (req, res) => {
+  const account = await getAccount(req);
   res.json({
     connected: !!account,
     businessName: account?.businessName ?? null,

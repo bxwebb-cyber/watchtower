@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import Stripe from 'stripe';
 import { createInvoice, stripeConfigured } from '../services/invoiceCreator';
+import { getAccount } from '../lib/account';
 
 const prisma = new PrismaClient();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -10,8 +11,8 @@ export const invoicesRouter = Router();
 
 // The form checks this on load so it can say plainly what's missing
 // (Stripe key vs. connected account) instead of failing mysteriously.
-invoicesRouter.get('/status', async (_req, res) => {
-  const account = await prisma.account.findFirst();
+invoicesRouter.get('/status', async (req, res) => {
+  const account = await getAccount(req);
   res.json({
     stripeConfigured: stripeConfigured(),
     accountConnected: !!account,
@@ -24,6 +25,11 @@ invoicesRouter.get('/status', async (_req, res) => {
 // under the connected account, mirror it, and start watching.
 invoicesRouter.post('/', async (req, res) => {
   const body = req.body ?? {};
+
+  const account = await getAccount(req);
+  if (!account) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
 
   const clientName = String(body.clientName ?? '').trim();
   const clientEmail = String(body.clientEmail ?? '').trim().toLowerCase();
@@ -63,6 +69,7 @@ invoicesRouter.post('/', async (req, res) => {
   const graceDays = Math.max(1, Math.round(Number(body.fee?.graceDays ?? 7)));
 
   const result = await createInvoice({
+    accountId: account.id,
     clientName,
     clientEmail,
     amountCents: Math.round(amountDollars * 100),
@@ -71,7 +78,10 @@ invoicesRouter.post('/', async (req, res) => {
   });
 
   if (!result.ok) {
-    const status = result.code === 'not_configured' ? 503 : result.code === 'no_account' ? 409 : 502;
+    const status =
+      result.code === 'not_configured' ? 503 :
+      result.code === 'no_account' ? 409 :
+      result.code === 'plan_limit' ? 402 : 502;
     return res.status(status).json({ error: result.message, code: result.code });
   }
 
@@ -80,8 +90,10 @@ invoicesRouter.post('/', async (req, res) => {
 
 // POST /invoices/:id/waive — waive a pending fee with an optional note.
 invoicesRouter.post('/:id/waive', async (req, res) => {
+  const account = await getAccount(req);
+  if (!account) return res.status(401).json({ error: 'Not authenticated' });
   const { id } = req.params;
-  const invoice = await prisma.invoice.findUnique({ where: { id } });
+  const invoice = await prisma.invoice.findFirst({ where: { id, accountId: account.id } });
   if (!invoice) return res.status(404).json({ error: 'Invoice not found' });
   if (invoice.feeStatus !== 'open' && !invoice.feeApplied) {
     return res.status(400).json({ error: 'No pending fee to waive' });
@@ -112,14 +124,16 @@ invoicesRouter.post('/:id/waive', async (req, res) => {
 // action = 'send' → trigger the T+14 final notice email to the client
 // action = 'call' → mark as owner-handled, stop auto-reminders
 invoicesRouter.post('/:id/escalate', async (req, res) => {
+  const account = await getAccount(req);
+  if (!account) return res.status(401).json({ error: 'Not authenticated' });
   const { id } = req.params;
   const action = String(req.body.action ?? '').trim();
   if (action !== 'send' && action !== 'call') {
     return res.status(400).json({ error: 'Action must be "send" or "call".' });
   }
 
-  const invoice = await prisma.invoice.findUnique({
-    where: { id },
+  const invoice = await prisma.invoice.findFirst({
+    where: { id, accountId: account.id },
     include: { client: true, account: true },
   });
   if (!invoice) return res.status(404).json({ error: 'Invoice not found' });
@@ -157,9 +171,13 @@ invoicesRouter.post('/:id/escalate', async (req, res) => {
 });
 
 // GET /invoices/escalations — list invoices needing owner decision.
-invoicesRouter.get('/escalations', async (_req, res) => {
+invoicesRouter.get('/escalations', async (req, res) => {
+  const account = await getAccount(req);
+  if (!account) return res.status(401).json({ error: 'Not authenticated' });
+
   const invoices = await prisma.invoice.findMany({
     where: {
+      accountId: account.id,
       status: 'open',
       escalateAction: null,
       feeApplied: false,
@@ -196,7 +214,7 @@ invoicesRouter.get('/fee-default', async (req, res) => {
   const email = String(req.query.email ?? '').trim().toLowerCase();
   if (!email) return res.json({ found: false });
 
-  const account = await prisma.account.findFirst();
+  const account = await getAccount(req);
   if (!account) return res.json({ found: false });
 
   const client = await prisma.client.findFirst({
@@ -222,8 +240,12 @@ invoicesRouter.get('/fee-default', async (req, res) => {
 
 // The dashboard's core view: every invoice, its status, what the agent has
 // done, and per-client lateness history. The "who's always late" screen.
-invoicesRouter.get('/', async (_req, res) => {
+invoicesRouter.get('/', async (req, res) => {
+  const account = await getAccount(req);
+  if (!account) return res.status(401).json({ error: 'Not authenticated' });
+
   const invoices = await prisma.invoice.findMany({
+    where: { accountId: account.id },
     include: {
       client: true,
       reminders: { orderBy: { sentAt: 'asc' } },

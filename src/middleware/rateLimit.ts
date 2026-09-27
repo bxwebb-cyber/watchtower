@@ -7,9 +7,6 @@ export const authLimiter = rateLimit({
   message: { error: 'Too many attempts. Try again in 15 minutes.' },
   standardHeaders: false,
   legacyHeaders: false,
-  keyGenerator: (req) => {
-    return (req.headers['x-forwarded-for'] as string)?.split(',')[0] || req.ip || 'unknown';
-  },
 });
 
 // Looser limit for general API (100 requests per 15 minutes per IP)

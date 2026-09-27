@@ -13,6 +13,7 @@ export function stripeConfigured(): boolean {
 }
 
 export interface CreateInvoiceInput {
+  accountId: string;
   clientName: string;
   clientEmail: string;
   amountCents: number;
@@ -41,7 +42,11 @@ export type CreateInvoiceResult =
         stripeNumber: string | null;
       };
     }
-  | { ok: false; code: 'not_configured' | 'no_account' | 'stripe_error'; message: string };
+  | { ok: false; code: 'not_configured' | 'no_account' | 'plan_limit' | 'stripe_error'; message: string };
+
+// The Solo ($39) tier allows 10 invoices per calendar month. Business ($59) is
+// unlimited. Un-subscribed accounts (plan null, pre-launch) are not blocked.
+const SOLO_MONTHLY_INVOICE_LIMIT = 10;
 
 // The product's heart: owner fills OUR form (with the fee prompt), we create
 // the invoice on THEIR connected Stripe account via API, then mirror client +
@@ -55,14 +60,32 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<CreateIn
     };
   }
 
-  // v1 single-account: the one business that connected their Stripe.
-  const account = await prisma.account.findFirst();
+  // Resolve the account whose Stripe connection we're invoicing under.
+  const account = await prisma.account.findUnique({ where: { id: input.accountId } });
   if (!account) {
     return {
       ok: false,
       code: 'no_account',
       message: 'No Stripe account connected yet. Connect one at /auth/stripe/start, then come back.',
     };
+  }
+
+  // Plan cap: Solo gets 10 invoices per calendar month. The cap sorts buyers
+  // by usage, not self-declared "solo vs business" — an account on the $39
+  // tier simply cannot create an 11th invoice until the month rolls over.
+  if (account.plan === 'solo') {
+    const now = new Date();
+    const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    const countThisMonth = await prisma.invoice.count({
+      where: { accountId: account.id, createdAt: { gte: monthStart } },
+    });
+    if (countThisMonth >= SOLO_MONTHLY_INVOICE_LIMIT) {
+      return {
+        ok: false,
+        code: 'plan_limit',
+        message: `You've reached the ${SOLO_MONTHLY_INVOICE_LIMIT}-invoice monthly limit on your plan. Upgrade to unlimited to keep creating invoices.`,
+      };
+    }
   }
 
   try {

@@ -50,6 +50,15 @@ webhookRouter.post('/', async (req, res) => {
       case 'invoice.updated':
         await onInvoiceUpdated(event.data.object as Stripe.Invoice);
         break;
+      case 'checkout.session.completed':
+        await onCheckoutCompleted(event.data.object as Stripe.Checkout.Session);
+        break;
+      case 'customer.subscription.updated':
+        await onSubscriptionUpdated(event.data.object as Stripe.Subscription);
+        break;
+      case 'customer.subscription.deleted':
+        await onSubscriptionDeleted(event.data.object as Stripe.Subscription);
+        break;
       default:
         // other events we don't act on yet
         break;
@@ -244,5 +253,71 @@ async function onInvoiceUpdated(inv: Stripe.Invoice) {
   });
   await prisma.auditEvent.create({
     data: { invoiceId: invoice.id, event: 'invoice_updated', detail: `due date changed to ${dueDate.toISOString().slice(0, 10)}` },
+  });
+}
+
+// ---- subscription billing handlers ----
+
+// A checkout session completed means the owner subscribed to Dunn. Resolve
+// the session to its subscription + customer, then stamp the account.
+async function onCheckoutCompleted(session: Stripe.Checkout.Session) {
+  if (session.mode !== 'subscription') return;
+  const accountId = session.client_reference_id || session.metadata?.accountId;
+  if (!accountId) return;
+
+  const account = await prisma.account.findUnique({ where: { id: accountId } });
+  if (!account || !session.subscription) return;
+
+  const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
+  await syncSubscription(accountId, subscription);
+
+  await notifyOwner(
+    accountId,
+    'Subscription active',
+    'Your Dunn subscription is now active. Watchtower is keeping watch.'
+  );
+}
+
+// Subscription state changed (renewed, past-due, plan changed, etc.).
+async function onSubscriptionUpdated(sub: Stripe.Subscription) {
+  const accountId = sub.metadata?.accountId as string | undefined;
+  if (!accountId) return;
+  await syncSubscription(accountId, sub);
+}
+
+async function onSubscriptionDeleted(sub: Stripe.Subscription) {
+  const accountId = sub.metadata?.accountId as string | undefined;
+  if (!accountId) return;
+  await prisma.account.update({
+    where: { id: accountId },
+    data: {
+      subscriptionStatus: 'canceled',
+      stripeSubscriptionId: sub.id,
+      currentPeriodEnd: null,
+    },
+  });
+}
+
+// One source of truth for writing a subscription back to the account row.
+async function syncSubscription(accountId: string, sub: Stripe.Subscription) {
+  const item = sub.items?.data?.[0];
+  const price = item?.price;
+  // Map Stripe price id → our plan name via the configured env vars.
+  let plan: string | null = null;
+  if (price?.id === process.env.STRIPE_PRICE_SOLO) plan = 'solo';
+  else if (price?.id === process.env.STRIPE_PRICE_BUSINESS) plan = 'business';
+
+  await prisma.account.update({
+    where: { id: accountId },
+    data: {
+      stripeCustomerId: typeof sub.customer === 'string' ? sub.customer : sub.customer.id,
+      stripeSubscriptionId: sub.id,
+      subscriptionStatus: sub.status,
+      plan,
+      currentPeriodEnd: item?.current_period_end
+        ? new Date(item.current_period_end * 1000)
+        : null,
+      cancelAtPeriodEnd: sub.cancel_at_period_end,
+    },
   });
 }

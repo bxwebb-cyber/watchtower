@@ -27,6 +27,7 @@ export async function runTemplateJob(now = new Date()): Promise<number> {
       dueDate.setDate(dueDate.getDate() + tmpl.dueDays);
 
       const result = await createInvoice({
+        accountId: tmpl.accountId,
         clientName: tmpl.clientName,
         clientEmail: tmpl.clientEmail,
         amountCents: tmpl.amount,

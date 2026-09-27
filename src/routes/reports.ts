@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
+import { getAccount } from '../lib/account';
 
 const prisma = new PrismaClient();
 
@@ -31,13 +32,15 @@ function averageDays(msDeltas: number[]): number | null {
 // ── GET /reports/revenue — monthly report data ──
 
 reportsRouter.get('/revenue', async (req, res) => {
+  const account = await getAccount(req);
+  if (!account) return res.status(401).json({ error: 'Not authenticated' });
   const month = parseMonth(req.query.month as string | undefined);
   const start = new Date(month.getFullYear(), month.getMonth(), 1);
   const end = new Date(month.getFullYear(), month.getMonth() + 1, 1);
   const trendMonths = parseTrendMonths(req.query.months as string | undefined);
 
   const invoices = await prisma.invoice.findMany({
-    where: { status: 'paid' },
+    where: { accountId: account.id, status: 'paid' },
     include: { client: true },
   });
 
@@ -144,11 +147,13 @@ reportsRouter.get('/revenue', async (req, res) => {
 // ── GET /reports/revenue.csv — download CSV ──
 
 reportsRouter.get('/revenue.csv', async (req, res) => {
+  const account = await getAccount(req);
+  if (!account) return res.status(401).json({ error: 'Not authenticated' });
   const month = parseMonth(req.query.month as string | undefined);
   const trendMonths = parseTrendMonths(req.query.months as string | undefined);
 
   const invoices = await prisma.invoice.findMany({
-    where: { status: 'paid' },
+    where: { accountId: account.id, status: 'paid' },
     include: { client: true },
   });
 
@@ -198,11 +203,16 @@ reportsRouter.get('/revenue.csv', async (req, res) => {
 // ── GET /reports/export.csv — bookkeeper-friendly CSV (legacy) ──
 
 reportsRouter.get('/export.csv', async (req, res) => {
+  const account = await getAccount(req);
+  if (!account) return res.status(401).json({ error: 'Not authenticated' });
   const month = parseMonth(req.query.month as string | undefined);
   const start = new Date(month.getFullYear(), month.getMonth(), 1);
   const end = new Date(month.getFullYear(), month.getMonth() + 1, 1);
 
-  const invoices = await prisma.invoice.findMany({ include: { client: true } });
+  const invoices = await prisma.invoice.findMany({
+    where: { accountId: account.id },
+    include: { client: true },
+  });
 
   const rows: string[][] = [['Month', 'Invoices paid', 'Invoice revenue', 'Late fees collected', 'Fee revenue', 'Fees waived', 'Total']];
   const add = (m: string, invCount: number, invRevenue: number, feeCount: number, feeRevenue: number, waived: number, total: number) =>

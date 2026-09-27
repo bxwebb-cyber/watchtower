@@ -53,22 +53,45 @@ export function authRouter() {
       const connectedAccountId = oauthResp.stripe_user_id;
       const email = oauthResp.email || 'unknown@stripe.com';
 
-      const account = await prisma.account.upsert({
-        where: { stripeAccountId: connectedAccountId },
-        update: { email },
-        create: { stripeAccountId: connectedAccountId, email },
-      });
+      // LINK the Stripe account to whatever account is signed in, so a user
+      // who signed up first (account created with a `pending_` stripeAccountId)
+      // gets their real Stripe id written onto the SAME row — not a second
+      // orphaned account.
+      let accountId: string | null = resolveAccountId(req);
+      if (accountId) {
+        const existing = await prisma.account.findUnique({ where: { id: accountId } });
+        if (!existing) accountId = null;
+      }
 
-      const token = issueToken(account.id);
+      if (accountId) {
+        await prisma.account.update({
+          where: { id: accountId },
+          data: { stripeAccountId: connectedAccountId, email },
+        });
+      } else {
+        // Not signed in (direct OAuth): create/link by Stripe account id.
+        const acc = await prisma.account.upsert({
+          where: { stripeAccountId: connectedAccountId },
+          update: { email },
+          create: { stripeAccountId: connectedAccountId, email },
+        });
+        accountId = acc.id;
+      }
 
-      res.cookie('auth_token', token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        maxAge: 7 * 24 * 60 * 60 * 1000,
-      });
+      setAuthCookie(res, issueToken(accountId!));
 
-      res.redirect('/dashboard');
+      // Onboarding success screen — the counts the design §3.8 needs.
+      const [openInvoices, clientCount, pastDue] = await Promise.all([
+        prisma.invoice.count({ where: { accountId: accountId!, status: 'open' } }),
+        prisma.client.count({ where: { accountId: accountId! } }),
+        prisma.invoice.count({
+          where: { accountId: accountId!, status: 'open', dueDate: { lt: new Date() } },
+        }),
+      ]);
+
+      res.redirect(
+        `/onboarding-success.html?open_invoices=${openInvoices}&clients=${clientCount}&past_due=${pastDue}`
+      );
     } catch (err: any) {
       console.error('Stripe OAuth error:', err);
       res.status(500).send('Stripe connection failed. Please try again.');
@@ -80,6 +103,11 @@ export function authRouter() {
       const { email, password } = req.body;
       if (!email || !password) {
         res.status(400).json({ error: 'Email and password required' });
+        return;
+      }
+      const businessName = String(req.body.businessName ?? '').trim();
+      if (!businessName) {
+        res.status(400).json({ error: 'Business name is required — reminders are sent in your business\'s name.' });
         return;
       }
 
@@ -100,20 +128,23 @@ export function authRouter() {
       if (existing) {
         await prisma.account.update({
           where: { id: existing.id },
-          data: { passwordHash },
+          data: { passwordHash, businessName },
         });
         const token = issueToken(existing.id);
-        res.json({ token, account: { id: existing.id, email } });
+        setAuthCookie(res, token);
+        res.json({ token, account: { id: existing.id, email, businessName } });
       } else {
         const account = await prisma.account.create({
           data: {
             stripeAccountId: 'pending_' + crypto.randomUUID(),
             email,
             passwordHash,
+            businessName,
           },
         });
         const token = issueToken(account.id);
-        res.json({ token, account: { id: account.id, email } });
+        setAuthCookie(res, token);
+        res.json({ token, account: { id: account.id, email, businessName } });
       }
     } catch (err: any) {
       console.error('Signup error:', err);
@@ -138,6 +169,7 @@ export function authRouter() {
       }
 
       const token = issueToken(account.id);
+      setAuthCookie(res, token);
       res.json({
         token,
         account: {
@@ -180,4 +212,26 @@ export function authRouter() {
 
 function issueToken(accountId: string): string {
   return jwt.sign({ accountId }, jwtSecret, { expiresIn: '7d' });
+}
+
+function setAuthCookie(res: Response, token: string): void {
+  res.cookie('auth_token', token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  });
+}
+
+// Resolve the signed-in account id from the auth cookie / bearer token.
+function resolveAccountId(req: Request): string | null {
+  const authHeader = req.headers.authorization || '';
+  const token = req.cookies?.auth_token || (authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '');
+  if (!token) return null;
+  try {
+    const payload = jwt.verify(token, jwtSecret) as { accountId: string };
+    return payload.accountId;
+  } catch {
+    return null;
+  }
 }

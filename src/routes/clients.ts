@@ -1,13 +1,14 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
+import { getAccount } from '../lib/account';
 
 const prisma = new PrismaClient();
 export const clientsRouter = Router();
 
 // GET /clients — list all clients with lateness data.
-clientsRouter.get('/', async (_req, res) => {
-  const account = await prisma.account.findFirst();
-  if (!account) return res.status(503).json({ error: 'No Stripe account connected' });
+clientsRouter.get('/', async (req, res) => {
+  const account = await getAccount(req);
+  if (!account) return res.status(401).json({ error: 'Not authenticated' });
 
   const clients = await prisma.client.findMany({
     where: { accountId: account.id },

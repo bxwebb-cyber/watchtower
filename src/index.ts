@@ -12,6 +12,7 @@ import { reportsRouter } from './routes/reports';
 import { templatesRouter } from './routes/templates';
 import { settingsRouter } from './routes/settings';
 import { clientsRouter } from './routes/clients';
+import { billingRouter } from './routes/billing';
 import { inboundRouter } from './routes/inbound';
 import { authMiddleware } from './middleware/auth';
 import { apiLimiter } from './middleware/rateLimit';
@@ -42,7 +43,7 @@ app.get('/health', (_req, res) => {
   res.json({ ok: true, service: 'watchtower' });
 });
 
-app.use('/auth', authRouter);
+app.use('/auth', authRouter());
 
 app.use(authMiddleware);
 
@@ -51,6 +52,7 @@ app.use('/reports', apiLimiter, reportsRouter);
 app.use('/templates', apiLimiter, templatesRouter);
 app.use('/settings', apiLimiter, settingsRouter);
 app.use('/clients', apiLimiter, clientsRouter);
+app.use('/billing', apiLimiter, billingRouter);
 app.use('/webhooks/resend/inbound', express.raw({ type: 'application/json' }), inboundRouter);
 
 app.get('/login', (_req: Request, res: Response) => {
