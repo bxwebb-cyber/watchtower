@@ -100,11 +100,11 @@ _Updated 2026-09-27 (v1.7 — full UI re-integration + onboarding + invoice form
 ## Honest Status
 **Watchtower (Dunn) v1.7 is DEPLOYED + VERIFIED (9/27/26).** Live on Railway (carefree-education / valiant-miracle, bashira.webb@gmail.com) at https://valiant-miracle-production-16b0.up.railway.app. DB migrated (11 migrations). Node pinned to 24. **Full UI re-integrated this session:** new 69KB designer dashboard (6 views) wired via a rewritten `api.js`; `/invoices` + `/clients` enriched; onboarding (signup → connect Stripe → default fee); invoice form rebuilt at `/index.html` with default-fee prefill + returning-client memory; landing serves $39/$59 (route fix); login eye-toggle + 12-char password rule; demo "back to site" fixed. Verified end-to-end in a browser with a test account (all six views render, samples cleared, data binds).
 
-**Remaining (credentials + domain + one real-data test — no code left):**
-1. New Resend API key (old revoked) → `RESEND_API_KEY`
-2. Stripe $39/$59 price IDs → `STRIPE_PRICE_SOLO` / `STRIPE_PRICE_BUSINESS`
+**Remaining (domain + go-live + one real-data test — no code left):**
+1. ✅ Resend API key — DONE (new key set + verified; getdunn.org already verified in Resend)
+2. ✅ Stripe $39/$59 price IDs — DONE (test mode; checkout verified returning a Stripe URL)
 3. Stripe webhook endpoint + secret → `STRIPE_WEBHOOK_SECRET`
 4. Stripe OAuth redirect URI for the prod URL
 5. Point getdunn.org at Railway
-6. Switch to live Stripe keys when ready for real payments
+6. Switch to live Stripe keys + activate account + link a bank for payouts, when ready for real payments
 7. Exercise the full flow against a CONNECTED Stripe account (create invoice → reminder → late fee) — code-complete but not yet run on live connected data

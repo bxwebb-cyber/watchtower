@@ -9,7 +9,7 @@ _Last updated: 2026-09-27 (v1.7 — full UI re-integration + onboarding + invoic
 
 **Full UI re-integration done 9/27/26:** the new 69KB designer dashboard (six views — Dashboard / Invoices / Recurring / Clients / Reports / Settings) is swapped in and fully wired via a rewritten `api.js` (the designer's `{placeholder}` templates + `wt:*` events). `/invoices` and `/clients` enriched with the fields the new UI displays (client email, fee state, paid-at; client "since" year). **Onboarding built:** signup → `/onboarding` (connect Stripe + set a default late-fee, stored on Settings) → dashboard. **Invoice form rebuilt** at `/index.html` — fee prompt with live preview, prefills the account's default fee, and remembers a returning client's last terms. Landing `/` serves the $39/$59 page (correct — a route fix stopped it from serving the stale prototype). Login has an eye toggle + the real 12-char password rule. Demo "back to site" fixed.
 
-Remaining is config/creds only: a new Resend key, Stripe $39/$59 price IDs + webhook secret + OAuth redirect URI, the getdunn.org domain, and switching to live Stripe keys. Stripe is still TEST mode. **The full real-data flow (connect Stripe → create invoice → reminders → late fee) is code-complete but NOT exercised against a live connected account yet.**
+Remaining is config/creds only: the Stripe webhook secret + OAuth redirect URI for the prod URL, the getdunn.org domain, and switching to live Stripe keys (plus account activation + a linked bank for payouts). **Email (Resend) and subscription billing (Stripe) are now CONFIGURED and VERIFIED in test mode.** Still TEST mode overall. **The full real-data flow (connect Stripe → create invoice → reminders → late fee) is code-complete but NOT exercised against a live connected account yet.**
 
 **What exists:** Everything. Invoice creator, pre-due reminders, late-fee engine with owner-approval gate, per-invoice fee prompts, inbound client replies, recurring invoice templates, dashboard (KPI cards + invoice list with 5 statuses + fee approval), settings (owner email + 3 alert toggles), per-client lateness view, reports (revenue + CSV export), HTML email templates (8 Handlebars, designer-delivered), Stripe Connect OAuth, bearer token auth, 48 passing tests, Railway deploy config with cron. Landing page (designer prototype) at /. Login/signup page at /login. Dashboard protected behind JWT auth. Pain point validation research + NSF SBIR pitch drafted.
 - **Location:** `~/Desktop/watchtower/`
@@ -22,9 +22,9 @@ Remaining is config/creds only: a new Resend key, Stripe $39/$59 price IDs + web
 
 Deployed + healthy. Everything below is config/creds, not code:
 
-1. **Resend API key (new)** — old `re_...` was revoked. resend.com → API Keys → Create → set `RESEND_API_KEY` on Railway. *(Without it, reminder/fee/paid emails silently dry-run.)*
+1. ✅ **Resend API key** — DONE. New key set on Railway + local .env, verified (getdunn.org already verified in Resend; sending enabled).
 2. **Resend inbound webhook secret** — resend.com → Domains → getdunn.org → Inbound → set `RESEND_WEBHOOK_SECRET` (only if inbound client replies matter now).
-3. **Stripe products/prices** — create $39/mo + $59/mo products in Stripe dashboard → set `STRIPE_PRICE_SOLO` / `STRIPE_PRICE_BUSINESS` (the `price_...` IDs).
+3. ✅ **Stripe products/prices** — DONE (test mode). $39/$59 created, set as `STRIPE_PRICE_SOLO` / `STRIPE_PRICE_BUSINESS`; checkout verified (returns a Stripe checkout URL). Recreate in LIVE mode at launch.
 4. **Stripe webhook endpoint + secret** — Stripe dashboard → Developers → Webhooks → point at `https://valiant-miracle-production-16b0.up.railway.app/webhooks/stripe` → set `STRIPE_WEBHOOK_SECRET`.
 5. **Stripe OAuth redirect URI** — add `https://valiant-miracle-production-16b0.up.railway.app/auth/stripe/callback` to the OAuth redirect list (currently registered only for localhost).
 6. **Domain** — Railway → carefree-education → Settings → Networking → add `getdunn.org` as custom domain, then the CNAME/DNS record at your registrar. Swap `APP_URL`/`STRIPE_REDIRECT_URI`/`MASCOT_URL` to getdunn.org once live.
