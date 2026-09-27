@@ -73,16 +73,18 @@ app.use('/dashboard', (req: Request, res: Response, _next: NextFunction) => {
   res.redirect('/');
 });
 
-app.use(express.static(path.join(__dirname, '../public')));
-
-app.get('/', (_req, res) => {
+// Root + demo routes BEFORE express.static so they take precedence over
+// the directory's index.html default (otherwise "/" serves the stale index.html).
+app.get('/', (_req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, '../public/landing.html'));
 });
 
 // Demo dashboard (sample data, no API calls).
-app.get('/demo', (_req, res) => {
+app.get('/demo', (_req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, '../public/demo.html'));
 });
+
+app.use(express.static(path.join(__dirname, '../public')));
 
 const port = Number(process.env.PORT || 4000);
 app.listen(port, () => {
