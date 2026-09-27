@@ -215,6 +215,7 @@ async function loadRecurring() {
       result_label: !t.lastRunAt ? '' : (t.lastRunOk ? 'Sent' : 'Failed, will retry'),
       sent_count: t.sentCount || 0,
       status_label: t.active ? 'Active' : 'Paused',
+      status_class: t.active ? 'wt-pill--active' : 'wt-pill--paused',
     };
   });
 
