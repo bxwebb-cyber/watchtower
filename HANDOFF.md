@@ -1,11 +1,11 @@
 # Watchtower — Handoff Sheet
-_Last updated: 2026-09-25 (v1.4 — notification escalation + extension + widget) · working name = "Watchtower"; real name = "Dunn" (accounting term). Keep calling it Watchtower in code/docs until the domain is bought._
+_Last updated: 2026-09-27 (v1.6 — subscription billing + deploy fixes; verified LIVE on Railway) · working name = "Watchtower"; real name = "Dunn" (accounting term). Keep calling it Watchtower in code/docs until the domain is bought._
 
 ---
 
-## ▶ STATUS — v1.5 BUILD DONE. DEPLOYED TO RAILWAY. POLISH REMAINING.
+## ▶ STATUS — v1.6 DEPLOYED + VERIFIED LIVE. REMAINING = CREDENTIALS + DOMAIN.
 
-**Current state:** App is deployed and running at Railway (private URL). Postgres connected. Security review completed and fixes applied. Chrome extension built. Notification escalation logic added. Landing page, dashboard, login, recurring invoices, and demo all wired to designer's latest screens. Reminder emails are coded but need a fresh Resend API key to send. Subscription billing (users paying for Dunn) is NOT built yet. Domain getdunn.org is registered but not pointed at Railway.
+**Current state (verified 9/27/26):** LIVE on Railway. Project auto-named **"carefree-education"** (service **"valiant-miracle"**), under **bashira.webb@gmail.com** → workspace "bxwebb-cyber's Projects". Public URL: **https://valiant-miracle-production-16b0.up.railway.app**. All 10 Prisma migrations applied (the DB was empty before 9/27 — the earlier "deployed" claim had an unmigrated DB; now fixed with a `prisma migrate deploy` step on every deploy). Node pinned to 24 via `.nvmrc` + `engines` (kills the svix ESM crash on Node 18). `@prisma/client` moved to dependencies; `node_modules` + `dist/` untracked from git. Subscription billing CODE is BUILT (Stripe Checkout, $39 solo / $59 business) but inert until Stripe price IDs + live keys are set. Reminder emails need a NEW Resend API key (old one revoked by GitHub secret scanning). Chrome extension built. Escalation logic added. Domain getdunn.org registered, not yet pointed at Railway. Stripe is in TEST mode (sk_test) until go-live.
 
 **What exists:** Everything. Invoice creator, pre-due reminders, late-fee engine with owner-approval gate, per-invoice fee prompts, inbound client replies, recurring invoice templates, dashboard (KPI cards + invoice list with 5 statuses + fee approval), settings (owner email + 3 alert toggles), per-client lateness view, reports (revenue + CSV export), HTML email templates (8 Handlebars, designer-delivered), Stripe Connect OAuth, bearer token auth, 48 passing tests, Railway deploy config with cron. Landing page (designer prototype) at /. Login/signup page at /login. Dashboard protected behind JWT auth. Pain point validation research + NSF SBIR pitch drafted.
 - **Location:** `~/Desktop/watchtower/`
@@ -13,6 +13,20 @@ _Last updated: 2026-09-25 (v1.4 — notification escalation + extension + widget
 - **Verified (2026-08-29):** `tsc --noEmit` clean · server boots · `/health` ok · `/invoices/status` now returns `stripeConfigured:true` · OAuth start URL builds correctly with the real client_id · webhook pipeline returns 200 (was 404 — see bug fix below).
 - **`.env` now contains (all TEST mode):** `STRIPE_SECRET_KEY` (sk_test), `STRIPE_CLIENT_ID` (ca_), `STRIPE_REDIRECT_URI`, `STRIPE_WEBHOOK_SECRET` (whsec, from `stripe listen`). Plus existing `DATABASE_URL`/`PORT`/`RESEND_API_KEY`/`APP_URL`.
 |- **Stripe Standard OAuth is ENABLED (confirmed by user).** Test OAuth flow worked end-to-end in v1.3.
+
+## 🚀 GO-LIVE CHECKLIST — remaining (verified 9/27/26)
+
+Deployed + healthy. Everything below is config/creds, not code:
+
+1. **Resend API key (new)** — old `re_...` was revoked. resend.com → API Keys → Create → set `RESEND_API_KEY` on Railway. *(Without it, reminder/fee/paid emails silently dry-run.)*
+2. **Resend inbound webhook secret** — resend.com → Domains → getdunn.org → Inbound → set `RESEND_WEBHOOK_SECRET` (only if inbound client replies matter now).
+3. **Stripe products/prices** — create $39/mo + $59/mo products in Stripe dashboard → set `STRIPE_PRICE_SOLO` / `STRIPE_PRICE_BUSINESS` (the `price_...` IDs).
+4. **Stripe webhook endpoint + secret** — Stripe dashboard → Developers → Webhooks → point at `https://valiant-miracle-production-16b0.up.railway.app/webhooks/stripe` → set `STRIPE_WEBHOOK_SECRET`.
+5. **Stripe OAuth redirect URI** — add `https://valiant-miracle-production-16b0.up.railway.app/auth/stripe/callback` to the OAuth redirect list (currently registered only for localhost).
+6. **Domain** — Railway → carefree-education → Settings → Networking → add `getdunn.org` as custom domain, then the CNAME/DNS record at your registrar. Swap `APP_URL`/`STRIPE_REDIRECT_URI`/`MASCOT_URL` to getdunn.org once live.
+7. **Go live** — switch `STRIPE_SECRET_KEY` from `sk_test` to `sk_live` (and use live Connect client_id + price IDs) when ready to take real payments.
+
+**Railway access note:** project lives under **bashira.webb@gmail.com** (NOT bmwxcf@gmail.com — that account only has prospectai). The local CLI is logged in as bashira.webb; the bmwxcf login is backed up at `~/.railway/config.json.bmwxcf.bak`. Local repo is linked to carefree-education/valiant-miracle.
 
 ## The Product (locked decisions — do not drift from these)
 - **Tagline (locked 8/21/26): "We keep watch so you don't have to."** The whole pitch in one sentence — the lighthouse keeps watch so the ships don't have to, Watchtower keeps watch so the owner doesn't have to chase.
