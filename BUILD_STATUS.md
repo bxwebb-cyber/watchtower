@@ -1,5 +1,5 @@
 # Watchtower — Build Status
-_Updated 2026-09-27 (v1.6 — deployed + verified live on Railway) · working name = "Watchtower"; real name = "Dunn"_
+_Updated 2026-09-27 (v1.7 — full UI re-integration + onboarding + invoice form) · working name = "Watchtower"; real name = "Dunn"_
 
 ## What's Built
 
@@ -98,12 +98,13 @@ _Updated 2026-09-27 (v1.6 — deployed + verified live on Railway) · working na
 10. ⚠️ **Subscription billing** — CODE DONE 9/26/26: billing route + subscription webhooks + Account fields built, typecheck + tests green. REMAINING (config): create $39/$59 Stripe products/prices, set STRIPE_PRICE_SOLO/STRIPE_PRICE_BUSINESS, wire "Start watching" buttons (designer), add JWT_SECRET to local .env.
 
 ## Honest Status
-**Watchtower (Dunn) v1.6 is DEPLOYED + VERIFIED LIVE (9/27/26).** All backend APIs built and tested (48 passing). All designer screens wired. Auth live (email/password + Stripe OAuth). Runs on Railway: project "carefree-education" / service "valiant-miracle" under bashira.webb@gmail.com, at https://valiant-miracle-production-16b0.up.railway.app. DB migrated (all 10 migrations — the DB was empty before 9/27; a `prisma migrate deploy` step now runs on every deploy). Node pinned to 24 (.nvmrc + engines). Subscription billing code built, inert pending Stripe price IDs.
+**Watchtower (Dunn) v1.7 is DEPLOYED + VERIFIED (9/27/26).** Live on Railway (carefree-education / valiant-miracle, bashira.webb@gmail.com) at https://valiant-miracle-production-16b0.up.railway.app. DB migrated (11 migrations). Node pinned to 24. **Full UI re-integrated this session:** new 69KB designer dashboard (6 views) wired via a rewritten `api.js`; `/invoices` + `/clients` enriched; onboarding (signup → connect Stripe → default fee); invoice form rebuilt at `/index.html` with default-fee prefill + returning-client memory; landing serves $39/$59 (route fix); login eye-toggle + 12-char password rule; demo "back to site" fixed. Verified end-to-end in a browser with a test account (all six views render, samples cleared, data binds).
 
-**Remaining (credentials + domain — no code left):**
+**Remaining (credentials + domain + one real-data test — no code left):**
 1. New Resend API key (old revoked) → `RESEND_API_KEY`
 2. Stripe $39/$59 price IDs → `STRIPE_PRICE_SOLO` / `STRIPE_PRICE_BUSINESS`
 3. Stripe webhook endpoint + secret → `STRIPE_WEBHOOK_SECRET`
 4. Stripe OAuth redirect URI for the prod URL
 5. Point getdunn.org at Railway
 6. Switch to live Stripe keys when ready for real payments
+7. Exercise the full flow against a CONNECTED Stripe account (create invoice → reminder → late fee) — code-complete but not yet run on live connected data
