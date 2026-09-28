@@ -1,5 +1,5 @@
 # Watchtower — Build Status
-_Updated 2026-09-27 (v1.7 — full UI re-integration + onboarding + invoice form) · working name = "Watchtower"; real name = "Dunn"_
+_Updated 2026-09-28 (v1.8 — daily job scheduler; verified locally, not yet deployed) · working name = "Watchtower"; real name = "Dunn"_
 
 ## What's Built
 
@@ -47,7 +47,12 @@ _Updated 2026-09-27 (v1.7 — full UI re-integration + onboarding + invoice form
 - `prisma/schema.prisma` — **UPDATED (v1.4):** `escalateAction` field on Invoice (null | "send_reminder" | "owner_calling")
 - `src/routes/invoices.ts` — **UPDATED (v1.4):** added `POST /invoices/:id/escalate` and `GET /invoices/escalations`
 - `src/services/reminderEngine.ts` — **UPDATED (v1.4):** at T+14, asks owner instead of auto-sending client email
-- `railway.json` — **NEW (v1.1):** build/deploy/cron config for Railway (daily templates job at noon ET)
+- `railway.json` — **NEW (v1.1):** build/deploy config for Railway. **v1.8:** removed the `"cron"` block — not a valid Railway key, it never ran.
+- `src/jobs/scheduler.ts` — **NEW (v1.8):** in-process daily sweep at 9:00am America/New_York (15-min tick, catch-up after restart, 3 retries/day). On in production/Railway, off in local dev; `SCHEDULER=on|off` overrides.
+- `src/jobs/sweep.ts` — **NEW (v1.8):** `runSweep()` (reminders → fees → templates, each isolated) + `withJobLock()` (Postgres advisory lock — no two runs ever overlap). `run.ts` uses the same lock.
+- `src/services/reminderEngine.ts` — **UPDATED (v1.8):** sends only the *current* step; no back-filling missed older steps.
+- `src/services/feeEngine.ts` — **UPDATED (v1.8):** owner asked once per pending fee; waived fees never re-issued.
+- `package.json` — **UPDATED (v1.8):** `build` copies `src/email-templates` into `dist/` (reminders crashed in production without it).
 - `src/email-templates/` — **NEW (v1.0):** 8 Handlebars email templates from designer.
 - `src/services/emailRenderer.ts` — **NEW (v1.0):** Handlebars HTML email rendering.
 - `public/lighthouse-transparent.png` — **NEW (v1.0):** transparent-background mascot for emails (278×454).
@@ -108,6 +113,8 @@ _Updated 2026-09-27 (v1.7 — full UI re-integration + onboarding + invoice form
 5. ✅ Point getdunn.org at Railway — DONE (live + serving; APP_URL / redirect / mascot swapped to getdunn.org)
 6. Switch to live Stripe keys + activate account + link a bank for payouts, when ready for real payments
 7. ✅ Structural SEO + brand — DONE. Brand = "Dunn"; title/meta/schema/robots/sitemap live; "Watchtower"→"Dunn" user-facing sweep done.
-8. ◐ Real-data e2e test — connect + invoice creation VERIFIED (real test account connected via OAuth; real invoice landed on it); reminder-fire + late fee still UNVERIFIED (needs cron + Railway-shell DB access)
-9. 🔴 Wire a cron/scheduler for reminder + fee jobs — GO-LIVE BLOCKER (jobs are manual-only today; reminders would never auto-fire)
+8. ✅ Real-data e2e test — PASSED 9/28 locally with real Stripe test mode + real Resend: scheduler auto-fired → t+7 reminder delivered → $25 fee invoice issued in Stripe → paid via Stripe → webhook marked it paid → no more reminders. (Found + fixed on the way: ALL Stripe webhooks were failing signature verification in prod — body parsed before `express.raw`; and the t+7 subject had a blank date.) Re-check on Railway after deploy.
+9. ◐ Wire a cron/scheduler for reminder + fee jobs — BUILT 9/28 (v1.8), verified locally: 62 tests, scratch-DB sweep proof, real server boot. Remaining: deploy + confirm `[scheduler] on` in Railway logs. Also fixed: reminder templates missing from `dist/` (crash), reminder back-fill, repeat fee-approval emails, waived-fee re-charge. See HANDOFF v1.8.
+10b. ✅ ONE-BILL LATE FEE — 9/28 (Bashira's call). Fee lands the morning after the deadline; original invoice voided + replaced by one invoice for balance + fee; Dunn emails the designer's "late fee added — Pay $275" email; stale t+3/t+7 warnings skipped; webhook marks invoice + fee paid together. E2E passed with real Stripe test + Resend (day 7 warning only → day 8 one $275 bill + email → paid → silence). 71 tests. See HANDOFF v1.8.
+11. 🔴 Fee approval broken under default settings — dashboard Approve calls a nonexistent `/invoices/:id/fee/approve`; pending fees never listed; waive rejects pending fees. Plus: escalation "send final notice" never sends; waiving an issued fee doesn't void it in Stripe. Details in HANDOFF v1.8.
 10. Content SEO + AEO (findability) — NOT DONE (only structural/label SEO is live; content clusters + AI-findability still ahead — see seo-geo-aeo-content-system skill)
