@@ -108,4 +108,5 @@ _Updated 2026-09-27 (v1.7 — full UI re-integration + onboarding + invoice form
 5. ✅ Point getdunn.org at Railway — DONE (live + serving; APP_URL / redirect / mascot swapped to getdunn.org)
 6. Switch to live Stripe keys + activate account + link a bank for payouts, when ready for real payments
 7. ✅ Structural SEO + brand — DONE. Brand = "Dunn"; title/meta/schema/robots/sitemap live; "Watchtower"→"Dunn" user-facing sweep done.
-8. Exercise the full flow against a CONNECTED Stripe account (create invoice → reminder → late fee) — code-complete but not yet run on live connected data
+8. ◐ Real-data e2e test — connect + invoice creation VERIFIED (real test account connected via OAuth; real invoice landed on it); reminder-fire + late fee still UNVERIFIED (needs cron + Railway-shell DB access)
+9. 🔴 Wire a cron/scheduler for reminder + fee jobs — GO-LIVE BLOCKER (jobs are manual-only today; reminders would never auto-fire)
