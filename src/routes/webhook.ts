@@ -11,17 +11,28 @@ export const webhookRouter = Router();
 // Stripe sends the raw body; verify signature, then dispatch on event type.
 webhookRouter.post('/', async (req, res) => {
   const sig = req.headers['stripe-signature'] as string;
-  let event: Stripe.Event;
 
-  try {
-    event = stripe.webhooks.constructEvent(
-      req.body,
-      sig,
-      process.env.STRIPE_WEBHOOK_SECRET!
-    );
-  } catch (err) {
-    console.error('[webhook] signature verification failed', err);
-    return res.status(400).send(`Webhook Error: ${(err as Error).message}`);
+  // Two webhook destinations feed this route — billing events ("Your account")
+  // and invoice events ("Connected accounts") — and each carries its OWN signing
+  // secret. Try each configured secret until one verifies.
+  const secrets = [
+    process.env.STRIPE_WEBHOOK_SECRET,
+    process.env.STRIPE_WEBHOOK_SECRET_2,
+  ].filter((s): s is string => !!s);
+
+  let event: Stripe.Event | null = null;
+  for (const secret of secrets) {
+    try {
+      event = stripe.webhooks.constructEvent(req.body, sig, secret);
+      break;
+    } catch {
+      // try the next secret
+    }
+  }
+
+  if (!event) {
+    console.error('[webhook] signature verification failed for all configured secrets');
+    return res.status(400).send('Webhook Error: signature verification failed');
   }
 
   try {
