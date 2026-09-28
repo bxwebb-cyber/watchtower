@@ -107,5 +107,5 @@ _Updated 2026-09-27 (v1.7 — full UI re-integration + onboarding + invoice form
 4. ✅ Stripe OAuth redirect URI for getdunn.org — DONE
 5. ✅ Point getdunn.org at Railway — DONE (live + serving; APP_URL / redirect / mascot swapped to getdunn.org)
 6. Switch to live Stripe keys + activate account + link a bank for payouts, when ready for real payments
-7. Structural SEO (title/meta/headings/robots/sitemap/schema — title currently "Bundled Page") + the "Dunn vs Watchtower" brand decision
+7. ✅ Structural SEO + brand — DONE. Brand = "Dunn"; title/meta/schema/robots/sitemap live; "Watchtower"→"Dunn" user-facing sweep done.
 8. Exercise the full flow against a CONNECTED Stripe account (create invoice → reminder → late fee) — code-complete but not yet run on live connected data

@@ -29,7 +29,7 @@ Deployed + healthy. Everything below is config/creds, not code:
 5. ✅ **Stripe OAuth redirect URI** — DONE. `https://getdunn.org/auth/stripe/callback` added to the redirect list.
 6. ✅ **Domain** — DONE. getdunn.org pointed at Railway (CNAME `@` → `ad6zexbx.up.railway.app`, DNS-only; `_railway-verify` TXT), verified + SSL issued, serving the live landing. `APP_URL` / `STRIPE_REDIRECT_URI` / `MASCOT_URL` swapped to getdunn.org. *(Optional: add `www`.)*
 7. **Go live** — switch `STRIPE_SECRET_KEY` from `sk_test` to `sk_live` (and use live Connect client_id + price IDs) when ready to take real payments.
-8. **Structural SEO** — title/meta/headings/robots/sitemap/schema (title is currently "Bundled Page"). **OPEN: brand decision "Dunn" vs "Watchtower"** for the `<title>`/`<h1>`.
+8. ✅ **Structural SEO + rebrand** — DONE. Brand resolved to **"Dunn"** (user-facing: title/meta/og/twitter/schema/robots/sitemap + full "Watchtower"→"Dunn" copy sweep across landing, internal pages, email templates, and the notify/webhook sender strings). Code/filenames keep `watchtower` (codename). *Follow-ups: proper 1200x630 og:image; verify "see how it works" demo nav; `pay.watchtower.app` sample URLs in email previews are stale.*
 
 **Railway access note:** project lives under **bashira.webb@gmail.com** (NOT bmwxcf@gmail.com — that account only has prospectai). The local CLI is logged in as bashira.webb; the bmwxcf login is backed up at `~/.railway/config.json.bmwxcf.bak`. Local repo is linked to carefree-education/valiant-miracle.
 
