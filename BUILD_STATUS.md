@@ -103,8 +103,8 @@ _Updated 2026-09-27 (v1.7 — full UI re-integration + onboarding + invoice form
 **Remaining (go-live + SEO + one real-data test — no code left):**
 1. ✅ Resend API key — DONE (new key set + verified; getdunn.org already verified in Resend)
 2. ✅ Stripe $39/$59 price IDs — DONE (test mode; checkout verified returning a Stripe URL)
-3. Stripe webhook endpoint + secret → `STRIPE_WEBHOOK_SECRET`
-4. Stripe OAuth redirect URI for getdunn.org
+3. ✅ Stripe webhook (two destinations with separate secrets) — DONE (`webhook.ts` verifies both)
+4. ✅ Stripe OAuth redirect URI for getdunn.org — DONE
 5. ✅ Point getdunn.org at Railway — DONE (live + serving; APP_URL / redirect / mascot swapped to getdunn.org)
 6. Switch to live Stripe keys + activate account + link a bank for payouts, when ready for real payments
 7. Structural SEO (title/meta/headings/robots/sitemap/schema — title currently "Bundled Page") + the "Dunn vs Watchtower" brand decision
