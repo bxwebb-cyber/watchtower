@@ -87,12 +87,6 @@
     <p>Pre-filled on every new invoice. You can change it per invoice — or choose no fee.</p>
 
     <div class="wt-fee-panel">
-      <label class="wt-field-label">Grace period</label>
-      <div class="wt-grace-wrap">
-        <input type="number" id="grace-days" min="0" max="90" value="7">
-        <span>days after the due date before the fee applies</span>
-      </div>
-
       <label class="wt-field-label">Late fee</label>
       <div class="wt-fee-opts">
         <div class="wt-fee-opt" data-kind="none" role="button" tabindex="0">
@@ -117,6 +111,26 @@
         </div>
       </div>
 
+      <!-- When the fee applies — the owner's choice, nothing pre-picked (engineering 9/28). Hidden when "No late fee". -->
+      <div id="grace-block" hidden>
+        <label class="wt-field-label" style="margin-top:18px">When does the late fee apply?</label>
+        <div class="wt-fee-opts">
+          <div class="wt-fee-opt" data-grace="0" role="button" tabindex="0">
+            <div>
+              <div class="wt-fee-opt__title">The day after it's due</div>
+              <div class="wt-fee-opt__sub">Due Oct 1 → the fee applies Oct 2</div>
+            </div>
+          </div>
+          <div class="wt-fee-opt" data-grace="days" role="button" tabindex="0">
+            <div>
+              <div class="wt-fee-opt__title">Give them extra days</div>
+              <div class="wt-fee-opt__sub">Days after the due date before the fee applies</div>
+            </div>
+            <span class="wt-amount-input"><input type="text" inputmode="numeric" id="grace-days" aria-label="Days after the due date" style="margin-right:4px;width:44px"><span style="color:#5D6E6B;font-weight:600">days</span></span>
+          </div>
+        </div>
+      </div>
+
       <div class="wt-preview" id="fee-preview"></div>
     </div>
 
@@ -132,6 +146,7 @@
 
 <script>
 let currentKind = 'none'; // none | flat | percent
+let graceChoice = null;   // null (not chosen yet) | '0' (the day after it's due) | 'days'
 
 async function api(method, path, body) {
   const opts = { method, headers: { 'Content-Type': 'application/json' } };
@@ -158,23 +173,44 @@ async function loadStripeState() {
 }
 
 // --- Fee defaults (prefill + preview + save) ---
+// The owner chooses when the fee applies — Dunn never picks it for them.
+function graceValue() {
+  if (graceChoice === '0') return 0;
+  if (graceChoice !== 'days') return null;
+  const v = document.getElementById('grace-days').value.trim();
+  const n = Number(v);
+  return v !== '' && Number.isInteger(n) && n >= 0 && n <= 90 ? n : null;
+}
+function feeWhen(g) {
+  return g === 0 ? "if it's not paid by the due date" : `if unpaid ${g} day${g === 1 ? '' : 's'} after the due date`;
+}
+
 function preview() {
-  const grace = document.getElementById('grace-days').value || '7';
   const el = document.getElementById('fee-preview');
-  if (currentKind === 'none') {
-    el.textContent = 'Your client sees: No late fee.';
-  } else if (currentKind === 'flat') {
-    const amt = document.getElementById('flat-amount').value || '0';
-    el.textContent = `Your client sees: "A $${amt} late fee applies if unpaid ${grace} days after the due date."`;
-  } else {
-    const pct = document.getElementById('percent-amount').value || '0';
-    el.textContent = `Your client sees: "A ${pct}% late fee applies if unpaid ${grace} days after the due date."`;
-  }
+  document.getElementById('grace-block').hidden = currentKind === 'none';
+  if (currentKind === 'none') { el.textContent = 'Your client sees: No late fee.'; return; }
+  const grace = graceValue();
+  if (grace === null) { el.textContent = 'Choose when the late fee applies.'; return; }
+  const fee = currentKind === 'flat'
+    ? '$' + (document.getElementById('flat-amount').value || '0')
+    : (document.getElementById('percent-amount').value || '0') + '%';
+  el.textContent = `Your client sees: "A ${fee} late fee applies ${feeWhen(grace)}."`;
+}
+
+function selectGrace(choice) {
+  graceChoice = choice;
+  document.querySelectorAll('.wt-fee-opt[data-grace]').forEach(opt => {
+    const selected = opt.getAttribute('data-grace') === choice;
+    opt.classList.toggle('is-selected', selected);
+    const ai = opt.querySelector('.wt-amount-input');
+    if (ai) ai.classList.toggle('visible', selected);
+  });
+  preview();
 }
 
 function selectKind(kind) {
   currentKind = kind;
-  document.querySelectorAll('.wt-fee-opt').forEach(opt => {
+  document.querySelectorAll('.wt-fee-opt[data-kind]').forEach(opt => {
     const selected = opt.getAttribute('data-kind') === kind;
     opt.classList.toggle('is-selected', selected);
     const ai = opt.querySelector('.wt-amount-input');
@@ -187,23 +223,30 @@ async function loadDefaults() {
   try {
     const s = await api('GET', '/settings');
     if (s.defaultFeeKind) currentKind = s.defaultFeeKind;
-    if (s.defaultGraceDays !== undefined) document.getElementById('grace-days').value = s.defaultGraceDays;
+    if (s.defaultGraceDays === 0) graceChoice = '0';
+    else if (s.defaultGraceDays > 0) { graceChoice = 'days'; document.getElementById('grace-days').value = s.defaultGraceDays; }
     if (s.defaultFeeKind === 'flat' && s.defaultFeeAmount) document.getElementById('flat-amount').value = s.defaultFeeAmount;
     if (s.defaultFeeKind === 'percent' && s.defaultFeeAmount) document.getElementById('percent-amount').value = s.defaultFeeAmount;
-  } catch (err) { /* not signed in or no settings yet — use defaults */ }
+  } catch (err) { /* not signed in or no settings yet — nothing pre-picked */ }
   selectKind(currentKind);
+  selectGrace(graceChoice);
 }
 
-document.querySelectorAll('.wt-fee-opt').forEach(opt => {
+document.querySelectorAll('.wt-fee-opt[data-kind]').forEach(opt => {
   opt.addEventListener('click', () => selectKind(opt.getAttribute('data-kind')));
   opt.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectKind(opt.getAttribute('data-kind')); } });
+});
+document.querySelectorAll('.wt-fee-opt[data-grace]').forEach(opt => {
+  opt.addEventListener('click', () => { if (graceChoice !== opt.getAttribute('data-grace')) selectGrace(opt.getAttribute('data-grace')); });
+  opt.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectGrace(opt.getAttribute('data-grace')); } });
 });
 document.getElementById('grace-days').addEventListener('input', preview);
 document.getElementById('flat-amount').addEventListener('input', preview);
 document.getElementById('percent-amount').addEventListener('input', preview);
 
 document.getElementById('save-fee').addEventListener('click', async () => {
-  const graceDays = parseInt(document.getElementById('grace-days').value) || 7;
+  const graceDays = graceValue();
+  if (currentKind !== 'none' && graceDays === null) { alert('Choose when the late fee applies: the day after it\'s due, or a number of extra days.'); return; }
   const body = { defaultFeeKind: currentKind, defaultGraceDays: graceDays };
   if (currentKind === 'flat') body.defaultFeeAmount = parseFloat(document.getElementById('flat-amount').value) || 0;
   else if (currentKind === 'percent') body.defaultFeeAmount = parseFloat(document.getElementById('percent-amount').value) || 0;

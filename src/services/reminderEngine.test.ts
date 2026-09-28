@@ -6,7 +6,7 @@ import {
   addDays,
   isPastFeeDeadline,
   isStaleFeeWarning,
-  SCHEDULE,
+  scheduleFor,
 } from './reminderEngine';
 
 describe('isPastFeeDeadline', () => {
@@ -29,27 +29,23 @@ describe('isPastFeeDeadline', () => {
 describe('isStaleFeeWarning', () => {
   const fee = { hasLateFee: true, feeApplied: false, graceDays: 7 };
 
-  it('sends the t+7 warning on the deadline day ("pay today to avoid the fee")', () => {
-    expect(isStaleFeeWarning('t+7', { ...fee, offset: 7 })).toBe(false);
+  it('sends the fee warning while the deadline is still ahead', () => {
+    expect(isStaleFeeWarning('fee_warning', { ...fee, offset: 5 })).toBe(false);
   });
 
-  it('skips the t+7 warning once the deadline has passed', () => {
-    expect(isStaleFeeWarning('t+7', { ...fee, offset: 8 })).toBe(true);
+  it('skips the fee warning once the deadline has passed (catch-up after a missed run)', () => {
+    expect(isStaleFeeWarning('fee_warning', { ...fee, offset: 8 })).toBe(true);
   });
 
-  it('skips the t+7 warning once the fee is applied', () => {
-    expect(isStaleFeeWarning('t+7', { ...fee, feeApplied: true, offset: 7 })).toBe(true);
+  it('skips the fee warning once the fee is on the bill', () => {
+    expect(isStaleFeeWarning('fee_warning', { ...fee, feeApplied: true, offset: 5 })).toBe(true);
   });
 
-  it('skips the t+3 warning when a short grace period has already run out', () => {
-    expect(isStaleFeeWarning('t+3', { ...fee, graceDays: 2, offset: 3 })).toBe(true);
+  it('never skips the "past due" nudge on an invoice with no fee', () => {
+    expect(isStaleFeeWarning('t+3', { ...fee, hasLateFee: false, offset: 3 })).toBe(false);
   });
 
-  it('never skips when the invoice has no late fee', () => {
-    expect(isStaleFeeWarning('t+7', { ...fee, hasLateFee: false, offset: 10 })).toBe(false);
-  });
-
-  it('never skips the t+14 notice (it shows the balance with the fee)', () => {
+  it('never skips the 14-day step (the owner decides)', () => {
     expect(isStaleFeeWarning('t+14', { ...fee, feeApplied: true, offset: 14 })).toBe(false);
   });
 });
@@ -93,105 +89,64 @@ describe('dayOffset', () => {
   });
 });
 
+describe('scheduleFor (at most one reminder before, one after)', () => {
+  const steps = (o: { hasLateFee: boolean; graceDays: number }) =>
+    scheduleFor(o).map((s) => `${s.step}@${s.offsetDays}`);
+
+  it('7-day grace: reminder 4 days before, fee warning 3 days before the fee lands, owner at 14', () => {
+    // due Oct 1 → reminder Sep 27, warning Oct 6 ("pay by Oct 8"), fee Oct 9.
+    expect(steps({ hasLateFee: true, graceDays: 7 })).toEqual(['t-4@-4', 'fee_warning@5', 't+14@14']);
+  });
+
+  it('no grace (fee the day after the due date): no separate warning — the reminder already states it', () => {
+    expect(steps({ hasLateFee: true, graceDays: 0 })).toEqual(['t-4@-4', 't+14@14']);
+  });
+
+  it('short grace: the warning still comes before the fee', () => {
+    expect(steps({ hasLateFee: true, graceDays: 1 })).toEqual(['t-4@-4', 'fee_warning@1', 't+14@14']);
+    expect(steps({ hasLateFee: true, graceDays: 3 })).toEqual(['t-4@-4', 'fee_warning@1', 't+14@14']);
+  });
+
+  it('no late fee: one "past due" nudge at 3 days late', () => {
+    expect(steps({ hasLateFee: false, graceDays: 0 })).toEqual(['t-4@-4', 't+3@3', 't+14@14']);
+  });
+
+  it('never schedules the old 7-days-before, 3-days-before or due-date emails', () => {
+    const all = [0, 1, 7, 30].flatMap((g) => steps({ hasLateFee: true, graceDays: g }));
+    expect(all.some((s) => /^(t-7|t-3|due)@/.test(s))).toBe(false);
+  });
+});
+
 describe('computeNextStep', () => {
-  const due = new Date('2026-10-15');
+  const schedule = scheduleFor({ hasLateFee: true, graceDays: 7 });
+  const due = new Date('2026-10-01');
+  const at = (d: number) => dayOffset(addDays(due, d), due);
 
-  it("returns t-7 when 7 days before due and nothing sent", () => {
-    const today = addDays(due, -7);
-    const offset = dayOffset(today, due);
-    expect(offset).toBe(-7);
-    const step = computeNextStep(offset, new Set(), { schedule: SCHEDULE });
-    expect(step?.step).toBe('t-7');
+  it('nothing before 4 days out', () => {
+    expect(computeNextStep(at(-10), new Set(), schedule)).toBeUndefined();
   });
 
-  it("returns t-3 when 3 days before due and t-7 already sent", () => {
-    const today = addDays(due, -3);
-    const offset = dayOffset(today, due);
-    const sent = new Set(['t-7']);
-    const step = computeNextStep(offset, sent, { schedule: SCHEDULE });
-    expect(step?.step).toBe('t-3');
+  it('the reminder 4 days before', () => {
+    expect(computeNextStep(at(-4), new Set(), schedule)?.step).toBe('t-4');
   });
 
-  it("returns due on the due date with pre-due steps sent", () => {
-    const today = due;
-    const offset = dayOffset(today, due);
-    const sent = new Set(['t-7', 't-3']);
-    const step = computeNextStep(offset, sent, { schedule: SCHEDULE });
-    expect(step?.step).toBe('due');
+  it('nothing on the due date or right after (no due-today email)', () => {
+    expect(computeNextStep(at(0), new Set(['t-4']), schedule)).toBeUndefined();
+    expect(computeNextStep(at(3), new Set(['t-4']), schedule)).toBeUndefined();
   });
 
-  it("returns t+3 when 3 days past due", () => {
-    const today = addDays(due, 3);
-    const offset = dayOffset(today, due);
-    const sent = new Set(['t-7', 't-3', 'due']);
-    const step = computeNextStep(offset, sent, { schedule: SCHEDULE });
-    expect(step?.step).toBe('t+3');
+  it('the fee warning on day 5', () => {
+    expect(computeNextStep(at(5), new Set(['t-4']), schedule)?.step).toBe('fee_warning');
   });
 
-  it("returns t+14 when 14+ days past due and all earlier sent", () => {
-    const today = addDays(due, 20);
-    const offset = dayOffset(today, due);
-    const sent = new Set(['t-7', 't-3', 'due', 't+3', 't+7']);
-    const step = computeNextStep(offset, sent, { schedule: SCHEDULE });
-    expect(step?.step).toBe('t+14');
+  it('catches up to a missed step, but never back-fills older ones', () => {
+    expect(computeNextStep(at(6), new Set(['t-4']), schedule)?.step).toBe('fee_warning');
+    expect(computeNextStep(at(6), new Set(), schedule)?.step).toBe('fee_warning');
+    expect(computeNextStep(at(14), new Set(), schedule)?.step).toBe('t+14');
   });
 
-  it("returns undefined when all steps are already sent", () => {
-    const today = addDays(due, 20);
-    const offset = dayOffset(today, due);
-    const sent = new Set(['t-7', 't-3', 'due', 't+3', 't+7', 't+14']);
-    const step = computeNextStep(offset, sent, { schedule: SCHEDULE });
-    expect(step).toBeUndefined();
-  });
-
-  it("catches up: returns t+7 when at day 13 (between t+7 and t+14) and t+7 was missed", () => {
-    const today = addDays(due, 13);
-    const offset = dayOffset(today, due);
-    const sent = new Set(['t-7', 't-3', 'due', 't+3']);
-    const step = computeNextStep(offset, sent, { schedule: SCHEDULE });
-    expect(step?.step).toBe('t+7');
-  });
-
-  it("returns undefined when offset is before the earliest step", () => {
-    const today = addDays(due, -14);
-    const offset = dayOffset(today, due);
-    const step = computeNextStep(offset, new Set(), { schedule: SCHEDULE });
-    expect(step).toBeUndefined();
-  });
-
-  it("never back-fills: a missed t-7 is not sent once t-3 has gone out", () => {
-    const today = addDays(due, -3);
-    const offset = dayOffset(today, due);
-    const sent = new Set(['t-3']);
-    const step = computeNextStep(offset, sent, { schedule: SCHEDULE });
-    expect(step).toBeUndefined();
-  });
-
-  it("never back-fills: after 'due' is sent, a second run the same day sends nothing", () => {
-    const offset = dayOffset(due, due);
-    const sent = new Set(['due']); // t-7 / t-3 were missed (e.g. no scheduler yet)
-    const step = computeNextStep(offset, sent, { schedule: SCHEDULE });
-    expect(step).toBeUndefined();
-  });
-
-  it("never back-fills: the day after 'due', a missed t-3 ('due in 3 days') is not sent", () => {
-    const offset = dayOffset(addDays(due, 1), due);
-    const sent = new Set(['due']);
-    const step = computeNextStep(offset, sent, { schedule: SCHEDULE });
-    expect(step).toBeUndefined();
-  });
-
-  it("returns undefined for empty schedule", () => {
-    const step = computeNextStep(5, new Set(), { schedule: [] });
-    expect(step).toBeUndefined();
-  });
-
-  it("handles offset=exactly boundary for t+7", () => {
-    const today = addDays(due, 7);
-    const offset = dayOffset(today, due);
-    const sent = new Set(['t-7', 't-3', 'due', 't+3']);
-    const step = computeNextStep(offset, sent, { schedule: SCHEDULE });
-    expect(step?.step).toBe('t+7');
+  it('nothing once a step is sent', () => {
+    expect(computeNextStep(at(20), new Set(['t+14']), schedule)).toBeUndefined();
   });
 });
 

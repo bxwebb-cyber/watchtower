@@ -18,6 +18,16 @@ async function api(method, path, body) {
 
 function money(cents) { return '$' + ((cents || 0) / 100).toFixed(2); }
 
+// The grace period is the owner's choice — never default it. 0 = the late fee
+// applies the day after the due date. Returns null when blank or invalid.
+function graceValue(raw) {
+  const v = String(raw == null ? '' : raw).trim();
+  if (v === '') return null;
+  const n = Number(v);
+  return Number.isInteger(n) && n >= 0 && n <= 90 ? n : null;
+}
+const GRACE_REQUIRED = 'Choose when the late fee applies: 0 for the day after the due date, or a number of days after it.';
+
 // Fill every [data-bind] element with a mapped value.
 function bind(data) {
   document.querySelectorAll('[data-bind]').forEach(el => {
@@ -209,7 +219,7 @@ async function loadDashboard() {
   });
 
   renderList('pending_fees', pendingFees, (inv) => Object.assign(feeRow(inv), {
-    grace_days: inv.graceDays || 7,
+    grace_note: inv.graceDays > 0 ? inv.graceDays + '-day grace period passed' : 'due date passed',
     fee_kind: inv.feeKind === 'percent' ? inv.fee + ' fee' : 'flat fee',
   }));
   renderList('billed_fees', billedFees, (inv) => Object.assign(feeRow(inv), {
@@ -363,7 +373,7 @@ async function loadSettings() {
 
     // default fee terms
     const feeKind = settings.defaultFeeKind === 'percent' ? 'pct' : (settings.defaultFeeKind === 'flat' ? 'flat' : 'none');
-    form.querySelector('[name="grace_days"]').value = settings.defaultGraceDays != null ? settings.defaultGraceDays : 7;
+    form.querySelector('[name="grace_days"]').value = settings.defaultGraceDays != null ? settings.defaultGraceDays : '';
     setFeeOption(form, feeKind);
     if (feeKind === 'flat') form.querySelector('[name="fee_flat"]').value = settings.defaultFeeAmount || '';
     if (feeKind === 'pct') form.querySelector('[name="fee_pct"]').value = settings.defaultFeeAmount || '';
@@ -449,8 +459,11 @@ document.addEventListener('wt:recurring-save', async e => {
     startDate: d.next_invoice_date,
     feeKind,
     feeAmount: feeKind === 'flat' ? (parseFloat(d.fee_flat) || 0) : feeKind === 'percent' ? (parseFloat(d.fee_pct) || 0) : 0,
-    graceDays: parseInt(d.grace_days) || 7,
   };
+  // Only send the grace period when there's a fee — then it's required.
+  const grace = graceValue(d.grace_days);
+  if (feeKind !== 'none' && grace === null) { alert(GRACE_REQUIRED); return; }
+  if (grace !== null) body.graceDays = grace;
   try {
     if (d.id) { await api('PATCH', '/templates/' + d.id, body); }
     else { await api('POST', '/templates', body); }
@@ -481,7 +494,7 @@ document.addEventListener('wt:recurring-edit', async e => {
     form.querySelector('[name="frequency"]').value = t.frequency;
     form.querySelector('[name="custom_day"]').value = t.customDay || 1;
     form.querySelector('[name="next_invoice_date"]').value = (t.nextRunDate || '').slice(0, 10);
-    form.querySelector('[name="grace_days"]').value = t.graceDays || 7;
+    form.querySelector('[name="grace_days"]').value = t.graceDays != null ? t.graceDays : '';
     if (t.feeKind === 'flat') { form.querySelector('[name="fee_flat"]').value = t.feeAmount; }
     if (t.feeKind === 'percent') { form.querySelector('[name="fee_pct"]').value = t.feeAmount; }
     setFeeOption(form, t.feeKind === 'percent' ? 'pct' : t.feeKind);
@@ -501,9 +514,10 @@ document.addEventListener('wt:settings-save', async e => {
     alertPayment: !!d.alert_paid,
     defaultFeeKind: feeKind,
     defaultFeeAmount: feeKind === 'flat' ? (parseFloat(d.fee_flat) || 0) : feeKind === 'percent' ? (parseFloat(d.fee_pct) || 0) : 0,
-    defaultGraceDays: parseInt(d.grace_days) || 7,
+    defaultGraceDays: graceValue(d.grace_days),
   };
   if (!body.businessName) { alert('Business name is required. It\'s what your clients see in every email.'); return; }
+  if (body.defaultFeeKind !== 'none' && body.defaultGraceDays === null) { alert(GRACE_REQUIRED); return; }
   try {
     await api('PUT', '/settings', body);
     loadSettings(); // refresh the Stripe-name check against the new business name

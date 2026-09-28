@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import Stripe from 'stripe';
 import { sendClientEmail } from './reminderEngine';
+import { feeWhen } from './feeRules';
 
 const prisma = new PrismaClient();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -24,7 +25,7 @@ export interface CreateInvoiceInput {
   fee?: {
     kind: 'flat' | 'percent' | 'none';
     amount?: number; // flat: dollars; percent: 0-100
-    graceDays?: number; // days after due before the fee applies (default 7)
+    graceDays?: number; // days after due before the fee applies — the owner's choice, 0 = the day after the due date
   };
   // Set when a recurring template creates the invoice ("Your monthly invoice").
   recurring?: { frequencyLabel: string };
@@ -124,7 +125,7 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<CreateIn
     const fee = input.fee;
     const feeDescription =
       fee && fee.kind !== 'none'
-        ? `Late fee: ${feeLabel(fee)} applies ${fee.graceDays ?? 7} days after the due date.`
+        ? `Late fee: ${feeLabel(fee)} applies ${feeWhen(fee.graceDays ?? 0)}.`
         : undefined;
 
     const stripeInvoice = await stripe.invoices.create(
@@ -186,7 +187,7 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<CreateIn
           accountId: account.id,
           kind: fee.kind,
           amount: fee.amount ?? 0,
-          graceDays: fee.graceDays ?? 7,
+          graceDays: fee.graceDays ?? 0,
         },
       });
       await prisma.invoice.update({
@@ -199,7 +200,7 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<CreateIn
       .toISOString()
       .slice(0, 10)}${
       fee && fee.kind !== 'none'
-        ? ` + late fee ${feeLabel(fee)} after ${fee.graceDays ?? 7}d`
+        ? ` + late fee ${feeLabel(fee)} ${feeWhen(fee.graceDays ?? 0)}`
         : ''
     }`;
     await prisma.auditEvent.create({

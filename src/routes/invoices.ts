@@ -3,7 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import Stripe from 'stripe';
 import { createInvoice, stripeConfigured } from '../services/invoiceCreator';
 import { approveFee, changeBilledFee, waiveFee, FeeActionError } from '../services/feeEngine';
-import { agreedFeeCents } from '../services/feeRules';
+import { agreedFeeCents, parseGraceDays, GRACE_REQUIRED } from '../services/feeRules';
 import { getAccount } from '../lib/account';
 
 const prisma = new PrismaClient();
@@ -68,7 +68,11 @@ invoicesRouter.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Percent fee must be between 0 and 100.' });
     }
   }
-  const graceDays = Math.max(1, Math.round(Number(body.fee?.graceDays ?? 7)));
+  // The owner chooses when the fee applies (0 = the day after the due date).
+  const graceDays = parseGraceDays(body.fee?.graceDays);
+  if (kind !== 'none' && graceDays === null) {
+    return res.status(400).json({ error: GRACE_REQUIRED });
+  }
 
   const result = await createInvoice({
     accountId: account.id,
@@ -76,7 +80,7 @@ invoicesRouter.post('/', async (req, res) => {
     clientEmail,
     amountCents: Math.round(amountDollars * 100),
     dueDate,
-    fee: kind === 'none' ? { kind: 'none' } : { kind, amount: feeAmount, graceDays },
+    fee: kind === 'none' ? { kind: 'none' } : { kind, amount: feeAmount, graceDays: graceDays! },
   });
 
   if (!result.ok) {
@@ -292,7 +296,7 @@ invoicesRouter.get('/', async (req, res) => {
       status: inv.status,
       fee: inv.feePolicy ? feeLabel(inv.feePolicy) : null,
       feeKind: inv.feePolicy?.kind ?? 'none',
-      graceDays: inv.feePolicy?.graceDays ?? 7,
+      graceDays: inv.feePolicy?.graceDays ?? null,
       feeApplied: inv.feeApplied,
       feeStatus: inv.feeStatus ?? null,
       feeAmountCents: inv.feeAmountCents ?? null,

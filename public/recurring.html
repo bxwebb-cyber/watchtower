@@ -312,7 +312,7 @@
       <div class="wt-fee-panel__label"><img src="lighthouse-transparent.png" alt="">Late fee · every invoice in this series</div>
       <div class="wt-fee-panel__question">
         <span>If not paid within</span>
-        <input class="wt-fee-panel__grace" name="grace_days" type="number" min="0" value="7" aria-label="Grace days">
+        <input class="wt-fee-panel__grace" name="grace_days" type="number" min="0" max="90" value="" placeholder="?" aria-label="Days after the due date before the late fee applies (0 = the day after it's due)">
         <span>days of the due date, what's your late fee?</span>
       </div>
       <div class="wt-fee-options" role="group" aria-label="Late fee type">

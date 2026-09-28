@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Dunn client email: 04-past-due-3-days-after | Trigger: 3 days after due date | Handlebars. Subject: Invoice {{invoice_id}} is a few days past due -->
+<!-- Dunn client email: 04-past-due-3-days-after | Trigger (9/28 schedule): the late-fee warning, 3 days before the fee lands (day depends on the owner's grace period), or 3 days late when there is no fee | Handlebars. Subject: Invoice {{invoice_id}} is past due. Engineering changed "3 days"/"a few days" to "past due" — designer to review. -->
 <html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
 <meta charset="utf-8">
@@ -8,7 +8,7 @@
 <meta name="color-scheme" content="light dark">
 <meta name="supported-color-schemes" content="light dark">
 <meta name="x-apple-disable-message-reformatting">
-<title>Invoice {{invoice_id}} is a few days past due</title>
+<title>Invoice {{invoice_id}} is past due</title>
 <!--[if mso]><noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript><![endif]-->
 <style>
   @media only screen and (max-width:620px) {
@@ -37,12 +37,12 @@
 <div style="font-family:Georgia, 'Times New Roman', serif;font-size:18px;line-height:22px;mso-line-height-rule:exactly;color:#0F302E;">{{business_name}}</div>
 <div style="font-family:Arial, Helvetica, sans-serif;font-size:12px;line-height:18px;mso-line-height-rule:exactly;color:#7C8B88;">Invoice {{invoice_id}}</div>
 </td>
-<td align="right" valign="middle"><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td bgcolor="#F0E2D3" style="background-color:#F0E2D3;border-radius:999px;padding:4px 10px;font-family:Arial, Helvetica, sans-serif;font-size:11px;line-height:16px;mso-line-height-rule:exactly;font-weight:bold;color:#6B4424;white-space:nowrap;">3 days past due</td></tr></table></td>
+<td align="right" valign="middle"><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td bgcolor="#F0E2D3" style="background-color:#F0E2D3;border-radius:999px;padding:4px 10px;font-family:Arial, Helvetica, sans-serif;font-size:11px;line-height:16px;mso-line-height-rule:exactly;font-weight:bold;color:#6B4424;white-space:nowrap;">Past due</td></tr></table></td>
 </tr></table>
 </td></tr>
 
 <tr><td class="wt-px" style="padding:28px 28px 6px 28px;">
-<h1 class="wt-head" style="margin:0 0 18px 0;font-family:Georgia, 'Times New Roman', serif;font-weight:normal;font-size:24px;line-height:30px;mso-line-height-rule:exactly;color:#0F302E;">A few days past due.</h1>
+<h1 class="wt-head" style="margin:0 0 18px 0;font-family:Georgia, 'Times New Roman', serif;font-weight:normal;font-size:24px;line-height:30px;mso-line-height-rule:exactly;color:#0F302E;">Past due.</h1>
 <p style="margin:0 0 14px 0;font-family:Arial, Helvetica, sans-serif;font-size:16px;line-height:25px;mso-line-height-rule:exactly;color:#243B39;">Hi {{client_first_name}},</p>
 <p style="margin:0 0 14px 0;font-family:Arial, Helvetica, sans-serif;font-size:16px;line-height:25px;mso-line-height-rule:exactly;color:#243B39;">Invoice {{invoice_id}} was due on {{due_date_long}} and still shows as open on our side. It's easy to miss one, so the link below has everything you need.</p>
 {{#if has_late_fee}}<p style="margin:0 0 14px 0;font-family:Arial, Helvetica, sans-serif;font-size:16px;line-height:25px;mso-line-height-rule:exactly;color:#243B39;">As a reminder, the invoice terms include a {{fee_amount}} late fee if it's still unpaid after {{fee_deadline_long}}.</p>{{/if}}
@@ -83,7 +83,7 @@
 </td></tr>
 
 <tr><td class="wt-px" style="padding:0 28px 24px 28px;">
-<div style="border-top:1px solid #E4DFD2;padding-top:14px;font-family:Arial, Helvetica, sans-serif;font-size:12.5px;line-height:19px;mso-line-height-rule:exactly;color:#7C8B88;">{{#if has_late_fee}}Terms: payment due {{due_date_long}}. A {{fee_amount}} late fee applies if unpaid {{grace_days}} days after the due date, as agreed on the invoice.{{else}}Terms: payment due {{due_date_long}}.{{/if}}</div>
+<div style="border-top:1px solid #E4DFD2;padding-top:14px;font-family:Arial, Helvetica, sans-serif;font-size:12.5px;line-height:19px;mso-line-height-rule:exactly;color:#7C8B88;">{{#if has_late_fee}}Terms: payment due {{due_date_long}}. A {{fee_amount}} late fee applies {{fee_when}}, as agreed on the invoice.{{else}}Terms: payment due {{due_date_long}}.{{/if}}</div>
 </td></tr>
 </table>
 </td></tr>

@@ -159,7 +159,7 @@ model Settings {
   // Default late-fee terms — prefill the invoice form + recurring templates.
   defaultFeeKind   String  @default("none") // "none" | "flat" | "percent"
   defaultFeeAmount Float   @default(0)      // flat: dollars; percent: 0-100
-  defaultGraceDays Int     @default(7)      // days after due before the fee applies
+  defaultGraceDays Int?                     // days after due before the fee applies — the owner chooses (0 = the day after the due date); null until they do
   createdAt    DateTime @default(now())
 }
 

@@ -3,21 +3,37 @@ import type { Invoice, Client, Account, FeePolicy } from '@prisma/client';
 import { Resend } from 'resend';
 import { clientMailFrom, replyToFor, notifyOwner, notifyEscalation } from './notify';
 import { renderEmail, EMAIL_TEMPLATES, EmailData } from './emailRenderer';
-import { agreedFeeCents } from './feeRules';
+import { agreedFeeCents, feeWhen } from './feeRules';
 
 const prisma = new PrismaClient();
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
-// The schedule offsets (relative to the invoice due date), in days.
-// Negative = before due. This is the agent's clock.
-export const SCHEDULE: { step: string; offsetDays: number; subject: string }[] = [
-  { step: 't-7', offsetDays: -7, subject: 'Heads up — invoice {NUMBER} is coming due' },
-  { step: 't-3', offsetDays: -3, subject: 'Invoice {NUMBER} is due in 3 days' },
-  { step: 'due', offsetDays: 0, subject: 'Invoice {NUMBER} is due today' },
-  { step: 't+3', offsetDays: 3, subject: 'Invoice {NUMBER} — payment reminder' },
-  { step: 't+7', offsetDays: 7, subject: 'Invoice {NUMBER} — now past due' },
-  { step: 't+14', offsetDays: 14, subject: 'Invoice {NUMBER} — final notice' },
-];
+// The agent's clock: offsets relative to the invoice due date, in days
+// (negative = before due). Deliberately few emails, so the owner's clients
+// never feel nagged (Bashira's call 9/28, after the research):
+//   · the invoice itself, sent the moment it's created (invoiceCreator)
+//   · ONE friendly reminder 4 days before the due date
+//   · ONE warning 3 days before the late fee lands ("pay by <deadline>"), or,
+//     with no late fee, ONE "past due" nudge at 3 days late
+//   · the "late fee added" email the morning after the deadline (fee job)
+//   · at 14 days late the OWNER decides — final notice, or they'll call.
+// No due-today email. With no grace period (0) the fee lands the day after
+// the due date, so the invoice and the reminder already carry the warning.
+export type ScheduleStep = { step: string; offsetDays: number };
+export const PRE_DUE_DAYS = 4;
+
+export function scheduleFor(o: { hasLateFee: boolean; graceDays: number }): ScheduleStep[] {
+  const steps: ScheduleStep[] = [{ step: 't-4', offsetDays: -PRE_DUE_DAYS }];
+  if (!o.hasLateFee) {
+    steps.push({ step: 't+3', offsetDays: 3 });
+  } else if (o.graceDays >= 1) {
+    // The fee lands on day grace+1; warn 3 days before that, but never
+    // before the due date has actually passed.
+    steps.push({ step: 'fee_warning', offsetDays: Math.max(1, o.graceDays - 2) });
+  }
+  steps.push({ step: 't+14', offsetDays: 14 });
+  return steps.sort((a, b) => a.offsetDays - b.offsetDays);
+}
 
 const MIN_DAYS_AFTER_CREATE = 2;
 
@@ -100,7 +116,9 @@ export async function runReminderJob(now = new Date()) {
       (await prisma.reminder.findMany({ where: { invoiceId: invoice.id } })).map((r) => r.step)
     );
 
-    const step = computeNextStep(offset, sentSteps);
+    const hasLateFee = invoice.feePolicy != null && invoice.feePolicy.kind !== 'none';
+    const graceDays = invoice.feePolicy?.graceDays ?? 0;
+    const step = computeNextStep(offset, sentSteps, scheduleFor({ hasLateFee, graceDays }));
     if (!step) continue;
 
     const createdAtDay = new Date(
@@ -122,9 +140,6 @@ export async function runReminderJob(now = new Date()) {
     if (alreadyPaid?.status === 'paid') continue;
 
     const number = invoice.stripeNumber || invoice.stripeInvoiceId;
-    const hasLateFee = invoice.feePolicy != null && invoice.feePolicy.kind !== 'none';
-    const graceDays = invoice.feePolicy?.graceDays ?? 7;
-
     // "A late fee is added if unpaid after X" is false once X has passed —
     // the fee job's "late fee added" email replaces the warning.
     if (isStaleFeeWarning(step.step, { hasLateFee, feeApplied: invoice.feeApplied, offset, graceDays })) {
@@ -225,7 +240,7 @@ export async function sendClientEmail(
 function emailDataFor(invoice: EmailInvoice): EmailData {
   const due = new Date(invoice.dueDate);
   const hasLateFee = invoice.feePolicy != null && invoice.feePolicy.kind !== 'none';
-  const graceDays = invoice.feePolicy?.graceDays ?? 7;
+  const graceDays = invoice.feePolicy?.graceDays ?? 0;
   const termsCents = hasLateFee ? agreedFeeCents(invoice.amount, invoice.feePolicy!) : 0;
   // feeAmountCents is the fee actually billed (the owner may have lowered it).
   const feeCents = invoice.feeAmountCents ?? termsCents;
@@ -266,6 +281,7 @@ function emailDataFor(invoice: EmailInvoice): EmailData {
     feeApplied: invoice.feeApplied,
     feeWaived,
     termsFeeAmount: termsCents > 0 ? `$${(termsCents / 100).toFixed(2)}` : null,
+    feeWhen: feeWhen(graceDays),
     mascotUrl:
       process.env.MASCOT_URL ??
       `${process.env.APP_URL ?? 'http://localhost:4000'}/lighthouse-transparent.png`,
@@ -278,13 +294,14 @@ export function isPastFeeDeadline(now: Date, dueDate: Date, graceDays: number): 
   return dayOffset(now, dueDate) > graceDays;
 }
 
-// The t+3 and t+7 emails warn "a late fee is added if unpaid after X". Once
-// X has passed, or the fee is already on the bill, that warning is false.
+// The fee warning says "a late fee is added if unpaid after X". Once X has
+// passed (a missed run catching up), or the fee is on the bill, it's false.
+// ('t+3'/'t+7' are the older schedule's steps, still on some invoices.)
 export function isStaleFeeWarning(
   step: string,
   o: { hasLateFee: boolean; feeApplied: boolean; offset: number; graceDays: number }
 ): boolean {
-  if (step !== 't+3' && step !== 't+7') return false;
+  if (step !== 'fee_warning' && step !== 't+3' && step !== 't+7') return false;
   return o.hasLateFee && (o.feeApplied || o.offset > o.graceDays);
 }
 
@@ -335,9 +352,8 @@ export function dayOffset(today: Date, dueDate: Date): number {
 export function computeNextStep(
   offset: number,
   sentSteps: Set<string>,
-  options?: { schedule?: typeof SCHEDULE }
-): (typeof SCHEDULE)[number] | undefined {
-  const schedule = options?.schedule ?? SCHEDULE;
+  schedule: ScheduleStep[]
+): ScheduleStep | undefined {
   // Only the latest step whose day has arrived. A missed run still catches up
   // to it, but older missed steps are never back-filled ("due in 3 days" after
   // the due date would be wrong).

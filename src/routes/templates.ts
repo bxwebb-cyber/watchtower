@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import { stripeConfigured } from '../services/invoiceCreator';
 import { computeInitialNextRun, skipToNextCycle } from '../services/templateEngine';
 import { getAccount } from '../lib/account';
+import { parseGraceDays, GRACE_REQUIRED } from '../services/feeRules';
 
 const prisma = new PrismaClient();
 export const templatesRouter = Router();
@@ -60,6 +61,12 @@ templatesRouter.post('/', async (req, res) => {
     return res.status(400).json({ error: 'amount must be > 0' });
   }
 
+  // The owner chooses when the fee applies (0 = the day after the due date).
+  const grace = parseGraceDays(graceDays);
+  if ((feeKind ?? 'none') !== 'none' && grace === null) {
+    return res.status(400).json({ error: GRACE_REQUIRED });
+  }
+
   const validFrequencies = ['monthly', 'weekly', 'biweekly', 'custom'];
   const freq = (frequency ?? 'monthly') as string;
   if (!validFrequencies.includes(freq)) {
@@ -84,7 +91,7 @@ templatesRouter.post('/', async (req, res) => {
       dueDays: dueDays != null ? Number(dueDays) : 30,
       feeKind: feeKind ?? 'none',
       feeAmount: feeAmount != null ? Number(feeAmount) : 0,
-      graceDays: graceDays != null ? Number(graceDays) : 7,
+      graceDays: grace ?? 0,
       frequency: freq,
       customDay: freq === 'custom' ? Number(customDay) : null,
       nextRunDate: nextRun,
@@ -115,6 +122,10 @@ templatesRouter.patch('/:id', async (req, res) => {
     if (req.body[field] !== undefined) {
       if (field === 'amount') {
         updates.amount = Math.round(Number(req.body.amount) * 100);
+      } else if (field === 'graceDays') {
+        const grace = parseGraceDays(req.body.graceDays);
+        if (grace === null) return res.status(400).json({ error: GRACE_REQUIRED });
+        updates.graceDays = grace;
       } else {
         updates[field] = req.body[field];
       }

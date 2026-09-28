@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { getAccount } from '../lib/account';
 import { stripePublicName } from '../lib/stripeName';
+import { parseGraceDays, GRACE_REQUIRED } from '../services/feeRules';
 
 const prisma = new PrismaClient();
 export const settingsRouter = Router();
@@ -65,7 +66,13 @@ settingsRouter.put('/', async (req, res) => {
   if (req.body.alertPayment !== undefined) data.alertPayment = Boolean(req.body.alertPayment);
   if (req.body.defaultFeeKind !== undefined) data.defaultFeeKind = String(req.body.defaultFeeKind);
   if (req.body.defaultFeeAmount !== undefined) data.defaultFeeAmount = Number(req.body.defaultFeeAmount);
-  if (req.body.defaultGraceDays !== undefined) data.defaultGraceDays = Number(req.body.defaultGraceDays);
+  if (req.body.defaultGraceDays !== undefined) {
+    // The owner's choice (0 = the day after the due date); blank clears it.
+    const blank = req.body.defaultGraceDays === null || req.body.defaultGraceDays === '';
+    const grace = parseGraceDays(req.body.defaultGraceDays);
+    if (!blank && grace === null) return res.status(400).json({ error: GRACE_REQUIRED });
+    data.defaultGraceDays = blank ? null : grace;
+  }
 
   const settings = await prisma.settings.upsert({
     where: { accountId: account.id },

@@ -1,5 +1,44 @@
 import { describe, it, expect } from 'vitest';
-import { agreedFeeCents, checkFeeChange } from './feeRules';
+import { agreedFeeCents, checkFeeChange, feeWhen, parseGraceDays } from './feeRules';
+
+describe('parseGraceDays (the owner chooses — no default)', () => {
+  it('accepts 0: the fee applies the day after the due date', () => {
+    expect(parseGraceDays(0)).toBe(0);
+    expect(parseGraceDays('0')).toBe(0);
+  });
+
+  it('accepts whole days up to 90', () => {
+    expect(parseGraceDays('7')).toBe(7);
+    expect(parseGraceDays(90)).toBe(90);
+  });
+
+  it('never fills in a default when the owner left it blank', () => {
+    expect(parseGraceDays(undefined)).toBeNull();
+    expect(parseGraceDays('')).toBeNull();
+    expect(parseGraceDays(null)).toBeNull();
+  });
+
+  it('rejects negatives, fractions, too-long and non-numbers', () => {
+    expect(parseGraceDays(-1)).toBeNull();
+    expect(parseGraceDays(2.5)).toBeNull();
+    expect(parseGraceDays(91)).toBeNull();
+    expect(parseGraceDays('soon')).toBeNull();
+  });
+});
+
+describe('feeWhen (wording the client sees)', () => {
+  it('0 days → "if it\'s not paid by the due date" (never "0 days after")', () => {
+    expect(feeWhen(0)).toBe("if it's not paid by the due date");
+  });
+
+  it('1 day is singular', () => {
+    expect(feeWhen(1)).toBe('if unpaid 1 day after the due date');
+  });
+
+  it('several days', () => {
+    expect(feeWhen(7)).toBe('if unpaid 7 days after the due date');
+  });
+});
 
 describe('agreedFeeCents', () => {
   it('flat fee: dollars → cents', () => {

@@ -88,7 +88,7 @@
       <div class="wt-fee-panel__label">Late fee</div>
       <div class="wt-fee-panel__q">
         <span>If not paid within</span>
-        <input id="grace-days" type="number" min="0" max="90" value="7">
+        <input id="grace-days" type="number" min="0" max="90" value="" placeholder="?" aria-label="Days after the due date before the late fee applies (0 = the day after it's due)">
         <span>days of the due date, what's your late fee?</span>
       </div>
       <div class="wt-fee-options">
@@ -111,17 +111,28 @@
 <script>
 let feeKind = 'none';
 
+// The owner chooses the grace period — Dunn never fills one in.
+// 0 = the fee applies the day after the due date. (Same rule as feeRules.ts.)
+function graceValue() {
+  const v = document.getElementById('grace-days').value.trim();
+  if (v === '') return null;
+  const n = Number(v);
+  return Number.isInteger(n) && n >= 0 && n <= 90 ? n : null;
+}
+function feeWhen(g) {
+  return g === 0 ? "if it's not paid by the due date" : `if unpaid ${g} day${g === 1 ? '' : 's'} after the due date`;
+}
+const GRACE_REQUIRED = "Choose when the late fee applies: 0 for the day after the due date, or a number of days after it.";
+
 function preview() {
-  const grace = document.getElementById('grace-days').value || '7';
+  const grace = graceValue();
   const el = document.getElementById('fee-preview');
-  if (feeKind === 'none') el.textContent = 'Your client sees: No late fee.';
-  else if (feeKind === 'flat') {
-    const a = document.getElementById('fee-flat').value || '0';
-    el.textContent = `Your client sees: "A $${a} late fee applies if unpaid ${grace} days after the due date."`;
-  } else {
-    const p = document.getElementById('fee-pct').value || '0';
-    el.textContent = `Your client sees: "A ${p}% late fee applies if unpaid ${grace} days after the due date."`;
-  }
+  if (feeKind === 'none') { el.textContent = 'Your client sees: No late fee.'; return; }
+  if (grace === null) { el.textContent = GRACE_REQUIRED; return; }
+  const fee = feeKind === 'flat'
+    ? '$' + (document.getElementById('fee-flat').value || '0')
+    : (document.getElementById('fee-pct').value || '0') + '%';
+  el.textContent = `Your client sees: "A ${fee} late fee applies ${feeWhen(grace)}."`;
 }
 
 function selectKind(kind) {
@@ -191,7 +202,9 @@ document.getElementById('submit-btn').addEventListener('click', async () => {
   if (!Number.isFinite(amount) || amount <= 0) { showError('Enter an amount greater than $0.'); return; }
   if (!dueDate) { showError('Pick a due date.'); return; }
 
-  const fee = { kind: feeKind, graceDays: parseInt(document.getElementById('grace-days').value) || 7 };
+  const grace = graceValue();
+  if (feeKind !== 'none' && grace === null) { showError(GRACE_REQUIRED); return; }
+  const fee = { kind: feeKind, graceDays: grace };
   if (feeKind === 'flat') fee.amount = parseFloat(document.getElementById('fee-flat').value) || 0;
   if (feeKind === 'percent') fee.amount = parseFloat(document.getElementById('fee-pct').value) || 0;
 
