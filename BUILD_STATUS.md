@@ -110,3 +110,4 @@ _Updated 2026-09-27 (v1.7 — full UI re-integration + onboarding + invoice form
 7. ✅ Structural SEO + brand — DONE. Brand = "Dunn"; title/meta/schema/robots/sitemap live; "Watchtower"→"Dunn" user-facing sweep done.
 8. ◐ Real-data e2e test — connect + invoice creation VERIFIED (real test account connected via OAuth; real invoice landed on it); reminder-fire + late fee still UNVERIFIED (needs cron + Railway-shell DB access)
 9. 🔴 Wire a cron/scheduler for reminder + fee jobs — GO-LIVE BLOCKER (jobs are manual-only today; reminders would never auto-fire)
+10. Content SEO + AEO (findability) — NOT DONE (only structural/label SEO is live; content clusters + AI-findability still ahead — see seo-geo-aeo-content-system skill)
