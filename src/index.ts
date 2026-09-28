@@ -103,6 +103,7 @@ app.listen(port, () => {
   if (schedulerEnabled()) {
     startScheduler(() => withJobLock(() => runSweep()));
   } else {
-    console.log('[scheduler] off (local dev) — run jobs with npm run job:*, or set SCHEDULER=on');
+    const why = process.env.SCHEDULER === 'off' ? 'SCHEDULER=off' : 'local dev';
+    console.log(`[scheduler] off (${why}) — reminders and fees won't send on their own; run jobs with npm run job:*, or set SCHEDULER=on`);
   }
 });

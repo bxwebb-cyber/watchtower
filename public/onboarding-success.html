@@ -9,8 +9,12 @@
 <body>
 <!--
   ONBOARDING SUCCESS: show after the Stripe OAuth callback (/auth/stripe/start → callback → here).
-  Data: counts after the first sync: open_invoices, clients, past_due.
-        Get them from /invoices, or have the callback return them.
+  Data: the Stripe callback redirects here as
+        /onboarding-success.html?open_invoices=N&clients=N&past_due=N
+        The script at the bottom copies those three query values into the count cards.
+  Name check: the callback also passes ?dunn_name=…&stripe_name=… (URL-encoded).
+        Match (case/space-insensitive) → small ✓ line. Different → the side-by-side card. stripe_name missing → nothing.
+        The script at the bottom picks the state. "It's fine, continue" just hides the card (optionally POST that the owner saw it).
   The header "Create new invoice" button and the sidebar pending badge are hidden until the owner leaves this screen.
 -->
 <div class="wt-app">
@@ -23,12 +27,12 @@
       </div>
     </div>
     <nav class="wt-nav" aria-label="Main">
-      <a class="wt-nav__item is-active" href="dashboard.html" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v5H3z"/></svg><span class="wt-nav__label">Dashboard</span></a>
-      <a class="wt-nav__item" href="dashboard.html#invoices"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6M8 13h8M8 17h5"/></svg><span class="wt-nav__label">Invoices</span></a>
-      <a class="wt-nav__item" href="recurring.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 2l4 4-4 4M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4M21 13v2a3 3 0 0 1-3 3H3"/></svg><span class="wt-nav__label">Recurring</span></a>
-      <a class="wt-nav__item" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/></svg><span class="wt-nav__label">Clients</span></a>
-      <a class="wt-nav__item" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18M8 17V11M13 17V7M18 17v-4"/></svg><span class="wt-nav__label">Reports</span></a>
-      <a class="wt-nav__item" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 2.9-1.2V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0 1.2 2.9H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span class="wt-nav__label">Settings</span></a>
+      <a class="wt-nav__item" href="/dashboard#dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v5H3z"/></svg><span class="wt-nav__label">Dashboard</span><span class="wt-nav__badge" data-bind="pending_fee_count">2</span></a>
+      <a class="wt-nav__item" href="/dashboard#invoices"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6M8 13h8M8 17h5"/></svg><span class="wt-nav__label">Invoices</span></a>
+      <a class="wt-nav__item" href="/dashboard#recurring"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 2l4 4-4 4M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4M21 13v2a3 3 0 0 1-3 3H3"/></svg><span class="wt-nav__label">Recurring</span></a>
+      <a class="wt-nav__item" href="/dashboard#clients"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/></svg><span class="wt-nav__label">Clients</span></a>
+      <a class="wt-nav__item" href="/dashboard#reports"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18M8 17V11M13 17V7M18 17v-4"/></svg><span class="wt-nav__label">Reports</span></a>
+      <a class="wt-nav__item" href="/dashboard#settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 2.9-1.2V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0 1.2 2.9H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span class="wt-nav__label">Settings</span></a>
     </nav>
     <div class="wt-profile">
       <span class="wt-profile__avatar" data-bind="owner_initials">MR</span>
@@ -60,12 +64,85 @@
         <div class="wt-stat"><div class="wt-stat__value wt-stat__value--alert" data-bind="past_due">2</div><div class="wt-stat__label">already past due</div></div>
       </div>
 
+      <!-- NAME CHECK: exactly one of these shows (or neither) -->
+      <div class="wt-namecheck" data-namecheck="match" hidden>
+        <div class="wt-namecheck__ok">Your clients will see <strong data-bind="dunn_name">Rivera Studio</strong> everywhere.</div>
+      </div>
+      <div class="wt-namecheck" data-namecheck="mismatch" hidden>
+        <div class="wt-namecheck__card" role="region" aria-labelledby="namecheck-title">
+          <p class="wt-namecheck__title" id="namecheck-title">Your clients will see two different names.</p>
+          <div class="wt-names">
+            <div class="wt-name"><div class="wt-name__where">In Dunn's emails</div><div class="wt-name__value" data-bind="dunn_name">Rivera Studio</div></div>
+            <div class="wt-name"><div class="wt-name__where">On the Stripe payment page and receipt</div><div class="wt-name__value" data-bind="stripe_name">Rivera Creative LLC</div></div>
+          </div>
+          <p class="wt-namecheck__text">Want them to match? Change your public business name in your Stripe settings.</p>
+          <p class="wt-namecheck__fine">Your client's bank statement shows the name on your Stripe account, so make sure it's one they'll recognize.</p>
+          <div class="wt-namecheck__actions">
+            <a class="wt-btn wt-btn--primary wt-btn--sm" href="https://dashboard.stripe.com/settings/public" target="_blank" rel="noopener">Open Stripe settings</a>
+            <button class="wt-btn wt-btn--secondary wt-btn--sm" type="button" data-namecheck-dismiss>It's fine, continue</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- STRIPE REMINDERS TIP (always shown). Confirm the exact Stripe menu path at build time. -->
+      <div class="wt-tip">
+        <span class="wt-tip__label">Tip</span>
+        <span>Turn off Stripe's invoice reminder emails. Dunn handles reminders for you, so your clients only hear from you once. <a href="https://dashboard.stripe.com/settings/billing/automatic" target="_blank" rel="noopener">Open Stripe email settings</a></span>
+      </div>
+
       <div class="wt-success__actions">
-        <a class="wt-btn wt-btn--primary" href="dashboard.html">Go to dashboard</a>
-        <a class="wt-btn wt-btn--secondary" href="settings.html#late-fee-defaults">Set default late-fee terms</a>
+        <a class="wt-btn wt-btn--primary" href="/dashboard">Go to dashboard</a>
+        <a class="wt-btn wt-btn--secondary" href="/dashboard#settings">Set default late-fee terms</a>
       </div>
     </section>
   </main>
 </div>
+<script>
+(function () {
+  var q = new URLSearchParams(window.location.search);
+  ['open_invoices', 'clients', 'past_due'].forEach(function (k) {
+    var el = document.querySelector('[data-bind="' + k + '"]');
+    if (el && q.has(k)) el.textContent = String(parseInt(q.get(k), 10) || 0);
+  });
+  var pd = document.querySelector('[data-bind="past_due"]');
+  if (pd && pd.textContent.trim() === '0') pd.classList.remove('wt-stat__value--alert');
+
+  var dn = q.get('dunn_name'), sn = q.get('stripe_name');
+  var norm = function (s) { return (s || '').toLowerCase().replace(/[^a-z0-9]/g, ''); };
+  if (dn && sn) {
+    var state = norm(dn) === norm(sn) ? 'match' : 'mismatch';
+    document.querySelectorAll('[data-bind="dunn_name"]').forEach(function (el) { el.textContent = dn; });
+    document.querySelectorAll('[data-bind="stripe_name"]').forEach(function (el) { el.textContent = sn; });
+    var box = document.querySelector('[data-namecheck="' + state + '"]');
+    if (box) box.hidden = false;
+  }
+  var dismiss = document.querySelector('[data-namecheck-dismiss]');
+  if (dismiss) dismiss.addEventListener('click', function () {
+    dismiss.closest('.wt-namecheck').hidden = true;
+    document.dispatchEvent(new CustomEvent('wt:namecheck-dismiss', { detail: { dunn_name: dn, stripe_name: sn } }));
+  });
+})();
+</script>
+<script>
+// Engineering (9/28): fill the sidebar with the signed-in owner (the designer's
+// sample is "Marta Rivera"), and keep the pending badge hidden on this screen.
+(function () {
+  var badge = document.querySelector('.wt-nav__badge[data-bind="pending_fee_count"]');
+  if (badge) badge.hidden = true;
+  fetch('/settings', { credentials: 'same-origin' })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (s) {
+      if (!s) return;
+      var who = s.ownerName || s.businessName || '';
+      var initials = who.trim().split(/\s+/).slice(0, 2).map(function (p) { return p[0] || ''; }).join('').toUpperCase();
+      var set = function (key, val) { document.querySelectorAll('[data-bind="' + key + '"]').forEach(function (el) { el.textContent = val; }); };
+      set('owner_name', who);
+      set('owner_email', s.ownerEmail || '');
+      set('owner_initials', initials || '—');
+      if (s.businessName) set('business_name', s.businessName);
+    })
+    .catch(function () {});
+})();
+</script>
 </body>
 </html>

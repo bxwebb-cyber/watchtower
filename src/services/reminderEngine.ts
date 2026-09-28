@@ -82,6 +82,15 @@ export async function runReminderJob(now = new Date()) {
       continue;
     }
 
+    // The owner answered the T+14 escalation with "send the final notice".
+    // The escalation already recorded t+14, so the schedule would never pick
+    // it again — send it here, once.
+    if (invoice.escalateAction === 'send_reminder') {
+      await prisma.invoice.update({ where: { id: invoice.id }, data: { escalateAction: null } });
+      if (await sendClientEmail(invoice, 't+14')) sent++;
+      continue;
+    }
+
     const due = new Date(invoice.dueDate);
     const dueDay = new Date(due.getFullYear(), due.getMonth(), due.getDate());
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -147,11 +156,6 @@ export async function runReminderJob(now = new Date()) {
       if (invoice.escalateAction === 'owner_calling') {
         continue;
       }
-      // 'send_reminder' — clear it, fall through to send the email.
-      await prisma.invoice.update({
-        where: { id: invoice.id },
-        data: { escalateAction: null },
-      });
     }
 
     if (await sendClientEmail(invoice, step.step)) sent++;
@@ -176,10 +180,14 @@ type EmailInvoice = Invoice & { client: Client | null; account: Account; feePoli
 // the business ("Hudson & Co. via Dunn"), and record it. Dry-run (no
 // RESEND_API_KEY) records without sending. Returns false when nothing went
 // out — no client email, or the send failed (not recorded, so it retries).
-export async function sendClientEmail(invoice: EmailInvoice, step: string): Promise<boolean> {
+export async function sendClientEmail(
+  invoice: EmailInvoice,
+  step: string,
+  extra: Partial<EmailData> = {}
+): Promise<boolean> {
   const to = invoice.client?.email;
   if (!to) return false;
-  const data = emailDataFor(invoice);
+  const data = { ...emailDataFor(invoice), ...extra };
   const { html, subject } = renderEmail(EMAIL_TEMPLATES[step], data);
 
   if (!resend) {
@@ -226,12 +234,17 @@ function emailDataFor(invoice: EmailInvoice): EmailData {
   // The deadline is part of the fee terms, so it's known before the fee is
   // applied — that's exactly when the t+7 email needs it ("applies after X").
   const feeDeadline = hasLateFee ? addDays(due, graceDays) : null;
+  // Sign off as the owner ("Reply to reach Marta"). Accounts from before the
+  // "Your name" field fall back to the full business name, never its first
+  // word ("Reply to reach Hudson" for Hudson Creative).
+  const businessName = invoice.account.businessName ?? 'Your Business';
+  const ownerName = invoice.account.ownerName?.trim() || null;
   return {
-    businessName: invoice.account.businessName ?? 'Your Business',
+    businessName,
     businessEmail: invoice.account.email ?? '',
     businessAddress: '',
-    ownerName: invoice.account.businessName ?? 'Your Business',
-    ownerFirstName: invoice.account.businessName?.split(/\s+/)[0] ?? 'Your',
+    ownerName: ownerName ?? businessName,
+    ownerFirstName: ownerName ? ownerName.split(/\s+/)[0] : businessName,
     clientFirstName: invoice.client?.name?.split(/\s+/)[0] ?? 'there',
     invoiceId: invoice.stripeNumber || invoice.stripeInvoiceId,
     amountDue: `$${(invoice.amount / 100).toFixed(2)}`,

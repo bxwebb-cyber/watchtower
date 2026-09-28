@@ -44,6 +44,9 @@ export interface EmailData {
   feeApplied: boolean;
   feeWaived?: boolean;
   termsFeeAmount?: string | null; // the fee in the invoice terms (feeAmount may be lower)
+  invoicePdfUrl?: string | null; // 00-new-invoice: Stripe's PDF
+  isRecurring?: boolean; // 00-new-invoice: sent by a recurring template
+  frequencyLabel?: string | null; // "monthly" / "weekly" / …
   mascotUrl: string;
 }
 
@@ -74,18 +77,35 @@ export function renderEmail(name: string, data: EmailData): { html: string; subj
     fee_applied: data.feeApplied,
     fee_waived: data.feeWaived ?? false,
     terms_fee_amount: data.termsFeeAmount ?? data.feeAmount,
+    invoice_pdf_url: data.invoicePdfUrl ?? null,
+    is_recurring: data.isRecurring ?? false,
+    frequency_label: data.frequencyLabel ?? null,
     mascot_url: data.mascotUrl,
   });
 
-  // Extract subject from <title> tag.
+  // Extract subject from <title> tag. Handlebars HTML-escapes values, which is
+  // right for the body but not for a subject line ("Hudson &amp; Co.") — decode.
   const titleMatch = html.match(/<title>([^<]+)<\/title>/);
-  const subject = titleMatch ? titleMatch[1] : '';
+  const subject = titleMatch ? decodeEntities(titleMatch[1]) : '';
 
   return { html, subject };
 }
 
+// The entities Handlebars' escapeExpression produces.
+export function decodeEntities(s: string): string {
+  return s
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#x27;|&#39;/g, "'")
+    .replace(/&#x60;/g, '`')
+    .replace(/&#x3D;/g, '=')
+    .replace(/&amp;/g, '&');
+}
+
 // Template names mapped to step identifiers.
 export const EMAIL_TEMPLATES: Record<string, string> = {
+  new_invoice: '00-new-invoice',
   't-7': '01-upcoming-7-days-before',
   't-3': '02-upcoming-3-days-before',
   due: '03-due-today',

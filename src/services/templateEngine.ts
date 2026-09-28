@@ -37,6 +37,7 @@ export async function runTemplateJob(now = new Date()): Promise<number> {
           tmpl.feeKind !== 'none'
             ? { kind: tmpl.feeKind as 'flat' | 'percent', amount: tmpl.feeAmount, graceDays: tmpl.graceDays }
             : undefined,
+        recurring: { frequencyLabel: FREQUENCY_LABELS[tmpl.frequency] ?? 'recurring' },
       });
 
       if (!result.ok) {
@@ -103,6 +104,14 @@ export async function runTemplateJob(now = new Date()): Promise<number> {
   console.log(`[job] template run: ${created} invoices created from templates`);
   return created;
 }
+
+// "Your monthly invoice." — custom runs monthly on a set day.
+const FREQUENCY_LABELS: Record<string, string> = {
+  monthly: 'monthly',
+  weekly: 'weekly',
+  biweekly: 'biweekly',
+  custom: 'monthly',
+};
 
 // Advance the nextRunDate based on frequency.
 export function advanceRunDate(current: Date, frequency: string, customDay?: number): Date {

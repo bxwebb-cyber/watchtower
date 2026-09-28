@@ -62,6 +62,11 @@ function invoiceStatus(inv, now) {
   if (inv.status === 'paid') {
     return { key: 'paid', pill: 'wt-pill--paid', label: 'Paid', dueClass: '', dueText: inv.paidAt ? 'Paid ' + new Date(inv.paidAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Paid' };
   }
+  // Cancelled in Stripe — no longer owed, so never "Pending" or "Overdue".
+  if (inv.status === 'void' || inv.status === 'uncollectible' || inv.status === 'deleted') {
+    const label = inv.status === 'uncollectible' ? 'Uncollectible' : 'Void';
+    return { key: 'void', pill: 'wt-pill--pending', label, dueClass: '', dueText: label.toLowerCase() };
+  }
   if (inv.feeApplied) {
     return { key: 'fee-applied', pill: 'wt-pill--fee-applied', label: 'Fee applied', dueClass: 'wt-due--late', dueText: '' };
   }
@@ -144,10 +149,11 @@ async function loadDashboard() {
   const period = now.getHours() < 12 ? 'morning' : now.getHours() < 17 ? 'afternoon' : 'evening';
   const bizName = settings.businessName || 'there';
 
-  const overdue = state.invoices.filter(i => i.status !== 'paid' && new Date(i.due) < now && !i.feeApplied);
-  const feeApplied = state.invoices.filter(i => i.status !== 'paid' && i.feeApplied);
+  // Only open invoices are owed (paid, void and uncollectible ones aren't).
+  const overdue = state.invoices.filter(i => i.status === 'open' && new Date(i.due) < now && !i.feeApplied);
+  const feeApplied = state.invoices.filter(i => i.status === 'open' && i.feeApplied);
   const dueSoon = state.invoices.filter(i => {
-    if (i.status === 'paid') return false;
+    if (i.status !== 'open') return false;
     const d = new Date(i.due);
     return d >= now && d <= new Date(now.getTime() + 7 * 86400000);
   });
@@ -182,9 +188,9 @@ async function loadDashboard() {
     pending_fees_total: money(pendingFees.reduce((s, i) => s + (i.feeAmountCents || 0), 0)),
     pending_fee_count: pendingFees.length,
     billed_fee_count: billedFees.length,
-    owner_name: bizName,
+    owner_name: settings.ownerName || bizName,
     owner_email: settings.ownerEmail || '',
-    owner_initials: initials(bizName),
+    owner_initials: initials(settings.ownerName || bizName),
   });
 
   renderInvoices();
@@ -348,6 +354,8 @@ async function loadSettings() {
 
   const form = document.querySelector('[data-settings-form]');
   if (form) {
+    form.querySelector('[name="owner_name"]').value = settings.ownerName || '';
+    form.querySelector('[name="business_name"]').value = settings.businessName || '';
     form.querySelector('[name="owner_email"]').value = settings.ownerEmail || '';
     form.querySelector('[name="alert_approve"]').checked = settings.alertFeeApproval !== false;
     form.querySelector('[name="alert_overdue"]').checked = settings.alertOverdue !== false;
@@ -366,13 +374,18 @@ async function loadSettings() {
   const accountId = status.stripeAccountId || '';
   const shortId = accountId.startsWith('acct_') ? accountId.slice(0, 9) + '…' + accountId.slice(-3) : accountId;
   bind({
-    stripe_account_name: settings.businessName || 'Stripe account',
+    stripe_account_name: status.stripeName || settings.businessName || 'Stripe account',
     stripe_account_id: shortId,
+    stripe_name: status.stripeName || '',
   });
   document.querySelectorAll('[data-stripe]').forEach(el => {
     const want = el.getAttribute('data-stripe');
     el.hidden = (want === 'connected') !== connected;
   });
+  // Name check: the Stripe payment page shows a different name than Dunn's emails.
+  const norm = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const mismatch = document.querySelector('[data-stripe-name-mismatch]');
+  if (mismatch) mismatch.hidden = !(connected && status.stripeName && settings.businessName && norm(status.stripeName) !== norm(settings.businessName));
 
   // Plan
   const plan = settings.plan || 'solo';
@@ -480,6 +493,8 @@ document.addEventListener('wt:settings-save', async e => {
   const d = e.detail.data;
   const feeKind = d.fee_type === 'pct' ? 'percent' : (d.fee_type === 'flat' ? 'flat' : 'none');
   const body = {
+    ownerName: (d.owner_name || '').trim(),
+    businessName: (d.business_name || '').trim(),
     ownerEmail: d.owner_email,
     alertFeeApproval: !!d.alert_approve,
     alertOverdue: !!d.alert_overdue,
@@ -488,15 +503,27 @@ document.addEventListener('wt:settings-save', async e => {
     defaultFeeAmount: feeKind === 'flat' ? (parseFloat(d.fee_flat) || 0) : feeKind === 'percent' ? (parseFloat(d.fee_pct) || 0) : 0,
     defaultGraceDays: parseInt(d.grace_days) || 7,
   };
+  if (!body.businessName) { alert('Business name is required. It\'s what your clients see in every email.'); return; }
   try {
     await api('PUT', '/settings', body);
+    loadSettings(); // refresh the Stripe-name check against the new business name
+    loadProfile();
     const note = document.querySelector('[data-save-note]');
     if (note) { note.textContent = 'Saved. Alerts go to ' + (d.owner_email || 'your email'); setTimeout(() => { note.textContent = ''; }, 4000); }
   } catch (err) { alert('Save failed: ' + err.message); }
 });
 
+// Sidebar profile on every view — otherwise opening #settings (or any view
+// but the dashboard) directly shows the designer's sample "Marta Rivera".
+async function loadProfile() {
+  const s = await api('GET', '/settings').catch(() => ({}));
+  const who = s.ownerName || s.businessName || '';
+  bind({ owner_name: who, owner_email: s.ownerEmail || '', owner_initials: initials(who) });
+}
+
 // ---- Init ----
 document.addEventListener('DOMContentLoaded', () => {
+  loadProfile();
   // Load whatever view the current hash points at (watchtower-ui.js fires wt:view on load too).
   const view = (window.location.hash || '').replace('#', '') || 'dashboard';
   document.dispatchEvent(new CustomEvent('wt:view', { detail: { view } }));

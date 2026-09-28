@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { PrismaClient } from '@prisma/client';
 import { authLimiter } from '../middleware/rateLimit';
+import { stripePublicName } from '../lib/stripeName';
 
 const prisma = new PrismaClient();
 
@@ -80,7 +81,24 @@ export function authRouter() {
 
       setAuthCookie(res, issueToken(accountId!));
 
-      res.redirect('/onboarding?connected=1');
+      // The "connected" screen: what Dunn found, plus the name check — the
+      // business name in Dunn's emails vs. the public name on the Stripe
+      // payment page and receipt (the page hides the check if either is missing).
+      const account = await prisma.account.findUniqueOrThrow({ where: { id: accountId! } });
+      const [openInvoices, clients, pastDue] = await Promise.all([
+        prisma.invoice.count({ where: { accountId: account.id, status: 'open' } }),
+        prisma.client.count({ where: { accountId: account.id } }),
+        prisma.invoice.count({ where: { accountId: account.id, status: 'open', dueDate: { lt: new Date() } } }),
+      ]);
+      const params = new URLSearchParams({
+        open_invoices: String(openInvoices),
+        clients: String(clients),
+        past_due: String(pastDue),
+      });
+      if (account.businessName) params.set('dunn_name', account.businessName);
+      const stripeName = await stripePublicName(connectedAccountId);
+      if (stripeName) params.set('stripe_name', stripeName);
+      res.redirect('/onboarding-success.html?' + params.toString());
     } catch (err: any) {
       console.error('Stripe OAuth error:', err);
       res.status(500).send('Stripe connection failed. Please try again.');
@@ -97,6 +115,11 @@ export function authRouter() {
       const businessName = String(req.body.businessName ?? '').trim();
       if (!businessName) {
         res.status(400).json({ error: 'Business name is required — reminders are sent in your business\'s name.' });
+        return;
+      }
+      const ownerName = String(req.body.ownerName ?? '').trim();
+      if (!ownerName) {
+        res.status(400).json({ error: 'Add your name — emails sign off with it.' });
         return;
       }
 
@@ -117,11 +140,11 @@ export function authRouter() {
       if (existing) {
         await prisma.account.update({
           where: { id: existing.id },
-          data: { passwordHash, businessName },
+          data: { passwordHash, businessName, ownerName },
         });
         const token = issueToken(existing.id);
         setAuthCookie(res, token);
-        res.json({ token, account: { id: existing.id, email, businessName } });
+        res.json({ token, account: { id: existing.id, email, businessName, ownerName } });
       } else {
         const account = await prisma.account.create({
           data: {
@@ -129,11 +152,12 @@ export function authRouter() {
             email,
             passwordHash,
             businessName,
+            ownerName,
           },
         });
         const token = issueToken(account.id);
         setAuthCookie(res, token);
-        res.json({ token, account: { id: account.id, email, businessName } });
+        res.json({ token, account: { id: account.id, email, businessName, ownerName } });
       }
     } catch (err: any) {
       console.error('Signup error:', err);
@@ -165,6 +189,7 @@ export function authRouter() {
           id: account.id,
           email: account.email,
           businessName: account.businessName,
+          ownerName: account.ownerName,
           stripeConnected: !account.stripeAccountId.startsWith('pending_'),
         },
       });
@@ -187,7 +212,7 @@ export function authRouter() {
       if (!account) { res.status(401).json({ error: 'Account not found' }); return; }
       res.json({
         account: {
-          id: account.id, email: account.email, businessName: account.businessName,
+          id: account.id, email: account.email, businessName: account.businessName, ownerName: account.ownerName,
           stripeConnected: !account.stripeAccountId.startsWith('pending_'),
         },
       });

@@ -17,6 +17,7 @@ model Account {
   stripeAccountId  String   @unique // the connected Stripe account id (acct_...)
   email            String
   businessName     String?
+  ownerName        String?  // the owner's own name — emails sign off "Reply to reach <first name>"
   passwordHash     String?  // set on first login; null before setup
   createdAt        DateTime @default(now())
 

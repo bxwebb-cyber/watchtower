@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import Stripe from 'stripe';
+import { sendClientEmail } from './reminderEngine';
 
 const prisma = new PrismaClient();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -25,6 +26,8 @@ export interface CreateInvoiceInput {
     amount?: number; // flat: dollars; percent: 0-100
     graceDays?: number; // days after due before the fee applies (default 7)
   };
+  // Set when a recurring template creates the invoice ("Your monthly invoice").
+  recurring?: { frequencyLabel: string };
 }
 
 export type CreateInvoiceResult =
@@ -152,16 +155,7 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<CreateIn
     });
     // The human `number` (e.g. HUDSON-0007) and the hosted payment URL are only
     // assigned once the invoice is finalized, so read them off the finalized result.
-
-    // Send is best-effort: creation must succeed even if the account's email
-    // settings aren't perfect in test mode. If it fails we still watch + remind.
-    try {
-      await stripe.invoices.sendInvoice(stripeInvoice.id, undefined, {
-        stripeAccount: account.stripeAccountId,
-      });
-    } catch (err) {
-      console.warn('[invoice] send failed (non-fatal)', (err as Error).message);
-    }
+    // Stripe does NOT email it: Dunn sends the invoice itself (step 4).
 
     // 3. Mirror into our DB: invoice + fee policy + audit trail.
     const invoice = await prisma.invoice.upsert({
@@ -211,6 +205,34 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<CreateIn
     await prisma.auditEvent.create({
       data: { invoiceId: invoice.id, event: 'invoice_created', detail },
     });
+
+    // 4. Dunn sends the invoice (template 00): the client's first email comes
+    //    from the business via Dunn, states the fee terms, and replies route
+    //    back to Dunn. Stripe sends its own email only if Dunn couldn't — the
+    //    client always gets the invoice exactly once. Never fails creation.
+    let emailed = false;
+    try {
+      const full = await prisma.invoice.findUniqueOrThrow({
+        where: { id: invoice.id },
+        include: { client: true, account: true, feePolicy: true },
+      });
+      emailed = await sendClientEmail(full, 'new_invoice', {
+        invoicePdfUrl: finalizedInvoice.invoice_pdf ?? null,
+        isRecurring: !!input.recurring,
+        frequencyLabel: input.recurring?.frequencyLabel ?? null,
+      });
+    } catch (err) {
+      console.error('[invoice] Dunn invoice email failed', (err as Error).message);
+    }
+    if (!emailed) {
+      try {
+        await stripe.invoices.sendInvoice(stripeInvoice.id, undefined, {
+          stripeAccount: account.stripeAccountId,
+        });
+      } catch (err) {
+        console.warn('[invoice] Stripe fallback send failed (non-fatal)', (err as Error).message);
+      }
+    }
 
     return {
       ok: true,

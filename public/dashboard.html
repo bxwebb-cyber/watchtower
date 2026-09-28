@@ -8,7 +8,7 @@
 </head>
 <body>
 <!--
-  WATCHTOWER APP: one file, six views. Serve it at /dashboard.
+  DUNN APP: one file, six views. Serve it at /dashboard.
   The sidebar switches views by URL hash: #dashboard (default) · #invoices · #recurring · #clients · #reports · #settings
   Any element with data-views="a b" shows only in those views; watchtower-ui.js handles it and fires wt:view { view }
   so you can load that view's data. /dashboard#settings opens Settings directly (used by onboarding).
@@ -856,6 +856,23 @@
           </div>
           <button class="wt-btn wt-btn--secondary wt-btn--sm" type="button" data-stripe="connected" data-action="stripe-disconnect">Disconnect</button>
           <a class="wt-btn wt-btn--primary wt-btn--sm" href="/auth/stripe/start" data-stripe="disconnected" hidden>Connect Stripe</a>
+        </div>
+        <!-- Show when stripe_name ≠ business_name -->
+        <p class="wt-setting__sub" data-stripe-name-mismatch hidden>Your Stripe payment page and receipts show <strong data-bind="stripe_name">Rivera Creative LLC</strong>. <a href="https://dashboard.stripe.com/settings/public" target="_blank" rel="noopener">Change it in Stripe</a> if you want it to match.</p>
+        <div class="wt-tip wt-tip--inline">
+          <span class="wt-tip__label">Tip</span>
+          <span>Turn off Stripe's invoice reminder emails. Dunn handles reminders, so clients aren't emailed twice.</span>
+        </div>
+      </section>
+
+      <section class="wt-card wt-setting" id="settings-profile" aria-labelledby="profile-title">
+        <h2 class="wt-h2" id="profile-title">You &amp; your business</h2>
+        <p class="wt-setting__sub">How you appear in every email Dunn sends your clients.</p>
+        <div class="wt-setting__body wt-stack" style="gap:16px">
+          <label class="wt-field wt-field--narrow">Your name<input class="wt-input" name="owner_name" value="" autocomplete="name" required>
+            <span class="wt-helper">Emails sign off with your first name: "Reply to reach Marta."</span></label>
+          <label class="wt-field wt-field--narrow">Business name<input class="wt-input" name="business_name" value="" autocomplete="organization" required>
+            <span class="wt-helper">The name your clients know you by. It's what they'll see in every email.</span></label>
         </div>
       </section>
 

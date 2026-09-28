@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { getAccount } from '../lib/account';
+import { stripePublicName } from '../lib/stripeName';
 
 const prisma = new PrismaClient();
 export const settingsRouter = Router();
@@ -26,6 +27,7 @@ settingsRouter.get('/', async (req, res) => {
     alertOverdue: settings.alertOverdue,
     alertPayment: settings.alertPayment,
     businessName: account.businessName,
+    ownerName: account.ownerName,
     stripeConnected: !!account.stripeAccountId && !account.stripeAccountId.startsWith('pending_'),
     defaultFeeKind: settings.defaultFeeKind,
     defaultFeeAmount: settings.defaultFeeAmount,
@@ -41,10 +43,19 @@ settingsRouter.put('/', async (req, res) => {
   }
 
   // businessName is the client-facing sender name; it lives on the Account.
+  // ownerName is the owner's own name — emails sign off with its first word.
   let businessName = account.businessName ?? null;
+  let ownerName = account.ownerName ?? null;
   if (req.body.businessName !== undefined) {
-    businessName = String(req.body.businessName).trim() || null;
-    await prisma.account.update({ where: { id: account.id }, data: { businessName } });
+    const next = String(req.body.businessName).trim();
+    if (!next) return res.status(400).json({ error: 'Business name is required — every email is sent in it.' });
+    businessName = next;
+  }
+  if (req.body.ownerName !== undefined) {
+    ownerName = String(req.body.ownerName).trim() || null;
+  }
+  if (req.body.businessName !== undefined || req.body.ownerName !== undefined) {
+    await prisma.account.update({ where: { id: account.id }, data: { businessName, ownerName } });
   }
 
   const data: Record<string, unknown> = {};
@@ -64,6 +75,7 @@ settingsRouter.put('/', async (req, res) => {
 
   res.json({
     businessName,
+    ownerName,
     ownerEmail: settings.ownerEmail ?? account.email,
     alertFeeApproval: settings.alertFeeApproval,
     alertOverdue: settings.alertOverdue,
@@ -80,6 +92,7 @@ settingsRouter.get('/status', async (req, res) => {
   res.json({
     connected: !!account,
     businessName: account?.businessName ?? null,
+    stripeName: await stripePublicName(account?.stripeAccountId),
     stripeAccountId: account?.stripeAccountId ?? null,
     stripeConnected: !!account?.stripeAccountId && !account.stripeAccountId.startsWith('pending_'),
   });
