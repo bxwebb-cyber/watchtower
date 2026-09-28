@@ -3,6 +3,7 @@ import type { Invoice, Client, Account, FeePolicy } from '@prisma/client';
 import { Resend } from 'resend';
 import { clientMailFrom, replyToFor, notifyOwner, notifyEscalation } from './notify';
 import { renderEmail, EMAIL_TEMPLATES, EmailData } from './emailRenderer';
+import { agreedFeeCents } from './feeRules';
 
 const prisma = new PrismaClient();
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
@@ -217,12 +218,11 @@ function emailDataFor(invoice: EmailInvoice): EmailData {
   const due = new Date(invoice.dueDate);
   const hasLateFee = invoice.feePolicy != null && invoice.feePolicy.kind !== 'none';
   const graceDays = invoice.feePolicy?.graceDays ?? 7;
-  const feeCents = invoice.feeAmountCents ??
-    (hasLateFee
-      ? invoice.feePolicy!.kind === 'percent'
-        ? Math.round(invoice.amount * (invoice.feePolicy!.amount / 100))
-        : Math.round(invoice.feePolicy!.amount * 100)
-      : 0);
+  const termsCents = hasLateFee ? agreedFeeCents(invoice.amount, invoice.feePolicy!) : 0;
+  // feeAmountCents is the fee actually billed (the owner may have lowered it).
+  const feeCents = invoice.feeAmountCents ?? termsCents;
+  // A waived fee is shown as waived but is no longer part of the balance.
+  const feeWaived = invoice.feeStatus === 'waived';
   // The deadline is part of the fee terms, so it's known before the fee is
   // applied — that's exactly when the t+7 email needs it ("applies after X").
   const feeDeadline = hasLateFee ? addDays(due, graceDays) : null;
@@ -236,7 +236,7 @@ function emailDataFor(invoice: EmailInvoice): EmailData {
     invoiceId: invoice.stripeNumber || invoice.stripeInvoiceId,
     amountDue: `$${(invoice.amount / 100).toFixed(2)}`,
     feeAmount: feeCents > 0 ? `$${(feeCents / 100).toFixed(2)}` : null,
-    balanceDue: `$${((invoice.amount + feeCents) / 100).toFixed(2)}`,
+    balanceDue: `$${((invoice.amount + (feeWaived ? 0 : feeCents)) / 100).toFixed(2)}`,
     graceDays,
     dueDateLong: formatDate(due),
     dueWeekday: due.toLocaleDateString('en-US', { weekday: 'long' }),
@@ -251,6 +251,8 @@ function emailDataFor(invoice: EmailInvoice): EmailData {
     receiptUrl: null,
     hasLateFee,
     feeApplied: invoice.feeApplied,
+    feeWaived,
+    termsFeeAmount: termsCents > 0 ? `$${(termsCents / 100).toFixed(2)}` : null,
     mascotUrl:
       process.env.MASCOT_URL ??
       `${process.env.APP_URL ?? 'http://localhost:4000'}/lighthouse-transparent.png`,

@@ -42,6 +42,8 @@ export interface EmailData {
   receiptUrl: string | null;
   hasLateFee: boolean;
   feeApplied: boolean;
+  feeWaived?: boolean;
+  termsFeeAmount?: string | null; // the fee in the invoice terms (feeAmount may be lower)
   mascotUrl: string;
 }
 
@@ -70,6 +72,8 @@ export function renderEmail(name: string, data: EmailData): { html: string; subj
     receipt_url: data.receiptUrl,
     has_late_fee: data.hasLateFee,
     fee_applied: data.feeApplied,
+    fee_waived: data.feeWaived ?? false,
+    terms_fee_amount: data.termsFeeAmount ?? data.feeAmount,
     mascot_url: data.mascotUrl,
   });
 
@@ -90,4 +94,5 @@ export const EMAIL_TEMPLATES: Record<string, string> = {
   't+14': '07-past-due-14-days-after',
   fee_applied: '06-fee-applied',
   paid: '08-paid',
+  fee_updated: '09-fee-updated',
 };

@@ -1,7 +1,9 @@
-import { Router } from 'express';
+import { Router, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import Stripe from 'stripe';
 import { createInvoice, stripeConfigured } from '../services/invoiceCreator';
+import { approveFee, changeBilledFee, waiveFee, FeeActionError } from '../services/feeEngine';
+import { agreedFeeCents } from '../services/feeRules';
 import { getAccount } from '../lib/account';
 
 const prisma = new PrismaClient();
@@ -88,37 +90,45 @@ invoicesRouter.post('/', async (req, res) => {
   res.status(201).json(result.invoice);
 });
 
-// POST /invoices/:id/waive — waive a pending fee with an optional note.
+// ---- Late-fee owner actions (dashboard). Amounts arrive in dollars. ----
+
+// POST /invoices/:id/fee/approve { amount? } — approve a pending fee, at the
+// amount in the terms or lower. Replaces the bill and emails the client.
+invoicesRouter.post('/:id/fee/approve', async (req, res) => {
+  const account = await getAccount(req);
+  if (!account) return res.status(401).json({ error: 'Not authenticated' });
+  const raw = req.body?.amount;
+  const amountCents = raw === undefined || raw === null || raw === '' ? undefined : Math.round(Number(raw) * 100);
+  await feeAction(res, () => approveFee(req.params.id, account.id, amountCents));
+});
+
+// POST /invoices/:id/fee/change { amount } — lower a fee that's already on
+// the bill. Reissues the bill and emails the client the new amount.
+invoicesRouter.post('/:id/fee/change', async (req, res) => {
+  const account = await getAccount(req);
+  if (!account) return res.status(401).json({ error: 'Not authenticated' });
+  const amountCents = Math.round(Number(req.body?.amount) * 100);
+  await feeAction(res, () => changeBilledFee(req.params.id, account.id, amountCents));
+});
+
+// POST /invoices/:id/waive { note? } — waive a pending fee, or one already on
+// the bill (the bill is reissued without it and the client is emailed).
 invoicesRouter.post('/:id/waive', async (req, res) => {
   const account = await getAccount(req);
   if (!account) return res.status(401).json({ error: 'Not authenticated' });
-  const { id } = req.params;
-  const invoice = await prisma.invoice.findFirst({ where: { id, accountId: account.id } });
-  if (!invoice) return res.status(404).json({ error: 'Invoice not found' });
-  if (invoice.feeStatus !== 'open' && !invoice.feeApplied) {
-    return res.status(400).json({ error: 'No pending fee to waive' });
-  }
-
-  const note = String(req.body.note ?? '').trim() || null;
-
-  await prisma.invoice.update({
-    where: { id },
-    data: {
-      feeApplied: false,
-      feeStatus: null,
-      waiveNote: note,
-    },
-  });
-  await prisma.auditEvent.create({
-    data: {
-      invoiceId: id,
-      event: 'fee_waived',
-      detail: note ? `Late fee waived by you — "${note}"` : 'Late fee waived by you',
-    },
-  });
-
-  res.json({ waived: true, note });
+  const note = String(req.body?.note ?? '').trim() || null;
+  await feeAction(res, () => waiveFee(req.params.id, account.id, note));
 });
+
+async function feeAction(res: Response, action: () => Promise<object>) {
+  try {
+    res.json({ ok: true, ...(await action()) });
+  } catch (err) {
+    if (err instanceof FeeActionError) return res.status(err.status).json({ error: err.message });
+    console.error('[fee] owner action failed', err);
+    res.status(502).json({ error: 'Stripe or the email service had a problem — nothing was changed. Try again in a minute.' });
+  }
+}
 
 // POST /invoices/:id/escalate — owner responds to an escalation.
 // action = 'send' → trigger the T+14 final notice email to the client
@@ -286,6 +296,8 @@ invoicesRouter.get('/', async (req, res) => {
       feeApplied: inv.feeApplied,
       feeStatus: inv.feeStatus ?? null,
       feeAmountCents: inv.feeAmountCents ?? null,
+      // The fee in the invoice terms — the most the owner can set it to.
+      feeTermsCents: inv.feePolicy ? agreedFeeCents(inv.amount, inv.feePolicy) : 0,
       paidAt: inv.paidAt ? inv.paidAt.toISOString() : null,
       reminders: inv.reminders.map((r) => ({ step: r.step, sentAt: r.sentAt })),
     })),

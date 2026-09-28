@@ -6,7 +6,8 @@
      wt:filter        { status }                 invoice filter tab clicked ("all" | "overdue" | "fee-applied" | "due-soon" | "pending" | "paid")
      wt:search        { query }                  invoice search input (debounced 200ms)
      wt:open-invoice  { id }                     invoice row clicked
-     wt:approve-fee   { invoiceId }              Approve fee clicked
+     wt:approve-fee   { invoiceId, amount? }     Approve fee clicked (amount = dollars, when the owner lowered it first)
+     wt:change-fee    { invoiceId, amount }      Lower a fee already on the bill (amount = dollars)
      wt:waive-fee     { invoiceId, note }        Waive confirmed (note may be "")
      wt:recurring-toggle { id, active }          Pause / Resume clicked (active = new state)
      wt:recurring-edit   { id }                  Edit clicked (open the modal and fill it from your data)
@@ -40,7 +41,16 @@
     emit('wt:open-invoice', { id: row.dataset.id });
   });
 
-  /* ---------- Pending fees: approve / waive with note ---------- */
+  /* ---------- Fee amount box: keep the confirm button's amount in sync ---------- */
+  document.addEventListener('input', (e) => {
+    const box = e.target.closest('.wt-fees__change');
+    if (!box) return;
+    const btn = box.querySelector('[data-action="confirm-change"]');
+    const v = Number(e.target.value);
+    btn.textContent = btn.dataset.verb + (v > 0 ? ' $' + v.toFixed(2) : '');
+  });
+
+  /* ---------- Fees: approve / change / waive with note ---------- */
   document.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-action]');
     if (!btn) return;
@@ -59,6 +69,19 @@
       case 'confirm-waive': {
         const note = row.querySelector('.wt-fees__waive input').value.trim();
         emit('wt:waive-fee', { invoiceId: row.dataset.invoiceId, note });
+        break;
+      }
+      case 'change-fee':
+        row.classList.add('is-changing');
+        row.querySelector('.wt-fees__change input')?.select();
+        break;
+      case 'cancel-change':
+        row.classList.remove('is-changing');
+        break;
+      case 'confirm-change': {
+        // Pending fee → approve at this amount. Fee on the bill → lower it.
+        const amount = row.querySelector('.wt-fees__change input').value;
+        emit(row.dataset.feeMode === 'billed' ? 'wt:change-fee' : 'wt:approve-fee', { invoiceId: row.dataset.invoiceId, amount });
         break;
       }
       /* ---------- Recurring list ---------- */

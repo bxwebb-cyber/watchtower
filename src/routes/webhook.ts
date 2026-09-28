@@ -185,14 +185,16 @@ async function onInvoicePaid(inv: Stripe.Invoice) {
   }
 
   // A fee replacement (metadata.replaces_invoice) is one bill for the original
-  // balance + the late fee, so paying it pays the fee too.
+  // balance + the late fee, so paying it pays the fee too — unless the bill
+  // was reissued without the fee (waived: includes_fee = 'false').
   const paidAt = new Date();
+  const paysFee = !!inv.metadata?.replaces_invoice && inv.metadata?.includes_fee !== 'false';
   const invoice = await prisma.invoice.update({
     where: { stripeInvoiceId: inv.id },
     data: {
       status: 'paid',
       paidAt,
-      ...(inv.metadata?.replaces_invoice ? { feeStatus: 'paid', feePaidAt: paidAt } : {}),
+      ...(paysFee ? { feeStatus: 'paid', feePaidAt: paidAt } : {}),
     },
   });
   const amount = `$${(inv.amount_paid / 100).toFixed(2)}`;
@@ -203,7 +205,7 @@ async function onInvoicePaid(inv: Stripe.Invoice) {
   await notifyOwner(
     invoice.accountId,
     `Invoice paid — ${number} (${amount})`,
-    `Invoice ${number} was paid (${amount}${inv.metadata?.replaces_invoice ? ', including the late fee' : ''}). Dunn has stopped the reminders.`
+    `Invoice ${number} was paid (${amount}${paysFee ? ', including the late fee' : ''}). Dunn has stopped the reminders.`
   );
   // Paid = stop all reminders. The daily job skips paid invoices.
 }

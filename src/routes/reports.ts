@@ -47,7 +47,7 @@ reportsRouter.get('/revenue', async (req, res) => {
   // ── Current month ──
   const paidThisMonth = invoices.filter(inv => inv.paidAt && inv.paidAt >= start && inv.paidAt < end);
   const feesThisMonth = invoices.filter(inv => inv.feeStatus === 'paid' && inv.feePaidAt && inv.feePaidAt >= start && inv.feePaidAt < end);
-  const waivedThisMonth = invoices.filter(inv => inv.waiveNote && inv.createdAt >= start && inv.createdAt < end);
+  const waivedThisMonth = invoices.filter(inv => (inv.feeStatus === 'waived' || inv.waiveNote) && inv.createdAt >= start && inv.createdAt < end);
 
   const moneyIn = paidThisMonth.reduce((s, i) => s + i.amount, 0);
   const feeRevenue = feesThisMonth.reduce((s, i) => s + (i.feeAmountCents ?? 0), 0);
@@ -86,7 +86,7 @@ reportsRouter.get('/revenue', async (req, res) => {
 
     const mInv = invoices.filter(x => x.paidAt && x.paidAt >= ms && x.paidAt < me);
     const mFee = invoices.filter(x => x.feeStatus === 'paid' && x.feePaidAt && x.feePaidAt >= ms && x.feePaidAt < me);
-    const mWv = invoices.filter(x => x.waiveNote && x.createdAt >= ms && x.createdAt < me);
+    const mWv = invoices.filter(x => (x.feeStatus === 'waived' || x.waiveNote) && x.createdAt >= ms && x.createdAt < me);
 
     const tm = `${ms.getFullYear()}-${String(ms.getMonth() + 1).padStart(2, '0')}`;
     const mIn = mInv.reduce((s, i) => s + i.amount, 0);
@@ -169,7 +169,7 @@ reportsRouter.get('/revenue.csv', async (req, res) => {
 
     const mInv = invoices.filter(x => x.paidAt && x.paidAt >= ms && x.paidAt < me);
     const mFee = invoices.filter(x => x.feeStatus === 'paid' && x.feePaidAt && x.feePaidAt >= ms && x.feePaidAt < me);
-    const mWv = invoices.filter(x => x.waiveNote && x.createdAt >= ms && x.createdAt < me);
+    const mWv = invoices.filter(x => (x.feeStatus === 'waived' || x.waiveNote) && x.createdAt >= ms && x.createdAt < me);
 
     const mIn = mInv.reduce((s, i) => s + i.amount, 0);
     const mFe = mFee.reduce((s, i) => s + (i.feeAmountCents ?? 0), 0);
@@ -227,7 +227,7 @@ reportsRouter.get('/export.csv', async (req, res) => {
   for (const m of months) {
     const invs = invoices.filter(inv => inv.paidAt && inv.paidAt >= m.start && inv.paidAt < m.end);
     const fees = invoices.filter(inv => inv.feeStatus === 'paid' && inv.feePaidAt && inv.feePaidAt >= m.start && inv.feePaidAt < m.end);
-    const waived = invoices.filter(inv => inv.waiveNote && inv.createdAt >= m.start && inv.createdAt < m.end);
+    const waived = invoices.filter(inv => (inv.feeStatus === 'waived' || inv.waiveNote) && inv.createdAt >= m.start && inv.createdAt < m.end);
     add(m.label, invs.length, invs.reduce((s, i) => s + i.amount, 0), fees.length, fees.reduce((s, i) => s + (i.feeAmountCents ?? 0), 0), waived.reduce((s, i) => s + (i.feeAmountCents ?? 0), 0), invs.reduce((s, i) => s + i.amount, 0) + fees.reduce((s, i) => s + (i.feeAmountCents ?? 0), 0));
   }
 

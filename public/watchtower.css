@@ -187,6 +187,13 @@ input::placeholder { color: var(--wt-faint); }
 .wt-fees__waive .wt-input { flex: 1 1 260px; height: 38px; font-size: 13.5px; }
 .wt-fees__row.is-waiving .wt-fees__actions { display: none; }
 .wt-fees__row.is-waiving .wt-fees__waive { display: flex; }
+/* Change a fee's amount (engineering 9/28 — mirrors the waive panel; designer to polish) */
+.wt-fees__change { grid-column: 1 / -1; display: none; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px; border-radius: 10px; background: var(--wt-paper); animation: wt-pop .25s ease both; }
+.wt-fees__change-label { font-size: 13.5px; color: var(--wt-text); }
+.wt-fees__change .wt-input { width: 110px; height: 38px; font-size: 13.5px; }
+.wt-fees__hint { flex: 1 1 200px; font-size: 12.5px; color: var(--wt-subtle); }
+.wt-fees__row.is-changing .wt-fees__actions { display: none; }
+.wt-fees__row.is-changing .wt-fees__change { display: flex; }
 
 /* ---------- Forms ---------- */
 .wt-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; font-size: 12px; color: var(--wt-muted); }

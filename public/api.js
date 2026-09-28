@@ -26,9 +26,13 @@ function bind(data) {
   });
 }
 
-// Replace {placeholder} tokens inside a cloned <template> element.
+// Replace {placeholder} tokens inside a cloned <template> element — including
+// the element's own attributes (e.g. data-invoice-id="{row_id}"), which
+// innerHTML alone never reaches.
 function fillTpl(clone, map) {
-  clone.innerHTML = clone.innerHTML.replace(/\{([a-z_0-9]+)\}/g, (m, k) => (k in map ? map[k] : ''));
+  const fill = (s) => s.replace(/\{([a-z_0-9]+)\}/g, (m, k) => (k in map ? map[k] : ''));
+  clone.innerHTML = fill(clone.innerHTML);
+  Array.from(clone.attributes).forEach(a => { a.value = fill(a.value); });
 }
 
 // Render a <template> per item into a [data-list] container.
@@ -147,7 +151,10 @@ async function loadDashboard() {
     const d = new Date(i.due);
     return d >= now && d <= new Date(now.getTime() + 7 * 86400000);
   });
-  const pendingFees = state.invoices.filter(i => i.feeStatus === 'open');
+  // Pending: past the fee deadline, waiting on the owner. Billed: on the
+  // client's bill, still unpaid — can still be lowered or waived.
+  const pendingFees = state.invoices.filter(i => i.status === 'open' && i.feeStatus === 'pending');
+  const billedFees = state.invoices.filter(i => i.status === 'open' && i.feeApplied && i.feeStatus === 'open');
 
   let statusLine;
   if (overdue.length && dueSoon.length) statusLine = overdue.length + ' overdue, ' + dueSoon.length + ' due this week.';
@@ -174,6 +181,7 @@ async function loadDashboard() {
     fees_billed: money(feesBilled),
     pending_fees_total: money(pendingFees.reduce((s, i) => s + (i.feeAmountCents || 0), 0)),
     pending_fee_count: pendingFees.length,
+    billed_fee_count: billedFees.length,
     owner_name: bizName,
     owner_email: settings.ownerEmail || '',
     owner_initials: initials(bizName),
@@ -181,18 +189,32 @@ async function loadDashboard() {
 
   renderInvoices();
 
-  renderList('pending_fees', pendingFees, (inv) => {
-    const days = Math.round((new Date(inv.due).getTime() - Date.now()) / 86400000);
-    const feeKindLabel = inv.feeKind === 'percent' ? 'percentage fee' : inv.feeKind === 'flat' ? 'flat fee' : 'no fee';
-    return {
-      invoice_id: inv.stripeNumber || inv.id,
-      client_name: inv.client || '—',
-      days_late: Math.abs(days),
-      grace_days: inv.graceDays || 7,
-      fee_kind: feeKindLabel,
-      fee_amount: inv.feeKind === 'percent' ? (inv.feeAmountCents ? (inv.feeAmountCents / (inv.amountCents || 1) * 100).toFixed(0) + '%' : '0%') : money(inv.feeAmountCents || 0),
-    };
+  // Shared fields for both fee lists. Amounts in the change box are dollars;
+  // the most it can be is the fee in the invoice terms.
+  const feeRow = (inv) => ({
+    row_id: inv.id,
+    invoice_id: inv.stripeNumber || inv.id,
+    client_name: inv.client || '—',
+    days_late: Math.max(0, Math.floor((Date.now() - new Date(inv.due + 'T00:00:00').getTime()) / 86400000)),
+    fee_amount: money(inv.feeAmountCents || 0),
+    fee_value: ((inv.feeAmountCents || 0) / 100).toFixed(2),
+    fee_max: ((inv.feeTermsCents || 0) / 100).toFixed(2),
+    fee_terms: money(inv.feeTermsCents || 0),
   });
+
+  renderList('pending_fees', pendingFees, (inv) => Object.assign(feeRow(inv), {
+    grace_days: inv.graceDays || 7,
+    fee_kind: inv.feeKind === 'percent' ? inv.fee + ' fee' : 'flat fee',
+  }));
+  renderList('billed_fees', billedFees, (inv) => Object.assign(feeRow(inv), {
+    total_due: money((inv.amountCents || 0) + (inv.feeAmountCents || 0)),
+  }));
+
+  // Both fee sections render only when they have rows (designer §pending fees).
+  const pendingSection = document.querySelector('[data-section="pending_fees"]');
+  if (pendingSection) pendingSection.hidden = pendingFees.length === 0;
+  const billedSection = document.querySelector('[data-section="billed_fees"]');
+  if (billedSection) billedSection.hidden = billedFees.length === 0;
 }
 
 // ---- Recurring ----
@@ -385,8 +407,15 @@ document.addEventListener('wt:filter', e => { state.filter = e.detail.status; re
 document.addEventListener('wt:search', e => { state.query = e.detail.query; renderInvoices(); });
 
 document.addEventListener('wt:approve-fee', async e => {
-  try { await api('POST', '/invoices/' + e.detail.invoiceId + '/fee/approve'); }
+  // amount is set when the owner lowered the fee before approving.
+  const body = e.detail.amount !== undefined ? { amount: e.detail.amount } : {};
+  try { await api('POST', '/invoices/' + e.detail.invoiceId + '/fee/approve', body); }
   catch (err) { alert('Approve failed: ' + err.message); return; }
+  loadDashboard();
+});
+document.addEventListener('wt:change-fee', async e => {
+  try { await api('POST', '/invoices/' + e.detail.invoiceId + '/fee/change', { amount: e.detail.amount }); }
+  catch (err) { alert('Change failed: ' + err.message); return; }
   loadDashboard();
 });
 document.addEventListener('wt:waive-fee', async e => {

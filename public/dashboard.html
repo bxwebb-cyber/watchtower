@@ -141,8 +141,9 @@
 
       <!-- PENDING FEES: render only when count > 0.
            Approve → wt:approve-fee {invoiceId} → your fee engine. On success, remove the row; the invoice becomes status "fee-applied".
+           Change  → reveals the amount box (max = the fee in the invoice terms) → wt:approve-fee {invoiceId, amount}. (engineering 9/28)
            Waive   → reveals the note field → wt:waive-fee {invoiceId, note}. Send the note with the request. -->
-      <section class="wt-card wt-fees" aria-labelledby="fees-title">
+      <section class="wt-card wt-fees" aria-labelledby="fees-title" data-section="pending_fees">
         <div class="wt-fees__head">
           <div class="wt-fees__title">
             <h2 class="wt-h2" id="fees-title">Fees awaiting your approval</h2>
@@ -187,7 +188,7 @@
       </div>
         </div>
         <template id="tpl-pending_fees">
-      <div class="wt-fees__row" data-invoice-id="{invoice_id}">
+      <div class="wt-fees__row" data-invoice-id="{row_id}" data-fee-mode="pending">
         <div>
           <div class="wt-fees__client">{client_name} <span>· {invoice_id}</span></div>
           <div class="wt-fees__note">{days_late} days late · {grace_days}-day grace period passed · {fee_kind}</div>
@@ -195,11 +196,60 @@
         <div class="wt-fees__amount">{fee_amount}</div>
         <div class="wt-fees__actions">
           <button class="wt-btn wt-btn--secondary wt-btn--sm" type="button" data-action="waive-fee">Waive</button>
+          <button class="wt-btn wt-btn--secondary wt-btn--sm" type="button" data-action="change-fee">Change</button>
           <button class="wt-btn wt-btn--primary wt-btn--sm" type="button" data-action="approve-fee">Approve fee</button>
         </div>
+        <div class="wt-fees__change">
+          <label class="wt-fees__change-label" for="fee-{row_id}">Late fee $</label>
+          <input class="wt-input" id="fee-{row_id}" type="number" inputmode="decimal" min="0.01" step="0.01" max="{fee_max}" value="{fee_value}">
+          <span class="wt-fees__hint">Up to {fee_terms}, the amount in the invoice terms.</span>
+          <button class="wt-btn wt-btn--secondary wt-btn--sm" type="button" data-action="cancel-change">Cancel</button>
+          <button class="wt-btn wt-btn--primary wt-btn--sm" type="button" data-action="confirm-change" data-verb="Approve">Approve {fee_amount}</button>
+        </div>
         <div class="wt-fees__waive">
-          <label class="wt-sr-only" for="waive-{invoice_id}">Reason for waiving</label>
-          <input class="wt-input" id="waive-{invoice_id}" type="text" placeholder="Why are you waiving it? (optional — only you see this)">
+          <label class="wt-sr-only" for="waive-{row_id}">Reason for waiving</label>
+          <input class="wt-input" id="waive-{row_id}" type="text" placeholder="Why are you waiving it? (optional — only you see this)">
+          <button class="wt-btn wt-btn--secondary wt-btn--sm" type="button" data-action="cancel-waive">Cancel</button>
+          <button class="wt-btn wt-btn--primary wt-btn--sm" type="button" data-action="confirm-waive">Waive {fee_amount}</button>
+        </div>
+      </div>
+        </template>
+      </section>
+
+      <!-- FEES ON THE BILL (engineering 9/28 — designer to polish): late fees already on a client's bill, still unpaid.
+           Render only when count > 0. Either action reissues the client's bill and emails them the new amount.
+           Lower → reveals the amount box (max = the fee in the invoice terms) → wt:change-fee {invoiceId, amount}.
+           Waive → reveals the note field → wt:waive-fee {invoiceId, note}. -->
+      <section class="wt-card wt-fees" aria-labelledby="billed-fees-title" data-section="billed_fees" hidden>
+        <div class="wt-fees__head">
+          <div class="wt-fees__title">
+            <h2 class="wt-h2" id="billed-fees-title">Late fees on the bill</h2>
+            <span class="wt-count" data-bind="billed_fee_count">0</span>
+          </div>
+          <p class="wt-caption" style="margin:0">Lowering or waiving one sends your client an updated bill.</p>
+        </div>
+        <div data-list="billed_fees"></div>
+        <template id="tpl-billed_fees">
+      <div class="wt-fees__row" data-invoice-id="{row_id}" data-fee-mode="billed">
+        <div>
+          <div class="wt-fees__client">{client_name} <span>· {invoice_id}</span></div>
+          <div class="wt-fees__note">{days_late} days late · they owe {total_due} with the fee</div>
+        </div>
+        <div class="wt-fees__amount">{fee_amount}</div>
+        <div class="wt-fees__actions">
+          <button class="wt-btn wt-btn--secondary wt-btn--sm" type="button" data-action="waive-fee">Waive</button>
+          <button class="wt-btn wt-btn--secondary wt-btn--sm" type="button" data-action="change-fee">Lower</button>
+        </div>
+        <div class="wt-fees__change">
+          <label class="wt-fees__change-label" for="fee-{row_id}">Late fee $</label>
+          <input class="wt-input" id="fee-{row_id}" type="number" inputmode="decimal" min="0.01" step="0.01" max="{fee_max}" value="{fee_value}">
+          <span class="wt-fees__hint">Up to {fee_terms}. Your client gets an updated bill.</span>
+          <button class="wt-btn wt-btn--secondary wt-btn--sm" type="button" data-action="cancel-change">Cancel</button>
+          <button class="wt-btn wt-btn--primary wt-btn--sm" type="button" data-action="confirm-change" data-verb="Change to">Change to {fee_amount}</button>
+        </div>
+        <div class="wt-fees__waive">
+          <label class="wt-sr-only" for="waive-{row_id}">Reason for waiving</label>
+          <input class="wt-input" id="waive-{row_id}" type="text" placeholder="Why are you waiving it? (optional — only you see this)">
           <button class="wt-btn wt-btn--secondary wt-btn--sm" type="button" data-action="cancel-waive">Cancel</button>
           <button class="wt-btn wt-btn--primary wt-btn--sm" type="button" data-action="confirm-waive">Waive {fee_amount}</button>
         </div>
