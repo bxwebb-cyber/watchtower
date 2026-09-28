@@ -17,6 +17,8 @@ import { inboundRouter } from './routes/inbound';
 import { authMiddleware } from './middleware/auth';
 import { apiLimiter } from './middleware/rateLimit';
 import { httpsRedirect } from './middleware/https';
+import { schedulerEnabled, startScheduler } from './jobs/scheduler';
+import { withJobLock, runSweep } from './jobs/sweep';
 
 const app = express();
 
@@ -35,7 +37,11 @@ app.use(cors({
 }));
 
 app.use(cookieParser());
-app.use(express.json());
+// Webhooks (Stripe, Resend) verify a signature over the exact raw body, so
+// they must reach their own express.raw() unparsed. JSON-parsing them first
+// made every Stripe webhook fail verification.
+const jsonParser = express.json();
+app.use((req, res, next) => (req.path.startsWith('/webhooks/') ? next() : jsonParser(req, res, next)));
 
 app.use('/webhooks/stripe', express.raw({ type: 'application/json' }), webhookRouter);
 
@@ -94,4 +100,9 @@ app.use(express.static(path.join(__dirname, '../public')));
 const port = Number(process.env.PORT || 4000);
 app.listen(port, () => {
   console.log(`[watchtower] listening on :${port}`);
+  if (schedulerEnabled()) {
+    startScheduler(() => withJobLock(() => runSweep()));
+  } else {
+    console.log('[scheduler] off (local dev) — run jobs with npm run job:*, or set SCHEDULER=on');
+  }
 });

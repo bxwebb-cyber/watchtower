@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import type { Invoice, Client, Account, FeePolicy } from '@prisma/client';
 import { Resend } from 'resend';
 import { clientMailFrom, replyToFor, notifyOwner, notifyEscalation } from './notify';
 import { renderEmail, EMAIL_TEMPLATES, EmailData } from './emailRenderer';
@@ -89,7 +90,7 @@ export async function runReminderJob(now = new Date()) {
       (await prisma.reminder.findMany({ where: { invoiceId: invoice.id } })).map((r) => r.step)
     );
 
-    const step = [...SCHEDULE].reverse().find((s) => s.offsetDays <= offset && !sentSteps.has(s.step));
+    const step = computeNextStep(offset, sentSteps);
     if (!step) continue;
 
     const createdAtDay = new Date(
@@ -111,57 +112,13 @@ export async function runReminderJob(now = new Date()) {
     if (alreadyPaid?.status === 'paid') continue;
 
     const number = invoice.stripeNumber || invoice.stripeInvoiceId;
-    const templateName = EMAIL_TEMPLATES[step.step];
-    const mascotUrl =
-      process.env.MASCOT_URL ??
-      `${process.env.APP_URL ?? 'http://localhost:4000'}/lighthouse-transparent.png`;
-    const amountDue = `$${(invoice.amount / 100).toFixed(2)}`;
-    const feeCents = invoice.feeAmountCents ??
-      (invoice.feePolicy?.kind && invoice.feePolicy.kind !== 'none'
-        ? invoice.feePolicy.kind === 'percent'
-          ? Math.round(invoice.amount * (invoice.feePolicy.amount / 100))
-          : Math.round(invoice.feePolicy.amount * 100)
-        : 0);
-    const feeAmount = feeCents > 0 ? `$${(feeCents / 100).toFixed(2)}` : null;
-    const balanceCents = invoice.amount + feeCents;
+    const hasLateFee = invoice.feePolicy != null && invoice.feePolicy.kind !== 'none';
     const graceDays = invoice.feePolicy?.graceDays ?? 7;
-    const feeDeadline = invoice.feeApplied ? addDays(due, graceDays) : null;
-    const clientFirstName = invoice.client?.name?.split(/\s+/)[0] ?? 'there';
 
-    let htmlEmail: string, subject: string;
-    if (templateName) {
-      const rendered = renderEmail(templateName, {
-        businessName: invoice.account?.businessName ?? 'Your Business',
-        businessEmail: invoice.account?.email ?? '',
-        businessAddress: '',
-        ownerName: invoice.account?.businessName ?? 'Your Business',
-        ownerFirstName: invoice.account?.businessName?.split(/\s+/)[0] ?? 'Your',
-        clientFirstName,
-        invoiceId: number,
-        amountDue,
-        feeAmount,
-        balanceDue: `$${(balanceCents / 100).toFixed(2)}`,
-        graceDays,
-        dueDateLong: formatDate(due),
-        dueWeekday: due.toLocaleDateString('en-US', { weekday: 'long' }),
-        feeDeadlineLong: feeDeadline ? formatDate(feeDeadline) : null,
-        feeDeadlineShort: feeDeadline
-          ? feeDeadline.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-          : null,
-        paidAmount: null,
-        paidDateLong: null,
-        paymentMethod: null,
-        payUrl: paymentLink(invoice),
-        receiptUrl: null,
-        hasLateFee: invoice.feePolicy != null && invoice.feePolicy.kind !== 'none',
-        feeApplied: invoice.feeApplied,
-        mascotUrl,
-      });
-      htmlEmail = rendered.html;
-      subject = rendered.subject;
-    } else {
-      subject = step.subject.replace('{NUMBER}', number);
-      htmlEmail = '';
+    // "A late fee is added if unpaid after X" is false once X has passed —
+    // the fee job's "late fee added" email replaces the warning.
+    if (isStaleFeeWarning(step.step, { hasLateFee, feeApplied: invoice.feeApplied, offset, graceDays })) {
+      continue;
     }
 
     // ESCALATION: at T+14, instead of auto-sending a client email, ask the owner.
@@ -196,40 +153,7 @@ export async function runReminderJob(now = new Date()) {
       });
     }
 
-    if (resend && invoice.client?.email) {
-      const msg = await resend.emails.send({
-        from: clientMailFrom(invoice.account?.businessName),
-        to: invoice.client.email,
-        subject,
-        html: htmlEmail || undefined,
-        text: `Invoice ${number} for ${amountDue}. ${paymentLink(invoice)}`,
-        replyTo: replyToFor(invoice.id),
-      });
-      await prisma.reminder.create({
-        data: {
-          invoiceId: invoice.id,
-          step: step.step,
-          subject,
-          messageId: msg.data?.id,
-        },
-      });
-      await prisma.auditEvent.create({
-        data: {
-          invoiceId: invoice.id,
-          event: 'reminder_sent',
-          detail: `${step.step} (${subject}) → ${invoice.client.email}`,
-        },
-      });
-      sent++;
-    } else if (invoice.client?.email) {
-      await prisma.reminder.create({
-        data: { invoiceId: invoice.id, step: step.step, subject },
-      });
-      await prisma.auditEvent.create({
-        data: { invoiceId: invoice.id, event: 'reminder_sent (dry-run)', detail: step.step },
-      });
-      sent++;
-    }
+    if (await sendClientEmail(invoice, step.step)) sent++;
 
     // Owner alert on past-due reminders.
     if (offset >= 7) {
@@ -243,6 +167,110 @@ export async function runReminderJob(now = new Date()) {
 
   console.log(`[job] reminder run: ${sent} sent/recorded`);
   return sent;
+}
+
+type EmailInvoice = Invoice & { client: Client | null; account: Account; feePolicy: FeePolicy | null };
+
+// Render one of the designer's client emails for this invoice, send it from
+// the business ("Hudson & Co. via Dunn"), and record it. Dry-run (no
+// RESEND_API_KEY) records without sending. Returns false when nothing went
+// out — no client email, or the send failed (not recorded, so it retries).
+export async function sendClientEmail(invoice: EmailInvoice, step: string): Promise<boolean> {
+  const to = invoice.client?.email;
+  if (!to) return false;
+  const data = emailDataFor(invoice);
+  const { html, subject } = renderEmail(EMAIL_TEMPLATES[step], data);
+
+  if (!resend) {
+    await prisma.reminder.create({ data: { invoiceId: invoice.id, step, subject } });
+    await prisma.auditEvent.create({
+      data: { invoiceId: invoice.id, event: 'reminder_sent (dry-run)', detail: step },
+    });
+    return true;
+  }
+
+  const msg = await resend.emails.send({
+    from: clientMailFrom(invoice.account.businessName),
+    to,
+    subject,
+    html,
+    text: `Invoice ${data.invoiceId}: ${data.feeApplied ? data.balanceDue : data.amountDue} due. Pay here: ${data.payUrl}`,
+    replyTo: replyToFor(invoice.id),
+  });
+  if (msg.error) {
+    console.error(`[email] ${step} for invoice ${invoice.id} failed:`, msg.error.message);
+    await prisma.auditEvent.create({
+      data: { invoiceId: invoice.id, event: 'email_failed', detail: `${step}: ${msg.error.message}` },
+    });
+    return false;
+  }
+  await prisma.reminder.create({
+    data: { invoiceId: invoice.id, step, subject, messageId: msg.data?.id },
+  });
+  await prisma.auditEvent.create({
+    data: { invoiceId: invoice.id, event: 'reminder_sent', detail: `${step} (${subject}) → ${to}` },
+  });
+  return true;
+}
+
+function emailDataFor(invoice: EmailInvoice): EmailData {
+  const due = new Date(invoice.dueDate);
+  const hasLateFee = invoice.feePolicy != null && invoice.feePolicy.kind !== 'none';
+  const graceDays = invoice.feePolicy?.graceDays ?? 7;
+  const feeCents = invoice.feeAmountCents ??
+    (hasLateFee
+      ? invoice.feePolicy!.kind === 'percent'
+        ? Math.round(invoice.amount * (invoice.feePolicy!.amount / 100))
+        : Math.round(invoice.feePolicy!.amount * 100)
+      : 0);
+  // The deadline is part of the fee terms, so it's known before the fee is
+  // applied — that's exactly when the t+7 email needs it ("applies after X").
+  const feeDeadline = hasLateFee ? addDays(due, graceDays) : null;
+  return {
+    businessName: invoice.account.businessName ?? 'Your Business',
+    businessEmail: invoice.account.email ?? '',
+    businessAddress: '',
+    ownerName: invoice.account.businessName ?? 'Your Business',
+    ownerFirstName: invoice.account.businessName?.split(/\s+/)[0] ?? 'Your',
+    clientFirstName: invoice.client?.name?.split(/\s+/)[0] ?? 'there',
+    invoiceId: invoice.stripeNumber || invoice.stripeInvoiceId,
+    amountDue: `$${(invoice.amount / 100).toFixed(2)}`,
+    feeAmount: feeCents > 0 ? `$${(feeCents / 100).toFixed(2)}` : null,
+    balanceDue: `$${((invoice.amount + feeCents) / 100).toFixed(2)}`,
+    graceDays,
+    dueDateLong: formatDate(due),
+    dueWeekday: due.toLocaleDateString('en-US', { weekday: 'long' }),
+    feeDeadlineLong: feeDeadline ? formatDate(feeDeadline) : null,
+    feeDeadlineShort: feeDeadline
+      ? feeDeadline.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      : null,
+    paidAmount: null,
+    paidDateLong: null,
+    paymentMethod: null,
+    payUrl: paymentLink(invoice),
+    receiptUrl: null,
+    hasLateFee,
+    feeApplied: invoice.feeApplied,
+    mascotUrl:
+      process.env.MASCOT_URL ??
+      `${process.env.APP_URL ?? 'http://localhost:4000'}/lighthouse-transparent.png`,
+  };
+}
+
+// The fee terms: "a late fee applies if unpaid after <due + grace days>".
+// Past the deadline = the day after it, never the deadline day itself.
+export function isPastFeeDeadline(now: Date, dueDate: Date, graceDays: number): boolean {
+  return dayOffset(now, dueDate) > graceDays;
+}
+
+// The t+3 and t+7 emails warn "a late fee is added if unpaid after X". Once
+// X has passed, or the fee is already on the bill, that warning is false.
+export function isStaleFeeWarning(
+  step: string,
+  o: { hasLateFee: boolean; feeApplied: boolean; offset: number; graceDays: number }
+): boolean {
+  if (step !== 't+3' && step !== 't+7') return false;
+  return o.hasLateFee && (o.feeApplied || o.offset > o.graceDays);
 }
 
 function paymentLink(invoice: { hostedInvoiceUrl?: string | null; stripeInvoiceId: string }): string {
@@ -295,7 +323,11 @@ export function computeNextStep(
   options?: { schedule?: typeof SCHEDULE }
 ): (typeof SCHEDULE)[number] | undefined {
   const schedule = options?.schedule ?? SCHEDULE;
-  return [...schedule].reverse().find((s) => s.offsetDays <= offset && !sentSteps.has(s.step));
+  // Only the latest step whose day has arrived. A missed run still catches up
+  // to it, but older missed steps are never back-filled ("due in 3 days" after
+  // the due date would be wrong).
+  const current = [...schedule].reverse().find((s) => s.offsetDays <= offset);
+  return current && !sentSteps.has(current.step) ? current : undefined;
 }
 
 export function shouldSkipPreDue(

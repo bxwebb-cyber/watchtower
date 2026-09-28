@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "prisma generate && tsc",
+    "build": "prisma generate && tsc && cp -R src/email-templates dist/",
     "start": "prisma migrate deploy && node dist/index.js",
     "typecheck": "tsc --noEmit",
     "job:reminders": "tsx src/jobs/run.ts reminders",

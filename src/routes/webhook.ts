@@ -34,6 +34,7 @@ webhookRouter.post('/', async (req, res) => {
     console.error('[webhook] signature verification failed for all configured secrets');
     return res.status(400).send('Webhook Error: signature verification failed');
   }
+  console.log(`[webhook] ${event.type} verified`);
 
   try {
     switch (event.type) {
@@ -140,9 +141,12 @@ async function onInvoiceCreated(inv: Stripe.Invoice) {
 
 async function onInvoiceFinalized(inv: Stripe.Invoice) {
   // Late-fee invoices (metadata.parent_invoice) are never mirrored as their
-  // own rows — the fee state lives on the parent Invoice.
-  if (inv.metadata?.parent_invoice) return;
-  await prisma.invoice.update({
+  // own rows — the fee state lives on the parent Invoice. A fee replacement
+  // (metadata.replaces_invoice) is already written by the fee engine.
+  if (inv.metadata?.parent_invoice || inv.metadata?.replaces_invoice) return;
+  // updateMany: for invoices Dunn creates, this event can land before the
+  // creator has written the row — nothing to update yet, and that's fine.
+  await prisma.invoice.updateMany({
     where: { stripeInvoiceId: inv.id },
     data: { status: inv.status ?? 'open' },
   });
@@ -180,17 +184,26 @@ async function onInvoicePaid(inv: Stripe.Invoice) {
     return;
   }
 
+  // A fee replacement (metadata.replaces_invoice) is one bill for the original
+  // balance + the late fee, so paying it pays the fee too.
+  const paidAt = new Date();
   const invoice = await prisma.invoice.update({
     where: { stripeInvoiceId: inv.id },
-    data: { status: 'paid', paidAt: new Date() },
+    data: {
+      status: 'paid',
+      paidAt,
+      ...(inv.metadata?.replaces_invoice ? { feeStatus: 'paid', feePaidAt: paidAt } : {}),
+    },
   });
+  const amount = `$${(inv.amount_paid / 100).toFixed(2)}`;
+  const number = invoice.stripeNumber ?? inv.id;
   await prisma.auditEvent.create({
-    data: { invoiceId: invoice.id, event: 'invoice_paid', detail: `${inv.amount_paid / 100} ${inv.currency}` },
+    data: { invoiceId: invoice.id, event: 'invoice_paid', detail: `${amount} ${inv.currency}` },
   });
   await notifyOwner(
     invoice.accountId,
-    `Invoice paid — ${inv.amount_paid / 100} ${inv.currency}`,
-    `Invoice ${inv.id} was paid (${inv.amount_paid / 100} ${inv.currency}). Dunn has stopped the reminders.`
+    `Invoice paid — ${number} (${amount})`,
+    `Invoice ${number} was paid (${amount}${inv.metadata?.replaces_invoice ? ', including the late fee' : ''}). Dunn has stopped the reminders.`
   );
   // Paid = stop all reminders. The daily job skips paid invoices.
 }
@@ -243,7 +256,9 @@ async function onInvoiceDeleted(inv: Stripe.Invoice) {
 }
 
 async function onInvoiceUpdated(inv: Stripe.Invoice) {
-  if (inv.metadata?.parent_invoice) return;
+  // A fee replacement has its own Stripe due date, but the reminder clock
+  // stays anchored to the ORIGINAL due date — never re-anchor from it.
+  if (inv.metadata?.parent_invoice || inv.metadata?.replaces_invoice) return;
   const invoice = await prisma.invoice.findUnique({
     where: { stripeInvoiceId: inv.id },
   });
