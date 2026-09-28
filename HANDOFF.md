@@ -3,7 +3,25 @@ _Last updated: 2026-09-28 (v1.8 — scheduler + one-bill late fees + webhook fix
 
 ---
 
-## ▶ v1.9 (9/28/26, evening) — OWNER APPROVE / CHANGE / WAIVE LATE FEES. Committed locally, NOT deployed.
+## ▶ v2.0 (9/28/26, night) — DESIGNER DELIVERY MERGED: DUNN SENDS THE FIRST INVOICE · "YOUR NAME" · STRIPE NAME CHECK. Committed locally, NOT deployed.
+
+**What's in:**
+- **Dunn sends the first invoice email** (designer's `00-new-invoice`) on create and on every recurring run; `invoiceCreator` no longer calls Stripe `sendInvoice` — Stripe sends only if Dunn's email fails, so the client gets it exactly once. Recurring passes `is_recurring` + `frequency_label` ("Your monthly invoice"); `invoice_pdf_url` = Stripe's PDF.
+- **"Your name"**: `Account.ownerName` (migration `20260928200000_owner_name`, nullable). Required at signup; editable in Settings ("You & your business"). Emails sign off "Reply to reach <first name>"; accounts without one fall back to the full business name (never its first word).
+- **Stripe name check**: `src/lib/stripeName.ts` reads the connected account's public name (`business_profile.name` → `settings.dashboard.display_name`). The OAuth callback now lands on the designer's `/onboarding-success.html?open_invoices&clients&past_due&dunn_name&stripe_name` (was `/onboarding?connected=1`); its "Set default late-fee terms" button → `/dashboard#settings`. Settings shows the mismatch note + "Connected as <Stripe name>". Reminders-off tip on both.
+- **New sign-in / sign-up page** (designer's `login.html`) + `public/login.js` (the API side: validation, /auth/signup|login, ?plan= → checkout, signup → /onboarding). Kept from the old page: **show/hide password eye** and the 12-character rule hint. "Forgot password?" is **hidden** — no reset page exists yet.
+- **Fixes:** email subjects decode HTML entities ("Rivera &amp; Sons" → "Rivera & Sons"); **escalation "send final notice" now sends** (once); voided/uncollectible invoices show "Void"/"Uncollectible" and no longer count as overdue/due-soon; sidebar shows the real owner on every view (was the designer sample "Marta Rivera" on direct #settings loads); scheduler-off log says why.
+- 3 new tests (81 total).
+
+**NOT taken from the designer's files (tell the designer):** their `static/dashboard.html` was built on an older copy — it renamed the working list templates (`tpl-invoices`/`tpl-recurring`/`tpl-clients`/`tpl-pending_fees` → `-row`/`-fee` names, so lists render nothing), reverted placeholders (`{avatar}`, `{late_class}`, `{client_sub}`, a broken `{`), and **removed `<script src="api.js">`**. Only their genuinely new parts were brought over (Settings "You & your business", Stripe-name note, tip, "DUNN" comment). `watchtower.css` 3-way merged cleanly. Mascot unchanged. Copy notes: 00's recurring line says "this month's invoice" even for weekly/biweekly; the name check treats "Rivera & Sons" vs "Rivera and Sons" as different (their normalizer strips "&" but not "and"); `09-fee-updated` (engineering-built) still wants a designer pass. The `dunn-update-sep-28/` folder is left untracked (not committed).
+
+**E2E PASSED 9/28 (browser + Stripe test + Resend, throwaway DB):** signup page → no name: "Add your name. Emails sign off with it." · weak password: "…at least 12 characters." · eye shows password · real signup → /onboarding, `ownerName` + `businessName` saved · connected page: mismatch card (Rivera & Sons vs Defiance Media LLC), match ("rivera & sons"), no Stripe name → nothing; sidebar shows the real owner · test Stripe account's public name read live = "Defiance Media LLC" · Settings: connected note + mismatch note + names load; save "Alexandra Rivera" persists · new invoice P1Z3LUW2-0001: **Dunn's email delivered, subject "Invoice P1Z3LUW2-0001 from Rivera & Sons: $250.00 due October 12, 2026", "Reply to reach Alexandra", fee terms, PDF link; 0 Stripe `invoice.sent` events** · recurring $120 monthly → "Your monthly invoice… as usual" delivered, next run Oct 28 · escalation "send" → "Invoice P1Z3LUW2-0001 is two weeks past due" delivered once, flag cleared, second run 0 · 0 webhook errors.
+
+**Deploy note:** the new migration runs automatically on Railway start (`prisma migrate deploy`). Scheduler stays off in production (`SCHEDULER=off`).
+
+---
+
+## ▶ v1.9 (9/28/26, evening) — OWNER APPROVE / CHANGE / WAIVE LATE FEES. DEPLOYED 9/28 16:47 (commit 8d918aa).
 
 **Bashira's rules (9/28):** the owner can **lower** a late fee (never raise it above the fee in the invoice terms — the client was told that amount), approve it, or waive it — **both while it's pending and after it's on the bill**. Changing a billed fee reissues the bill and emails the client the new amount.
 
@@ -20,7 +38,7 @@ _Last updated: 2026-09-28 (v1.8 — scheduler + one-bill late fees + webhook fix
 
 **⚠️ DESIGNER DELIVERY `dunn-update-sep-28/` (arrived 9/28 16:31) — MERGE, DON'T COPY.** It implements the next-batch brief (00-new-invoice email, "Your name" signup, Stripe name check, reminders tip, Watchtower→Dunn copy). Its README says "replace the matching files", but its `static/dashboard.html` + `static/watchtower.css` are based on the pre-v1.9 files — copying them deletes the Change/Lower/Waive UI. Use a 3-way merge (`git merge-file`, base = commit before v1.9). Also: it renames `tpl-pending_fees` → `tpl-pending-fee`, which would make the pending-fee list render nothing (api.js looks up `tpl-pending_fees`) — keep the old id or update api.js.
 
-**Still open:** escalation "send final notice" never sends (t+14 already recorded by the escalation). Invoice list shows voided invoices as "Pending" (status model ignores `void`). Template filler doesn't HTML-escape values (client names come from the owner's own input — low risk).
+**Still open (as of v1.9; escalation + void display FIXED in v2.0):** Template filler doesn't HTML-escape values (client names come from the owner's own input — low risk).
 
 ---
 
