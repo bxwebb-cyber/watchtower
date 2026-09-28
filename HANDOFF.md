@@ -3,6 +3,30 @@ _Last updated: 2026-09-28 (v1.8 — scheduler + one-bill late fees + webhook fix
 
 ---
 
+## ▶ v2.1 (9/28/26, late) — FEWER EMAILS + THE OWNER CHOOSES WHEN THE FEE APPLIES. Committed locally, NOT deployed.
+
+**Bashira's calls (after research, see below):** clients must never feel nagged, and Dunn never picks the grace period for the owner.
+
+**The schedule now (`scheduleFor()` in reminderEngine.ts):**
+- the invoice itself when it's created (from Dunn, template 00)
+- ONE reminder 4 days before the due date (`t-4`, template 02). **No 7-days-before, no 3-days-before, no due-today email.**
+- with a late fee: ONE warning 3 days before the fee lands — "still unpaid after <deadline>" (`fee_warning`, template 04), never before the due date has passed; with grace 0 there's no separate warning (the invoice + the reminder state the terms). Without a fee: ONE "past due" nudge at 3 days late (`t+3`, template 04).
+- the "late fee added" email the morning after the deadline (fee job; owner approves unless auto-apply)
+- at 14 days late the owner decides (escalation — final notice or call).
+Simulated Oct 6–27 for a $250 invoice due Oct 12: no grace → reminder Oct 8, fee Oct 13 · 7-day grace → reminder Oct 8, warning Oct 17 ("…still unpaid after October 19"), fee Oct 20 · 1-day grace → reminder Oct 8, warning Oct 13, fee Oct 14 · no fee → reminder Oct 8, nudge Oct 15 · all: owner asked Oct 26. On-time client = 2 emails; latest payer ≤ 4.
+
+**Grace period = the owner's choice, no default:** `Settings.defaultGraceDays` is now nullable with no default (migration `20260928210000_grace_days_owner_choice`; existing values kept). 0 is allowed everywhere (0 = the fee applies the day after the due date) — before, the server forced min 1 AND every form turned 0 into 7 (`parseInt(x) || 7`). `feeRules.parseGraceDays` / `GRACE_REQUIRED` enforce it on invoices, recurring invoices and Settings (a fee without a chosen grace period → 400). Sign-up's default-fee step now asks "When does the late fee apply?" — "The day after it's due" / "Give them extra days" — nothing pre-picked, hidden when "No late fee". Invoice form, Settings and recurring forms start blank and refuse a fee without a choice.
+
+**Wording:** `feeRules.feeWhen()` → "if it's not paid by the due date" (0) / "if unpaid 1 day after…" / "if unpaid N days after…". Used in all 9 emails' terms line (`{{fee_when}}` replaced "if unpaid {{grace_days}} days after the due date"), the invoice-form preview, sign-up preview and the Stripe invoice note. Email 04 lost its hard-coded "3 days past due"/"a few days past due" → "past due" (it now fires on the owner's grace-dependent day). Pending-fee row says "due date passed" for 0.
+
+**Verified 9/28 (browser + Stripe test, throwaway DB):** sign-up fee step (hidden for no fee; nothing pre-picked; save blocked without a choice; "day after it's due" → preview + saved 0) · invoice form pre-fills 0 from the owner's default, "1 day" singular, blank blocks submit · invoice created with grace 0: Stripe note "Late fee: $25.00 applies if it's not paid by the due date.", Dunn email delivered with "A $25.00 late fee applies if it's not paid by the due date, as agreed on the invoice." · schedule walk above (record-only) · API: fee + no grace → 400 on invoices/recurring/settings; no fee + no grace → ok; 0 → ok. 85 tests.
+
+**For the designer:** 04's wording change; the pre-due reminder uses 02 ("due this Thursday") — fine for 4 days out; the no-grace case has no dedicated warning, so 02/00 could say the fee more prominently than the footer; a future "Reminder schedule" Settings section (days before due, due-date email on/off, fee-warning days, 14-day behavior, per-client pause) is the next owner-control step (DB still has unused `remindT7…remindT14` switches).
+
+**Research used (9/28):** one pre-due reminder 3–7 days out is the norm (Trove, Chaser: 70% of their best collectors use one); Xero defaults to only after-due reminders (7/14/21, max 5, one schedule for all — a known complaint); FreshBooks max 3 with per-client on/off; RCTs: a pre-due SMS raised on-time loan payment 7–9% (Cadena & Schoar, NBER 2011); weekly reminders helped tax compliance but twice-weekly reduced effectiveness (ZEW RCT).
+
+---
+
 ## ▶ v2.0 (9/28/26, night) — DESIGNER DELIVERY MERGED: DUNN SENDS THE FIRST INVOICE · "YOUR NAME" · STRIPE NAME CHECK. Committed locally, NOT deployed.
 
 **What's in:**
