@@ -1,9 +1,13 @@
 # Watchtower — Handoff Sheet
-_Last updated: 2026-09-28 (v1.8 — daily job scheduler built + verified locally; NOT yet deployed) · working name = "Watchtower"; real name = "Dunn" (accounting term). Keep calling it Watchtower in code/docs until the domain is bought._
+_Last updated: 2026-09-28 (v1.8 — scheduler + one-bill late fees + webhook fix DEPLOYED; scheduler switched OFF in production pending invoice review) · working name = "Watchtower"; real name = "Dunn" (accounting term). Keep calling it Watchtower in code/docs until the domain is bought._
 
 ---
 
-## ▶ v1.8 (9/28/26) — SCHEDULER BUILT. Deploy = push to main.
+## ▶ v1.8 (9/28/26) — DEPLOYED (commit d9bd8fc, live 16:15 ET) WITH THE SCHEDULER SWITCHED OFF.
+
+**Live state:** Railway variable `SCHEDULER=off` (set before the push, on Bashira's call) — the new code is live but sends nothing automatically, because the open invoices in the production DB haven't been reviewed (earlier tests used made-up client addresses, e.g. `billing@hudsonco.com`, that may belong to real companies; Claude's read of production data was blocked by the permission classifier). **Verified live:** `/health` ok · boot log `[scheduler] off` · Stripe webhooks now pass: `[webhook] payment_intent.* verified` (was 15/15 rejected before). The connected-accounts destination (`STRIPE_WEBHOOK_SECRET_2`) isn't proven yet — watch for `verified` on the next connected-account event.
+
+**To turn the scheduler on:** (1) review open invoices on getdunn.org (or allow a one-time production DB read) and void any test invoices with non-owned addresses, (2) `railway variables --set SCHEDULER=on` (or delete the variable — production defaults to on), (3) confirm `[scheduler] on — daily sweep at 9:00 America/New_York` in the Railway logs. Cosmetic: the off-message says "(local dev)" even in production — reword in the next batch.
 
 **The go-live blocker is fixed in code.** The web server now runs the daily sweep (reminders → fees → templates) itself at **9:00am New York time** — no separate Railway cron service. `src/jobs/scheduler.ts` (clock, checks every 15 min, catches up after a restart/deploy, retries a failed sweep up to 3x/day) + `src/jobs/sweep.ts` (Postgres advisory lock so two runs can never overlap — web server, a manual `job:*`, or old+new instance mid-deploy). On in production (`NODE_ENV=production` or Railway's `RAILWAY_ENVIRONMENT_NAME`), off in local dev; `SCHEDULER=on|off` overrides. Boot log says `[scheduler] on — daily sweep at 9:00 America/New_York` — check for it in Railway logs after deploy, then `[scheduler] daily sweep done for <date>` after 9am ET.
 
