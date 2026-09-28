@@ -6,13 +6,13 @@ const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KE
 
 // The single "from" address for every email the agent sends.
 export function mailFrom(): string {
-  return process.env.MAIL_FROM || 'Watchtower <reminders@watchtower.app>';
+  return process.env.MAIL_FROM || 'Dunn <reminders@getdunn.org>';
 }
 
 // The client-facing sender: display name = the business's actual name.
 export function clientMailFrom(businessName?: string | null): string {
   const base = mailFrom();
-  const addr = base.match(/<[^>]+>/)?.[0] ?? '<reminders@watchtower.app>';
+  const addr = base.match(/<[^>]+>/)?.[0] ?? '<reminders@getdunn.org>';
   const label = businessName?.trim();
   if (!label) return base;
   return `${label} via Dunn ${addr}`;
@@ -20,7 +20,7 @@ export function clientMailFrom(businessName?: string | null): string {
 
 // The per-invoice reply-to address for client email replies.
 export function replyToFor(invoiceId: string): string {
-  const domain = process.env.SENDING_DOMAIN || 'watchtower.app';
+  const domain = process.env.SENDING_DOMAIN || 'getdunn.org';
   return `reply-${invoiceId}@${domain}`;
 }
 

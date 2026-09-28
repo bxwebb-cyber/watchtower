@@ -190,7 +190,7 @@ async function onInvoicePaid(inv: Stripe.Invoice) {
   await notifyOwner(
     invoice.accountId,
     `Invoice paid — ${inv.amount_paid / 100} ${inv.currency}`,
-    `Invoice ${inv.id} was paid (${inv.amount_paid / 100} ${inv.currency}). Watchtower has stopped the reminders.`
+    `Invoice ${inv.id} was paid (${inv.amount_paid / 100} ${inv.currency}). Dunn has stopped the reminders.`
   );
   // Paid = stop all reminders. The daily job skips paid invoices.
 }
@@ -285,7 +285,7 @@ async function onCheckoutCompleted(session: Stripe.Checkout.Session) {
   await notifyOwner(
     accountId,
     'Subscription active',
-    'Your Dunn subscription is now active. Watchtower is keeping watch.'
+    'Your Dunn subscription is now active. Dunn is keeping watch.'
   );
 }
 

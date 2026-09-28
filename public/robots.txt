@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://getdunn.org/sitemap.xml
