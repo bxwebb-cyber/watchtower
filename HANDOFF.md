@@ -3,6 +3,16 @@ _Last updated: 2026-09-28 (v1.8 — scheduler + one-bill late fees + webhook fix
 
 ---
 
+## ▶ v2.3 (9/29/26) — LANDING PAGE WORKS ON A PHONE. Committed locally, NOT deployed.
+
+- **What was wrong:** `public/landing.html` (designer bundle) had zero phone rules. At 375px the hero buttons were cut off, the 3/4-column sections were squeezed into slivers ("$17,5…"), and the "always late" table was unreadable.
+- **Fix:** `scripts/phone-layout.cjs` tags elements inside the bundle's embedded template (`dm-*` classes, found by a unique piece of their inline style) and adds one `<style id="dunn-phone">` with rules under `@media (max-width: 760px)`. It has to go INSIDE the template: the bundle redraws the whole document from it on load, so outside styles are thrown away.
+- **Proof:** at 375px, 0 elements outside the screen (was dozens). At 1280px, all 304 elements are in the identical position and size before vs after, so desktop is untouched.
+- **⚠ When the designer sends a new landing.html:** run `node scripts/phone-layout.cjs` on it. It refuses to write if the page changed shape (each rule expects an exact match count), so it can't silently mis-tag. Better long-term: ask the designer to build the phone layout in their tool.
+- **Still not phone-friendly:** `/demo` (separate designer bundle, sidebar eats half the screen) — the landing page's "See how it works" goes there. The signed-in dashboard has phone rules in `watchtower.css` but hasn't been checked on a phone.
+
+---
+
 ## ▶ v2.2 (9/28/26, night) — CLIENT REPLIES REACH DUNN IN PRODUCTION. DEPLOYED 9/28 (commit d08e154). Waiting on RESEND_WEBHOOK_SECRET on Railway.
 
 - **Resend webhook repointed (done 9/28):** the `email.received` webhook now goes to `https://getdunn.org/webhooks/resend/inbound` (was the dead ngrok tunnel from 9/23). Only the URL changed, so its signing secret is the same one as `RESEND_WEBHOOK_SECRET` in the local `.env`.
