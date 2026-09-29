@@ -3,6 +3,17 @@ _Last updated: 2026-09-28 (v1.8 — scheduler + one-bill late fees + webhook fix
 
 ---
 
+## ▶ v2.2 (9/28/26, night) — CLIENT REPLIES REACH DUNN IN PRODUCTION. Code committed locally, NOT deployed.
+
+- **Resend webhook repointed (done 9/28):** the `email.received` webhook now goes to `https://getdunn.org/webhooks/resend/inbound` (was the dead ngrok tunnel from 9/23). Only the URL changed, so its signing secret is the same one as `RESEND_WEBHOOK_SECRET` in the local `.env`.
+- **Bashira does by hand:** put that signing secret on Railway as `RESEND_WEBHOOK_SECRET` (Claude doesn't handle secrets). Until it's set, production answers every reply with 500 "webhook not configured"; Resend retries, so replies in the gap aren't lost right away.
+- **🔴 Fixed: every signed reply would have failed the signature check.** Since v1.8 the route gets raw bytes (a Buffer) but still did `JSON.stringify(req.body)`, which never matches what Resend signed → 401 on every real reply. New `verifyInbound()` checks the exact bytes. `inbound.test.ts` signs payloads with a throwaway secret (genuine / tampered / wrong secret / no headers). **Replies stay broken in production until this deploys.**
+- **Fixed: the owner's "Client replied" alert had no message.** The body was fetched with `emails.get()` (sent mail only); received mail is `emails.receiving.get()`.
+- Also in v2.1's commit 40601cd: no owner email in any signature, and `/webhooks/*` is never behind `API_TOKEN`.
+- **To prove it after deploy:** reply to a Dunn email from `bashira.webb+client@gmail.com` → owner inbox gets "Client replied" with the text, and that invoice's reminders pause.
+
+---
+
 ## ▶ v2.1 (9/28/26, late) — FEWER EMAILS + THE OWNER CHOOSES WHEN THE FEE APPLIES. Committed locally, NOT deployed.
 
 **Bashira's calls (after research, see below):** clients must never feel nagged, and Dunn never picks the grace period for the owner.

@@ -9,6 +9,25 @@ const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KE
 
 export const inboundRouter = Router();
 
+type SvixHeaders = Record<'svix-id' | 'svix-timestamp' | 'svix-signature', string | string[] | undefined>;
+
+// Check the Svix signature against the EXACT bytes Resend sent, then parse.
+// express.raw() hands us a Buffer; re-serializing a parsed object instead
+// changes the bytes and every real webhook would fail the check.
+// Throws if the signature doesn't match.
+export function verifyInbound(rawBody: unknown, headers: SvixHeaders, secret: string): any {
+  const payload = Buffer.isBuffer(rawBody)
+    ? rawBody.toString('utf8')
+    : typeof rawBody === 'string' ? rawBody : JSON.stringify(rawBody ?? {});
+  const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? '';
+  new Webhook(secret).verify(payload, {
+    'svix-id': first(headers['svix-id']),
+    'svix-timestamp': first(headers['svix-timestamp']),
+    'svix-signature': first(headers['svix-signature']),
+  });
+  return JSON.parse(payload);
+}
+
 // Resend inbound webhook: a customer replied to a reminder email.
 //
 // Every reminder goes out with reply-to = reply-<invoiceId>@<SENDING_DOMAIN>,
@@ -25,24 +44,13 @@ inboundRouter.post('/', async (req, res) => {
     console.error('[inbound] RESEND_WEBHOOK_SECRET not configured — rejecting webhook');
     return res.status(500).json({ error: 'webhook not configured' });
   }
+  let event: any;
   try {
-    const wh = new Webhook(secret);
-    const payload = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
-    wh.verify(payload, {
-      'svix-id': Array.isArray(req.headers['svix-id'])
-        ? req.headers['svix-id'][0] : (req.headers['svix-id'] ?? ''),
-      'svix-timestamp': Array.isArray(req.headers['svix-timestamp'])
-        ? req.headers['svix-timestamp'][0] : (req.headers['svix-timestamp'] ?? ''),
-      'svix-signature': Array.isArray(req.headers['svix-signature'])
-        ? req.headers['svix-signature'][0] : (req.headers['svix-signature'] ?? ''),
-    });
+    event = verifyInbound(req.body, req.headers as SvixHeaders, secret) ?? {};
   } catch (err) {
     console.error('[inbound] signature verification failed', (err as Error).message);
     return res.status(401).json({ error: 'invalid webhook signature' });
   }
-
-  const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-  const event = body ?? {};
 
   // Resend inbound sends the email object directly (not wrapped); tolerate
   // both the bare shape and a {type, data} wrapper.
@@ -71,16 +79,15 @@ inboundRouter.post('/', async (req, res) => {
   }
 
   // The webhook carries metadata only — fetch the full body so the owner
-  // sees what the client actually said.
+  // sees what the client actually said. Received mail lives under
+  // emails.receiving; emails.get() only knows mail we SENT.
   let emailBody = '';
   const emailId = data.email_id;
   if (resend && emailId) {
     try {
-      const full = await resend.emails.get(emailId);
-      emailBody = (full?.data as { text?: string; html?: string } | undefined)?.text ?? '';
-      if (!emailBody) {
-        emailBody = (full?.data as { html?: string } | undefined)?.html ?? '';
-      }
+      const full = await resend.emails.receiving.get(emailId);
+      if (full.error) console.error('[inbound] failed to fetch email body', full.error.message);
+      emailBody = full.data?.text || full.data?.html || '';
     } catch (err) {
       console.error('[inbound] failed to fetch email body', (err as Error).message);
     }
