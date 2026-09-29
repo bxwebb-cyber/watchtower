@@ -400,7 +400,7 @@ async function loadSettings() {
   // Plan
   const plan = settings.plan || 'solo';
   bind({
-    plan_label: plan === 'business' ? 'Unlimited invoices · $59' : 'Up to 10 invoices / month · $39',
+    plan_label: plan === 'business' ? 'Unlimited invoices' : 'Up to 10 invoices / month',
     plan_usage: plan === 'business' ? 'Unlimited invoices' : 'Usage tracked on your next invoice',
   });
 }

@@ -78,7 +78,10 @@
 (function () {
   var q = new URLSearchParams(location.search);
   var plan = q.get('plan');
-  var PLANS = { solo: 'Up to 10 invoices / month · $39', business: 'Unlimited invoices · $59' };
+  var yearly = q.get('billing') === 'yearly';
+  var PLANS = yearly
+    ? { solo: 'Up to 10 invoices / month · $390 a year', business: 'Unlimited invoices · $540 a year' }
+    : { solo: 'Up to 10 invoices / month · $39 a month', business: 'Unlimited invoices · $59 a month' };
   var form = document.querySelector('[data-auth-form]');
   var mode = (plan || q.get('mode') === 'signup') ? 'signup' : 'signin';
   if (PLANS[plan]) {

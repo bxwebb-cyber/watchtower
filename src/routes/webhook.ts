@@ -332,8 +332,8 @@ async function syncSubscription(accountId: string, sub: Stripe.Subscription) {
   const price = item?.price;
   // Map Stripe price id → our plan name via the configured env vars.
   let plan: string | null = null;
-  if (price?.id === process.env.STRIPE_PRICE_SOLO) plan = 'solo';
-  else if (price?.id === process.env.STRIPE_PRICE_BUSINESS) plan = 'business';
+  if (price?.id && [process.env.STRIPE_PRICE_SOLO, process.env.STRIPE_PRICE_SOLO_YEARLY].includes(price.id)) plan = 'solo';
+  else if (price?.id && [process.env.STRIPE_PRICE_BUSINESS, process.env.STRIPE_PRICE_BUSINESS_YEARLY].includes(price.id)) plan = 'business';
 
   await prisma.account.update({
     where: { id: accountId },

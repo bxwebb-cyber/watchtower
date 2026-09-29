@@ -69,7 +69,7 @@
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'same-origin',
-          body: JSON.stringify({ plan }),
+          body: JSON.stringify({ plan, billing: new URLSearchParams(location.search).get('billing') === 'yearly' ? 'yearly' : 'monthly' }),
         });
         const c = await chk.json().catch(() => ({}));
         if (chk.ok && c.url) { location.href = c.url; return; }

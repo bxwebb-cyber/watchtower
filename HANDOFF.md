@@ -3,6 +3,16 @@ _Last updated: 2026-09-28 (v1.8 — scheduler + one-bill late fees + webhook fix
 
 ---
 
+## ▶ v2.4 (9/29/26) — YEARLY PRICING. Committed locally, NOT deployed (waiting on 2 Railway variables).
+
+- **Bashira's call:** monthly unchanged ($39 / $59). Yearly: **Solo $390/yr** (2 months free, ~17%), **Unlimited $540/yr** ($45/mo, 24% off). The bigger Unlimited discount nudges people up a plan.
+- **Stripe (test mode):** yearly prices on the same products — `STRIPE_PRICE_SOLO_YEARLY=price_1UL71HRve8cRy3m39KgK3Axn`, `STRIPE_PRICE_BUSINESS_YEARLY=price_1UL71IRve8cRy3m3KHuhiTqI`. In local `.env`; **must be added on Railway by hand before deploying** (Claude's write was blocked). Recreate both in LIVE mode at launch.
+- **Code:** `/billing/checkout` takes `billing: monthly|yearly` (default monthly); webhook maps yearly prices to the same plan; `/login?plan=…&billing=yearly` shows "$390 a year" and passes it to checkout; Settings plan label no longer shows a monthly price.
+- **Landing:** Monthly / Yearly toggle above the plan cards (edited inside the bundle's template + DC logic: `yearly` state, `payMonthly/payYearly`, `goSolo/goBusiness`). ⚠ A new designer landing.html won't have it — send the designer this spec or re-apply.
+- **Verified:** toggle switches $39→$390 / $59→$540 with "works out to" lines, 0 overflow at 375px, yearly button → `/login?plan=solo&billing=yearly`; test-mode checkout sessions total $390 and $540. 90 tests.
+
+---
+
 ## ▶ v2.3 (9/29/26) — LANDING PAGE WORKS ON A PHONE. Committed locally, NOT deployed.
 
 - **What was wrong:** `public/landing.html` (designer bundle) had zero phone rules. At 375px the hero buttons were cut off, the 3/4-column sections were squeezed into slivers ("$17,5…"), and the "always late" table was unreadable.

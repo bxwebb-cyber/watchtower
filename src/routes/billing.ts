@@ -17,10 +17,15 @@ const PLANS: Record<'solo' | 'business', { name: string; label: string; priceEnv
   business: { name: 'business', label: 'Business', priceEnv: 'STRIPE_PRICE_BUSINESS' },
 };
 
-function priceIdFor(plan: keyof typeof PLANS): string {
-  const id = process.env[PLANS[plan].priceEnv];
+// Paid monthly or once a year. Yearly prices live in <monthly env>_YEARLY:
+// Solo $390/yr (2 months free), Unlimited $540/yr ($45/mo) — Bashira 9/29.
+export type Billing = 'monthly' | 'yearly';
+
+function priceIdFor(plan: keyof typeof PLANS, billing: Billing): string {
+  const env = PLANS[plan].priceEnv + (billing === 'yearly' ? '_YEARLY' : '');
+  const id = process.env[env];
   if (!id) {
-    throw new Error(`${PLANS[plan].priceEnv} environment variable is not set`);
+    throw new Error(`${env} environment variable is not set`);
   }
   return id;
 }
@@ -60,11 +65,16 @@ billingRouter.get('/status', async (req, res) => {
 });
 
 // POST /billing/checkout — start a subscription for the given plan.
-// Body: { plan: "solo" | "business" }. Returns the hosted checkout URL.
+// Body: { plan: "solo" | "business", billing?: "monthly" | "yearly" }.
+// Returns the hosted checkout URL.
 billingRouter.post('/checkout', async (req, res) => {
   const plan = String(req.body?.plan ?? '') as 'solo' | 'business';
   if (plan !== 'solo' && plan !== 'business') {
     return res.status(400).json({ error: 'Plan must be "solo" or "business".' });
+  }
+  const billing = String(req.body?.billing ?? 'monthly') as Billing;
+  if (billing !== 'monthly' && billing !== 'yearly') {
+    return res.status(400).json({ error: 'Billing must be "monthly" or "yearly".' });
   }
 
   const accountId = resolveAccountId(req);
@@ -82,7 +92,7 @@ billingRouter.post('/checkout', async (req, res) => {
   }
 
   try {
-    const priceId = priceIdFor(plan);
+    const priceId = priceIdFor(plan, billing);
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       line_items: [{ price: priceId, quantity: 1 }],
@@ -94,7 +104,7 @@ billingRouter.post('/checkout', async (req, res) => {
       subscription_data: {
         metadata: { accountId: account.id },
       },
-      metadata: { accountId: account.id, plan },
+      metadata: { accountId: account.id, plan, billing },
     });
 
     res.json({ url: session.url });
