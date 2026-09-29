@@ -3,7 +3,7 @@ _Last updated: 2026-09-28 (v1.8 — scheduler + one-bill late fees + webhook fix
 
 ---
 
-## ▶ v2.2 (9/28/26, night) — CLIENT REPLIES REACH DUNN IN PRODUCTION. Code committed locally, NOT deployed.
+## ▶ v2.2 (9/28/26, night) — CLIENT REPLIES REACH DUNN IN PRODUCTION. DEPLOYED 9/28 (commit d08e154). Waiting on RESEND_WEBHOOK_SECRET on Railway.
 
 - **Resend webhook repointed (done 9/28):** the `email.received` webhook now goes to `https://getdunn.org/webhooks/resend/inbound` (was the dead ngrok tunnel from 9/23). Only the URL changed, so its signing secret is the same one as `RESEND_WEBHOOK_SECRET` in the local `.env`.
 - **Bashira does by hand:** put that signing secret on Railway as `RESEND_WEBHOOK_SECRET` (Claude doesn't handle secrets). Until it's set, production answers every reply with 500 "webhook not configured"; Resend retries, so replies in the gap aren't lost right away.
@@ -14,7 +14,7 @@ _Last updated: 2026-09-28 (v1.8 — scheduler + one-bill late fees + webhook fix
 
 ---
 
-## ▶ v2.1 (9/28/26, late) — FEWER EMAILS + THE OWNER CHOOSES WHEN THE FEE APPLIES. Committed locally, NOT deployed.
+## ▶ v2.1 (9/28/26, late) — FEWER EMAILS + THE OWNER CHOOSES WHEN THE FEE APPLIES. DEPLOYED 9/28 (commit d08e154).
 
 **Bashira's calls (after research, see below):** clients must never feel nagged, and Dunn never picks the grace period for the owner.
 
@@ -38,7 +38,7 @@ Simulated Oct 6–27 for a $250 invoice due Oct 12: no grace → reminder Oct 8,
 
 ---
 
-## ▶ v2.0 (9/28/26, night) — DESIGNER DELIVERY MERGED: DUNN SENDS THE FIRST INVOICE · "YOUR NAME" · STRIPE NAME CHECK. Committed locally, NOT deployed.
+## ▶ v2.0 (9/28/26, night) — DESIGNER DELIVERY MERGED: DUNN SENDS THE FIRST INVOICE · "YOUR NAME" · STRIPE NAME CHECK. DEPLOYED 9/28 (commit d08e154).
 
 **What's in:**
 - **Dunn sends the first invoice email** (designer's `00-new-invoice`) on create and on every recurring run; `invoiceCreator` no longer calls Stripe `sendInvoice` — Stripe sends only if Dunn's email fails, so the client gets it exactly once. Recurring passes `is_recurring` + `frequency_label` ("Your monthly invoice"); `invoice_pdf_url` = Stripe's PDF.
