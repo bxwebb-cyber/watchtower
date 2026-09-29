@@ -5,6 +5,10 @@ import { Request, Response, NextFunction } from 'express';
 //   Authorization: Bearer <token>
 // When unset, the API stays open (backwards compatible for local dev).
 export function authMiddleware(req: Request, res: Response, next: NextFunction): void {
+  // Webhooks (Stripe, Resend client replies) prove themselves with their own
+  // signatures and can never send our token — never block them here.
+  if ((req.path ?? '').startsWith('/webhooks/')) return next();
+
   const token = process.env.API_TOKEN;
   if (!token) {
     // No token configured — open access for local dev.

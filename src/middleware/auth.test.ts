@@ -19,6 +19,16 @@ function mockRes(): Response {
 describe('authMiddleware', () => {
   const origToken = process.env.API_TOKEN;
 
+  it('never blocks webhooks (client replies, Stripe), even with a token set', () => {
+    process.env.API_TOKEN = 'secret-token';
+    const req = { headers: {}, path: '/webhooks/resend/inbound' } as unknown as Request;
+    const res = mockRes();
+    let called = false;
+    authMiddleware(req, res, (() => { called = true; }) as NextFunction);
+    expect(called).toBe(true);
+    expect(res.status).not.toHaveBeenCalled();
+  });
+
   afterEach(() => {
     process.env.API_TOKEN = origToken;
   });
