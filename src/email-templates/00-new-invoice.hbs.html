@@ -45,7 +45,7 @@
 <tr><td class="wt-px" style="padding:28px 28px 6px 28px;">
 <h1 class="wt-head" style="margin:0 0 18px 0;font-family:Georgia, 'Times New Roman', serif;font-weight:normal;font-size:24px;line-height:30px;mso-line-height-rule:exactly;color:#0F302E;">{{#if is_recurring}}Your {{frequency_label}} invoice.{{else}}Your invoice from {{business_name}}.{{/if}}</h1>
 <p style="margin:0 0 14px 0;font-family:Arial, Helvetica, sans-serif;font-size:16px;line-height:25px;mso-line-height-rule:exactly;color:#243B39;">Hi {{client_first_name}},</p>
-<p style="margin:0 0 14px 0;font-family:Arial, Helvetica, sans-serif;font-size:16px;line-height:25px;mso-line-height-rule:exactly;color:#243B39;">{{#if is_recurring}}Here's this month's invoice from {{business_name}}, as usual.{{else}}Thanks for working with {{business_name}}. Here's the invoice for the work.{{/if}} It's {{amount_due}}, due {{due_date_long}}.</p>
+<p style="margin:0 0 14px 0;font-family:Arial, Helvetica, sans-serif;font-size:16px;line-height:25px;mso-line-height-rule:exactly;color:#243B39;">{{#if is_recurring}}Here's this month's invoice from {{business_name}}, as usual. It's {{amount_due}}, due {{due_date_long}}.{{else}}Thanks for working with {{business_name}}. Here's your invoice for {{amount_due}}, due {{due_date_long}}.{{/if}}</p>
 <p style="margin:0 0 14px 0;font-family:Arial, Helvetica, sans-serif;font-size:16px;line-height:25px;mso-line-height-rule:exactly;color:#243B39;">You can pay by card or bank transfer with the button below.</p>
 </td></tr>
 
