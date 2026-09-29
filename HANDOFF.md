@@ -3,6 +3,15 @@ _Last updated: 2026-09-28 (v1.8 — scheduler + one-bill late fees + webhook fix
 
 ---
 
+## ▶ v2.5 (9/29/26) — $39 PLAN = UP TO 5 CLIENTS. Committed locally, NOT deployed.
+
+- **Bashira's call:** the $39 plan is **"Up to 5 clients"** (was "10 invoices / month"), billed as often as weekly; $59 is **"Unlimited clients"**. Why: the old cap charged weekly billers (cleaners, tutors, trainers — often one-person, small invoices) for how OFTEN they bill; Dunn can't tell a solo owner from a team, so the cap sorts by clients, not who you are.
+- **Rule (`src/services/planLimits.ts`, 7 tests):** per calendar month, max 5 distinct clients (by email, case-insensitive) and 10 invoices per client (a guardrail nobody should feel — weekly is 4–5). Existing clients can still be invoiced when 5 are in use. Replaces `SOLO_MONTHLY_INVOICE_LIMIT`.
+- **No more silent misses:** a recurring invoice blocked by the cap now emails the owner once ("Recurring invoice for X not sent" + how to fix), not on every daily retry.
+- **Copy:** landing cards, "Both plans include" ("Unlimited clients" → "Weekly, monthly or one-off invoices"), SEO schema offer names, sign-up plan strip, Settings plan label. Never show "solo"/"business" to customers.
+
+---
+
 ## ▶ v2.4 (9/29/26) — YEARLY PRICING. Committed locally, NOT deployed (waiting on 2 Railway variables).
 
 - **Bashira's call:** monthly unchanged ($39 / $59). Yearly: **Solo $390/yr** (2 months free, ~17%), **Unlimited $540/yr** ($45/mo, 24% off). The bigger Unlimited discount nudges people up a plan.

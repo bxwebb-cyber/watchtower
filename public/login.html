@@ -20,7 +20,7 @@
   Mode: /login → Sign in. /login?plan=solo|business or /login?mode=signup → Create account.
         Landing "Get started" should link to /login?mode=signup; "Sign in" to /login.
   Plan: keep ?plan= through signup. The plan strip shows only when plan is set.
-        solo → "Up to 10 invoices / month · $39" · business → "Unlimited invoices · $59"
+        solo → "Up to 5 clients · $39 a month" · business → "Unlimited clients · $59 a month" (?billing=yearly → $390 / $540 a year)
   Submit fires wt:auth { mode, data } with FormData as an object:
         signin: email, password · signup: owner_name, business_name, email, password, plan
   Errors: fill .wt-auth__error and unhide it.
@@ -41,7 +41,7 @@
 
       <form class="wt-auth__form" data-auth-form novalidate>
         <div class="wt-auth__plan" data-plan-strip hidden>
-          <span>Plan: <strong data-bind="plan_label">Up to 10 invoices / month · $39</strong></span>
+          <span>Plan: <strong data-bind="plan_label">Up to 5 clients · $39 a month</strong></span>
           <a href="/#pricing">Change</a>
         </div>
         <input type="hidden" name="plan" value="">
@@ -80,8 +80,8 @@
   var plan = q.get('plan');
   var yearly = q.get('billing') === 'yearly';
   var PLANS = yearly
-    ? { solo: 'Up to 10 invoices / month · $390 a year', business: 'Unlimited invoices · $540 a year' }
-    : { solo: 'Up to 10 invoices / month · $39 a month', business: 'Unlimited invoices · $59 a month' };
+    ? { solo: 'Up to 5 clients · $390 a year', business: 'Unlimited clients · $540 a year' }
+    : { solo: 'Up to 5 clients · $39 a month', business: 'Unlimited clients · $59 a month' };
   var form = document.querySelector('[data-auth-form]');
   var mode = (plan || q.get('mode') === 'signup') ? 'signup' : 'signin';
   if (PLANS[plan]) {

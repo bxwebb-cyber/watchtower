@@ -42,6 +42,16 @@ export async function runTemplateJob(now = new Date()): Promise<number> {
 
       if (!result.ok) {
         console.error(`[template] failed for ${tmpl.id}: ${result.message}`);
+        // Over the plan limit: the client isn't invoiced until the owner acts,
+        // so tell them — once, not on every daily retry.
+        if (result.code === 'plan_limit' && tmpl.lastError !== result.message) {
+          await notifyOwner(
+            tmpl.accountId,
+            `Recurring invoice for ${tmpl.clientName} not sent`,
+            `Dunn didn't send ${tmpl.clientName}'s recurring invoice. ${result.message}` +
+              `\n\nUpgrade in Settings and Dunn sends it on the next daily run. Otherwise it goes out when your plan resets on the 1st.`
+          );
+        }
         await prisma.invoiceTemplate.update({
           where: { id: tmpl.id },
           data: { lastRunAt: now, lastRunOk: false, lastError: result.message },
