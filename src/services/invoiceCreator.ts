@@ -67,11 +67,13 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<CreateIn
 
   // Resolve the account whose Stripe connection we're invoicing under.
   const account = await prisma.account.findUnique({ where: { id: input.accountId } });
-  if (!account) {
+  // Signed up but never finished "Connect Stripe": the id is a pending_
+  // placeholder, and Stripe would answer with a confusing access error.
+  if (!account || account.stripeAccountId.startsWith('pending_')) {
     return {
       ok: false,
       code: 'no_account',
-      message: 'No Stripe account connected yet. Connect one at /auth/stripe/start, then come back.',
+      message: 'Connect your Stripe account first (Settings → Connect Stripe). Dunn creates invoices in your Stripe, so it needs that link.',
     };
   }
 
