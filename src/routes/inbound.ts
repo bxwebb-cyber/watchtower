@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import { Resend } from 'resend';
 import { Webhook } from 'svix';
 import { notifyOwner, mailFrom } from '../services/notify';
+import { replyText } from '../lib/replyText';
 
 const prisma = new PrismaClient();
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
@@ -128,7 +129,8 @@ inboundRouter.post('/', async (req, res) => {
     try {
       const full = await resend.emails.receiving.get(emailId);
       if (full.error) console.error('[inbound] failed to fetch email body', full.error.message);
-      emailBody = full.data?.text || full.data?.html || '';
+      // Just the client's new words: no markup, no quoted copy of our email.
+      emailBody = replyText(full.data?.text || full.data?.html || '');
     } catch (err) {
       console.error('[inbound] failed to fetch email body', (err as Error).message);
     }

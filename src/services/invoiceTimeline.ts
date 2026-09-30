@@ -1,3 +1,5 @@
+import { replyText } from '../lib/replyText';
+
 // The story of one invoice, oldest first, in plain words for the owner's
 // invoice view: what was sent, what the client said, what happened to the fee.
 // Reminders and replies come from their own tables (they carry the subject and
@@ -38,7 +40,7 @@ export function buildTimeline(input: {
   const out: TimelineEntry[] = [];
   for (const r of input.reminders) out.push({ at: r.sentAt.toISOString(), kind: 'sent', text: `Email sent: "${r.subject}"` });
   for (const r of input.replies) {
-    out.push({ at: r.createdAt.toISOString(), kind: 'reply', text: `${r.from} replied`, body: r.body || r.subject });
+    out.push({ at: r.createdAt.toISOString(), kind: 'reply', text: `${r.from} replied`, body: replyText(r.body) || r.subject });
   }
   for (const e of input.events) {
     const known = EVENT_TEXT[e.event];
