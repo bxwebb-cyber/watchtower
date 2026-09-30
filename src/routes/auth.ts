@@ -34,8 +34,9 @@ export function authRouter() {
   router.get('/stripe/start', (req: Request, res: Response) => {
     // Stripe links to an existing Dunn account. Without one, the callback
     // would invent an account with no business name and no reachable email.
-    if (!resolveAccountId(req)) {
-      res.redirect('/login?mode=signup');
+    const signedIn = resolveAccountId(req);
+    if (!signedIn) {
+      res.redirect('/login');
       return;
     }
     const clientId = process.env.STRIPE_CLIENT_ID;
@@ -44,14 +45,28 @@ export function authRouter() {
       res.status(500).json({ error: 'STRIPE_CLIENT_ID not configured' });
       return;
     }
-    const url = `https://connect.stripe.com/oauth/authorize?response_type=code&client_id=${clientId}&scope=read_write&redirect_uri=${encodeURIComponent(redirectUri)}`;
+    // `state` says who started this, signed and good for 15 minutes. The
+    // callback trusts it over the cookie (the browser may not send the cookie
+    // on Stripe's redirect back), and it stops anyone else's Stripe from
+    // being attached to this account (OAuth CSRF).
+    const state = jwt.sign({ accountId: signedIn, purpose: 'stripe_connect' }, jwtSecret, { expiresIn: '15m' });
+    const url = `https://connect.stripe.com/oauth/authorize?response_type=code&client_id=${clientId}&scope=read_write&redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(state)}`;
     res.redirect(url);
   });
 
   router.get('/stripe/callback', async (req: Request, res: Response) => {
-    const { code } = req.query;
+    const { code, state } = req.query;
     if (!code || typeof code !== 'string') {
       res.status(400).send('Missing authorization code.');
+      return;
+    }
+    let stateAccountId: string | null = null;
+    try {
+      const p = jwt.verify(String(state ?? ''), jwtSecret) as { accountId?: string; purpose?: string };
+      if (p.purpose === 'stripe_connect' && p.accountId) stateAccountId = p.accountId;
+    } catch { /* missing or expired: handled below */ }
+    if (!stateAccountId) {
+      res.status(400).send('This Stripe link expired or didn\'t start from Dunn. Go back to Dunn → Settings → Connect Stripe and try again.');
       return;
     }
     try {
@@ -63,13 +78,13 @@ export function authRouter() {
       // signup with a `pending_` stripeAccountId). Only the Stripe id changes:
       // the owner's email is their sign-in and where alerts go, and Stripe's
       // (often missing — test accounts return none) must never replace it.
-      let accountId: string | null = resolveAccountId(req);
+      let accountId: string | null = stateAccountId;
       if (accountId) {
         const existing = await prisma.account.findUnique({ where: { id: accountId } });
         if (!existing) accountId = null;
       }
       if (!accountId) {
-        res.redirect('/login?mode=signup');
+        res.redirect('/login');
         return;
       }
       // This Stripe account may already sit on another Dunn account. If that
@@ -125,7 +140,7 @@ export function authRouter() {
 
   // Sign out: drop the session cookie (same options it was set with).
   const signOut = (_req: Request, res: Response) => {
-    res.clearCookie('auth_token', { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'strict' });
+    res.clearCookie('auth_token', { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' });
     res.redirect('/login');
   };
   router.get('/logout', signOut);
@@ -258,7 +273,7 @@ function setAuthCookie(res: Response, token: string): void {
   res.cookie('auth_token', token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    sameSite: 'lax', // sent when Stripe redirects back; still not on cross-site POSTs
     maxAge: 7 * 24 * 60 * 60 * 1000,
   });
 }
