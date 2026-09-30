@@ -114,6 +114,25 @@ billingRouter.post('/checkout', async (req, res) => {
   }
 });
 
+// GET /billing/portal — the "Manage plan" link: straight to Stripe's billing
+// page. No plan yet → the pricing section; not signed in → sign-in.
+billingRouter.get('/portal', async (req, res) => {
+  const accountId = resolveAccountId(req);
+  if (!accountId) return res.redirect('/login');
+  const account = await prisma.account.findUnique({ where: { id: accountId } });
+  if (!account?.stripeCustomerId) return res.redirect('/#pricing');
+  try {
+    const session = await stripe.billingPortal.sessions.create({
+      customer: account.stripeCustomerId,
+      return_url: `${process.env.APP_URL || 'http://localhost:4000'}/dashboard`,
+    });
+    res.redirect(session.url);
+  } catch (err: any) {
+    console.error('[billing] portal failed:', err);
+    res.status(500).send('Could not open the billing page. Try again in a minute.');
+  }
+});
+
 // POST /billing/portal — open the Stripe customer portal (upgrade/downgrade/cancel).
 billingRouter.post('/portal', async (req, res) => {
   const accountId = resolveAccountId(req);

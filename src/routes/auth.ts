@@ -123,6 +123,14 @@ export function authRouter() {
     }
   });
 
+  // Sign out: drop the session cookie (same options it was set with).
+  const signOut = (_req: Request, res: Response) => {
+    res.clearCookie('auth_token', { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'strict' });
+    res.redirect('/login');
+  };
+  router.get('/logout', signOut);
+  router.post('/logout', signOut);
+
   router.post('/signup', authLimiter, async (req: Request, res: Response) => {
     try {
       const { email, password } = req.body;
