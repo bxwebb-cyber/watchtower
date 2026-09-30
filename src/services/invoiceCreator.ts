@@ -96,6 +96,14 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<CreateIn
     });
     let stripeCustomerId = client?.stripeCustomerId;
 
+    // Same email = same client, but the name the owner just typed wins (it's
+    // what goes on this invoice). Keep Dunn and the Stripe customer in step.
+    const typedName = input.clientName?.trim();
+    if (client && stripeCustomerId && typedName && typedName !== client.name) {
+      client = await prisma.client.update({ where: { id: client.id }, data: { name: typedName } });
+      await stripe.customers.update(stripeCustomerId, { name: typedName }, { stripeAccount: account.stripeAccountId });
+    }
+
     if (!stripeCustomerId) {
       const customer = await stripe.customers.create(
         {
