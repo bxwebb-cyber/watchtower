@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { soloLimitMessage, monthStart } from './planLimits';
+import { soloLimitMessage, monthStart, clientsUsed } from './planLimits';
 
 const weekly = (email: string, n: number) => Array.from({ length: n }, () => email);
 
@@ -37,5 +37,11 @@ describe('soloLimitMessage', () => {
 describe('monthStart', () => {
   it('is the 1st of the month, UTC', () => {
     expect(monthStart(new Date('2026-09-29T15:00:00Z')).toISOString()).toBe('2026-09-01T00:00:00.000Z');
+  });
+});
+
+describe('clientsUsed', () => {
+  it('counts different clients, not invoices', () => {
+    expect(clientsUsed(['a@x.com', 'A@x.com ', 'b@x.com', null])).toBe(2);
   });
 });

@@ -26,3 +26,8 @@ export function soloLimitMessage(clientEmailsThisMonth: (string | null | undefin
   }
   return null;
 }
+
+// How many different clients have been invoiced this month (for "3 of 5").
+export function clientsUsed(clientEmailsThisMonth: (string | null | undefined)[]): number {
+  return new Set(clientEmailsThisMonth.map(norm).filter(Boolean)).size;
+}

@@ -211,6 +211,20 @@ async function loadDashboard() {
   ]);
   state.invoices = invData.invoices || [];
 
+  // $39 plan: warn at 4 and 5 of 5 clients, before a new client gets blocked.
+  const warn = document.querySelector('[data-plan-warning]');
+  if (warn) {
+    const used = settings.clientsThisMonth, limit = settings.clientLimit;
+    warn.hidden = !(limit && used >= limit - 1);
+    if (!warn.hidden) {
+      warn.replaceChildren(document.createTextNode(used >= limit
+        ? `You've invoiced ${used} of ${limit} clients this month. A new client needs Unlimited. `
+        : `You've invoiced ${used} of ${limit} clients this month. One more new client fits. `));
+      const a = document.createElement('a'); a.href = '/#pricing'; a.textContent = 'See Unlimited'; a.style.textDecoration = 'underline'; a.style.color = 'inherit';
+      warn.append(a);
+    }
+  }
+
   const now = new Date();
   const period = now.getHours() < 12 ? 'morning' : now.getHours() < 17 ? 'afternoon' : 'evening';
   const bizName = settings.businessName || 'there';
@@ -457,7 +471,9 @@ async function loadSettings() {
   const plan = settings.plan || 'solo';
   bind({
     plan_label: plan === 'business' ? 'Unlimited clients' : 'Up to 5 clients',
-    plan_usage: plan === 'business' ? 'No limits' : 'Billed as often as weekly',
+    plan_usage: plan === 'business' ? 'No limits'
+      : settings.clientsThisMonth != null ? `${settings.clientsThisMonth} of ${settings.clientLimit} clients this month · billed as often as weekly`
+      : 'Billed as often as weekly',
   });
 }
 

@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import { getAccount } from '../lib/account';
 import { stripePublicName } from '../lib/stripeName';
 import { parseGraceDays, GRACE_REQUIRED } from '../services/feeRules';
+import { clientsUsed, monthStart, SOLO_CLIENTS_PER_MONTH } from '../services/planLimits';
 
 const prisma = new PrismaClient();
 export const settingsRouter = Router();
@@ -22,7 +23,20 @@ settingsRouter.get('/', async (req, res) => {
     });
   }
 
+  // $39 plan: how many of its 5 clients are used this month (for the warning).
+  let clientsThisMonth: number | null = null;
+  if (account.plan === 'solo') {
+    const invs = await prisma.invoice.findMany({
+      where: { accountId: account.id, createdAt: { gte: monthStart(new Date()) } },
+      select: { client: { select: { email: true } } },
+    });
+    clientsThisMonth = clientsUsed(invs.map((i) => i.client?.email));
+  }
+
   res.json({
+    plan: account.plan ?? null,
+    clientsThisMonth,
+    clientLimit: account.plan === 'solo' ? SOLO_CLIENTS_PER_MONTH : null,
     ownerEmail: settings.ownerEmail ?? account.email,
     alertFeeApproval: settings.alertFeeApproval,
     alertOverdue: settings.alertOverdue,
