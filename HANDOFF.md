@@ -3,6 +3,13 @@ _Last updated: 2026-09-28 (v1.8 — scheduler + one-bill late fees + webhook fix
 
 ---
 
+## ▶ DECISION (9/29/26) — WHAT MAIL DUNN HANDLES
+
+- Dunn only receives mail sent to its own addresses: `reply-<id>@getdunn.org` (client replies) and hello@/support@ (forwarded to `FORWARD_INBOX_TO`). It never reads anyone's inbox.
+- A client reply pauses reminders, is forwarded to the owner (Reply goes straight to the client, `replyTo`), and **the client's text is kept as evidence** (Bashira: keep it, for fee disputes). The owner's answers go from their own email and are not seen by Dunn.
+
+---
+
 ## ▶ v2.6 (9/29/26) — DUNN'S OWN INBOX (hello@getdunn.org → Bashira's Gmail).
 
 - All `@getdunn.org` mail lands in Resend (root MX → Resend inbound), so a normal mailbox provider would fight the client-reply routing. Instead: any `@getdunn.org` address that isn't `reply-<id>@` is forwarded to `FORWARD_INBOX_TO` (Railway variable — Bashira adds it) with **Reply-To = the sender**. Mail from our own domain is never forwarded (no loops). Attachments aren't carried over yet (text/HTML body only).
