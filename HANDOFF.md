@@ -3,6 +3,15 @@ _Last updated: 2026-09-28 (v1.8 — scheduler + one-bill late fees + webhook fix
 
 ---
 
+## ▶ v2.6 (9/29/26) — DUNN'S OWN INBOX (hello@getdunn.org → Bashira's Gmail).
+
+- All `@getdunn.org` mail lands in Resend (root MX → Resend inbound), so a normal mailbox provider would fight the client-reply routing. Instead: any `@getdunn.org` address that isn't `reply-<id>@` is forwarded to `FORWARD_INBOX_TO` (Railway variable — Bashira adds it) with **Reply-To = the sender**. Mail from our own domain is never forwarded (no loops). Attachments aren't carried over yet (text/HTML body only).
+- Resend's built-in `receiving.forward()` wasn't used: it sets no Reply-To, so replying in Gmail would bounce back into Dunn.
+- To send AS hello@getdunn.org from Gmail: Gmail → Settings → Accounts → "Send mail as", SMTP `smtp.resend.com`, port 465 SSL, user `resend`, password = a **sending-only** Resend API key made for this.
+- Live reply test 9/29: Resend received the reply, but it was to a LOCAL test invoice (GVKYOQ2S-0001) that production doesn't have, so production correctly ignored it. Re-test with an invoice created on getdunn.org.
+
+---
+
 ## ▶ v2.5 (9/29/26) — $39 PLAN = UP TO 5 CLIENTS. Committed locally, NOT deployed.
 
 - **Bashira's call:** the $39 plan is **"Up to 5 clients"** (was "10 invoices / month"), billed as often as weekly; $59 is **"Unlimited clients"**. Why: the old cap charged weekly billers (cleaners, tutors, trainers — often one-person, small invoices) for how OFTEN they bill; Dunn can't tell a solo owner from a team, so the cap sorts by clients, not who you are.

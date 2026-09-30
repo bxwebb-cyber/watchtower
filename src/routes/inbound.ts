@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { Resend } from 'resend';
 import { Webhook } from 'svix';
-import { notifyOwner } from '../services/notify';
+import { notifyOwner, mailFrom } from '../services/notify';
 
 const prisma = new PrismaClient();
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
@@ -26,6 +26,42 @@ export function verifyInbound(rawBody: unknown, headers: SvixHeaders, secret: st
     'svix-signature': first(headers['svix-signature']),
   });
   return JSON.parse(payload);
+}
+
+// Mail to any other @getdunn.org address (hello@, support@, billing@ …) is
+// Dunn's own inbox: forward it to FORWARD_INBOX_TO (Bashira's Gmail) with
+// Reply-To set to the sender, so hitting Reply answers them directly. Never
+// forward mail from our own domain — that would loop.
+export function isInboxMail(toAddrs: string[], from: string, sendingDomain: string | undefined): boolean {
+  if (!sendingDomain) return false;
+  const domain = sendingDomain.toLowerCase();
+  if (from.toLowerCase().includes('@' + domain)) return false;
+  const ours = toAddrs.filter((a) => a.toLowerCase().includes('@' + domain));
+  return ours.length > 0 && !ours.some((a) => /(^|[<\s])reply-[a-z0-9]+@/i.test(a));
+}
+
+async function forwardInboxMail(emailId: string, from: string, subject: string, toAddrs: string[]) {
+  const forwardTo = process.env.FORWARD_INBOX_TO;
+  if (!resend || !forwardTo || !emailId) {
+    console.error('[inbound] inbox mail not forwarded (FORWARD_INBOX_TO not set?) from', from);
+    return;
+  }
+  const full = await resend.emails.receiving.get(emailId);
+  if (full.error || !full.data) {
+    console.error('[inbound] could not fetch inbox mail', full.error?.message);
+    return;
+  }
+  const sentTo = toAddrs.join(', ');
+  const sent = await resend.emails.send({
+    from: mailFrom(),
+    to: forwardTo,
+    replyTo: from,
+    subject: subject || '(no subject)',
+    text: `To: ${sentTo}\nFrom: ${from}\n\n${full.data.text ?? ''}`,
+    ...(full.data.html ? { html: `<p style="color:#7C8B88;font-size:12px">To: ${sentTo} · From: ${from.replace(/</g, '&lt;')}</p>${full.data.html}` } : {}),
+  });
+  if (sent.error) console.error('[inbound] inbox forward failed', sent.error.message);
+  else console.log(`[inbound] forwarded inbox mail for ${sentTo}`);
 }
 
 // Resend inbound webhook: a customer replied to a reminder email.
@@ -64,6 +100,11 @@ inboundRouter.post('/', async (req, res) => {
   const toAddrs: string[] = Array.isArray(data.to) ? data.to : [];
   const from: string = data.from ?? '';
   const subject: string = data.subject ?? '';
+
+  if (isInboxMail(toAddrs, from, process.env.SENDING_DOMAIN)) {
+    await forwardInboxMail(data.email_id, from, subject, toAddrs);
+    return res.json({ received: true });
+  }
 
   // Which invoice is this reply for?
   const toLine = toAddrs.join(' ');
