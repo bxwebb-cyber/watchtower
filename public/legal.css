@@ -16,3 +16,24 @@ a:hover { color: #B23A2E; }
 .lg li { margin-bottom: 8px; }
 .lg-foot { padding: 24px 20px 40px; text-align: center; font-size: 13px; color: #7C8B88; border-top: 1px solid rgba(15, 48, 46, .12); }
 .lg-foot a { color: #5D6E6B; }
+
+/* Guides (/guides/*) share this page style. */
+.lg-crumb { margin: 0 0 14px; font-size: 13px; color: #7C8B88; }
+.lg-crumb a { color: #7C8B88; }
+.lg-lede { font-size: 18px; line-height: 1.65; color: #16302E; }
+.lg-answer { margin: 24px 0; padding: 18px 20px; border-radius: 12px; background: #FDFCF8; border: 1px solid rgba(15, 48, 46, .12); }
+.lg-answer strong { color: #0F302E; }
+.lg-template { margin: 14px 0 22px; padding: 16px 18px; border-radius: 12px; background: #FDFCF8; border-left: 3px solid #C07A2C; font-size: 15px; white-space: pre-line; }
+.lg-template b { display: block; margin-bottom: 6px; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: #8A7A55; font-weight: 500; }
+.lg table { width: 100%; border-collapse: collapse; margin: 16px 0 24px; font-size: 14.5px; }
+.lg th, .lg td { text-align: left; vertical-align: top; padding: 10px 8px; border-bottom: 1px solid rgba(15, 48, 46, .12); }
+.lg th { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: #8A7A55; font-weight: 500; }
+.lg-table-wrap { overflow-x: auto; }
+.lg-cta { margin: 40px 0 0; padding: 24px; border-radius: 14px; background: #0F302E; color: #E4E9E4; }
+.lg-cta h2 { margin: 0 0 8px; color: #F3F0E8; }
+.lg-cta p { margin: 0 0 16px; color: #C9D4D0; }
+.lg-cta a.lg-btn { display: inline-block; padding: 12px 22px; border-radius: 10px; background: #F3F0E8; color: #0F302E; font-weight: 600; text-decoration: none; }
+.lg-list { list-style: none; padding: 0; }
+.lg-list li { margin: 0 0 18px; }
+.lg-list a { font-family: 'Playfair Display', Georgia, serif; font-size: 22px; text-decoration: none; }
+.lg-list span { display: block; font-size: 14.5px; color: #5D6E6B; }

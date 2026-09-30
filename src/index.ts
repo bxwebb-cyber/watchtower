@@ -101,6 +101,19 @@ app.get('/privacy', (_req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, '../public/privacy.html'));
 });
 
+// Guides at clean URLs (/guides, /guides/<slug>). Slugs are checked against
+// the files that exist, so no path tricks reach the filesystem.
+const GUIDES_DIR = path.join(__dirname, '../public/guides');
+app.get('/guides', (_req: Request, res: Response) => {
+  res.sendFile(path.join(GUIDES_DIR, 'index.html'));
+});
+app.get('/guides/:slug', (req: Request, res: Response, next) => {
+  const slug = String(req.params.slug);
+  const file = path.join(GUIDES_DIR, slug + '.html');
+  if (!/^[a-z0-9-]+$/.test(slug) || !fs.existsSync(file)) return next();
+  res.sendFile(file);
+});
+
 // First-run onboarding (connect Stripe + set default late-fee terms).
 app.get('/onboarding', (_req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, '../public/onboarding.html'));
