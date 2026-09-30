@@ -148,8 +148,9 @@ inboundRouter.post('/', async (req, res) => {
   await notifyOwner(
     invoice.accountId,
     `Client replied: ${subject || 'Re: your invoice'}`,
-    `${from} replied about invoice ${invoice.stripeInvoiceId}.${bodyPreview}` +
-      `\n\nReminders for this invoice are paused. To respond, reply to this email thread from your inbox.`
+    `${from} replied about invoice ${invoice.stripeNumber ?? invoice.stripeInvoiceId}.${bodyPreview}` +
+      `\n\nReminders for this invoice are paused. Hit Reply to answer them directly.`,
+    from
   );
 
   res.json({ received: true });

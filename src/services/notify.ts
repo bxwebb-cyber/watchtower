@@ -25,7 +25,8 @@ export function replyToFor(invoiceId: string): string {
 }
 
 // Notify the owner about something that happened. Plain-text fallback.
-export async function notifyOwner(accountId: string, subject: string, text: string): Promise<void> {
+// replyTo: where the owner's Reply goes (e.g. the client, on a reply alert).
+export async function notifyOwner(accountId: string, subject: string, text: string, replyTo?: string): Promise<void> {
   const account = await prisma.account.findUnique({ where: { id: accountId } });
   const settings = await prisma.settings.findUnique({ where: { accountId } });
   const to = settings?.ownerEmail || account?.email;
@@ -40,7 +41,7 @@ export async function notifyOwner(accountId: string, subject: string, text: stri
   }
 
   try {
-    await resend.emails.send({ from: mailFrom(), to, subject, text });
+    await resend.emails.send({ from: mailFrom(), to, subject, text, ...(replyTo ? { replyTo } : {}) });
     console.log(`[notify-owner] -> ${to}: ${subject}`);
   } catch (err) {
     console.error('[notify-owner] send failed', (err as Error).message);
