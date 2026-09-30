@@ -94,6 +94,16 @@ function invoiceStatus(inv, now) {
 // ---- Shared: invoices (dashboard + invoices views) ----
 let state = { invoices: [], filter: 'all', query: '' };
 
+// Clicking an invoice opens the whole invoice as the client sees it (Stripe's
+// page: every line, the total, a PDF download). Rows are keyed by number || id.
+document.addEventListener('wt:open-invoice', (e) => {
+  const key = e.detail && e.detail.id;
+  const inv = state.invoices.find(i => (i.stripeNumber || i.id) === key);
+  if (!inv) return;
+  if (inv.hostedInvoiceUrl) window.open(inv.hostedInvoiceUrl, '_blank', 'noopener');
+  else alert("This invoice doesn't have a Stripe page yet.");
+});
+
 function renderInvoices() {
   const now = new Date();
   const list = state.invoices.filter(inv => {
@@ -453,12 +463,12 @@ document.addEventListener('wt:recurring-save', async e => {
   const body = {
     clientName: d.client_name,
     clientEmail: d.client_email,
-    amount: parseFloat(d.amount),
+    amount: parseMoney(d.amount),
     frequency: d.frequency,
     customDay: d.custom_day === 'last' ? 28 : (parseInt(d.custom_day) || undefined),
     startDate: d.next_invoice_date,
     feeKind,
-    feeAmount: feeKind === 'flat' ? (parseFloat(d.fee_flat) || 0) : feeKind === 'percent' ? (parseFloat(d.fee_pct) || 0) : 0,
+    feeAmount: feeKind === 'flat' ? (parseMoney(d.fee_flat) || 0) : feeKind === 'percent' ? (parseFloat(d.fee_pct) || 0) : 0,
   };
   // Only send the grace period when there's a fee — then it's required.
   const grace = graceValue(d.grace_days);
@@ -513,7 +523,7 @@ document.addEventListener('wt:settings-save', async e => {
     alertOverdue: !!d.alert_overdue,
     alertPayment: !!d.alert_paid,
     defaultFeeKind: feeKind,
-    defaultFeeAmount: feeKind === 'flat' ? (parseFloat(d.fee_flat) || 0) : feeKind === 'percent' ? (parseFloat(d.fee_pct) || 0) : 0,
+    defaultFeeAmount: feeKind === 'flat' ? (parseMoney(d.fee_flat) || 0) : feeKind === 'percent' ? (parseFloat(d.fee_pct) || 0) : 0,
     defaultGraceDays: graceValue(d.grace_days),
   };
   if (!body.businessName) { alert('Business name is required. It\'s what your clients see in every email.'); return; }

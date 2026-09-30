@@ -40,6 +40,11 @@
     row.classList.add('is-selected');
     emit('wt:open-invoice', { id: row.dataset.id });
   });
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    const row = e.target.closest('.wt-invoices .wt-table__row[data-id]');
+    if (row) emit('wt:open-invoice', { id: row.dataset.id });
+  });
 
   /* ---------- Fee amount box: keep the confirm button's amount in sync ---------- */
   document.addEventListener('input', (e) => {
@@ -117,7 +122,7 @@
     $$('[data-fee-input]', panel).forEach(el => { el.hidden = el.dataset.feeInput !== type; });
     panel.querySelector('input[name="fee_type"]').value = type;
     const grace = parseInt(panel.querySelector('.wt-fee-panel__grace').value, 10) || 0;
-    const flat = parseFloat(panel.querySelector('[name="fee_flat"]')?.value) || 0;
+    const flat = parseMoney(panel.querySelector('[name="fee_flat"]')?.value) || 0;
     const pct = parseFloat(panel.querySelector('[name="fee_pct"]')?.value) || 0;
     const preview = panel.querySelector('.wt-fee-panel__preview');
     if (!preview) return;

@@ -108,6 +108,7 @@
   <a class="wt-recurring-link" href="/dashboard#recurring">Bill this on a schedule? Make it recurring →</a>
 </div>
 
+<script src="money.js"></script>
 <script>
 let feeKind = 'none';
 
@@ -194,7 +195,7 @@ document.getElementById('client-email').addEventListener('blur', checkReturning)
 document.getElementById('submit-btn').addEventListener('click', async () => {
   const clientName = document.getElementById('client-name').value.trim();
   const clientEmail = document.getElementById('client-email').value.trim();
-  const amount = parseFloat(document.getElementById('amount').value);
+  const amount = parseMoney(document.getElementById('amount').value);
   const dueDate = document.getElementById('due-date').value;
 
   if (!clientName) { showError('Add the client name.'); return; }
@@ -205,7 +206,7 @@ document.getElementById('submit-btn').addEventListener('click', async () => {
   const grace = graceValue();
   if (feeKind !== 'none' && grace === null) { showError(GRACE_REQUIRED); return; }
   const fee = { kind: feeKind, graceDays: grace };
-  if (feeKind === 'flat') fee.amount = parseFloat(document.getElementById('fee-flat').value) || 0;
+  if (feeKind === 'flat') fee.amount = parseMoney(document.getElementById('fee-flat').value) || 0;
   if (feeKind === 'percent') fee.amount = parseFloat(document.getElementById('fee-pct').value) || 0;
 
   const btn = document.getElementById('submit-btn');

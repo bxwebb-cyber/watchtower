@@ -288,6 +288,8 @@ invoicesRouter.get('/', async (req, res) => {
       id: inv.id,
       stripeInvoiceId: inv.stripeInvoiceId,
       stripeNumber: inv.stripeNumber ?? null,
+      // Stripe's page for this invoice — what the client sees, with the PDF.
+      hostedInvoiceUrl: inv.hostedInvoiceUrl ?? null,
       client: inv.client?.name,
       clientEmail: inv.client?.email ?? null,
       amount: `$${(inv.amount / 100).toFixed(2)}`,

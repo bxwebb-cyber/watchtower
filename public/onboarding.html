@@ -144,6 +144,7 @@
   </div>
 </div>
 
+<script src="money.js"></script>
 <script>
 let currentKind = 'none'; // none | flat | percent
 let graceChoice = null;   // null (not chosen yet) | '0' (the day after it's due) | 'days'
@@ -248,7 +249,7 @@ document.getElementById('save-fee').addEventListener('click', async () => {
   const graceDays = graceValue();
   if (currentKind !== 'none' && graceDays === null) { alert('Choose when the late fee applies: the day after it\'s due, or a number of extra days.'); return; }
   const body = { defaultFeeKind: currentKind, defaultGraceDays: graceDays };
-  if (currentKind === 'flat') body.defaultFeeAmount = parseFloat(document.getElementById('flat-amount').value) || 0;
+  if (currentKind === 'flat') body.defaultFeeAmount = parseMoney(document.getElementById('flat-amount').value) || 0;
   else if (currentKind === 'percent') body.defaultFeeAmount = parseFloat(document.getElementById('percent-amount').value) || 0;
   else body.defaultFeeAmount = 0;
   try {
