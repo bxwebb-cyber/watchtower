@@ -3,6 +3,34 @@ _Last updated: 2026-09-28 (v1.8 — scheduler + one-bill late fees + webhook fix
 
 ---
 
+## ▶▶ START HERE — SESSION 9/29–9/30 (night). EVERYTHING BELOW IS LIVE on getdunn.org.
+
+**Done tonight (all deployed, Stripe still TEST mode, scheduler still OFF):**
+- **Client replies work end to end (verified live):** Resend webhook → getdunn.org; `RESEND_WEBHOOK_SECRET` on Railway; fixed signature check (raw bytes) + body fetch (`emails.receiving.get`). Reply pauses reminders, saved as evidence, owner alerted. Alert's Reply goes straight to the client (`replyTo`). Replies cleaned to just the client's words (`src/lib/replyText.ts`: strips HTML + quoted original).
+- **hello@getdunn.org inbox:** any non-`reply-` address forwards to `FORWARD_INBOX_TO` = bmwxcf@gmail.com (set on Railway, verified). Gmail "Send mail as" not set up yet.
+- **Pricing:** yearly added (Solo $390/yr, Unlimited $540/yr, toggle on landing; Railway `STRIPE_PRICE_*_YEARLY` set). **$39 plan = up to 5 clients/month, 10 invoices per client** (`planLimits.ts`); warning at 4 and 5 of 5 on the dashboard + "X of 5" in Settings; blocked recurring invoice emails the owner once.
+- **Landing:** phone layout (`scripts/phone-layout.cjs`, re-run on designer exports), Monthly/Yearly toggle, "Up to 5 clients" copy, **FAQ (7 Qs, FAQPage schema)**, footer: Guides · Terms · Privacy.
+- **Guides (SEO):** `/guides` + 5 pages built by `scripts/guides.cjs` (late fees, reminder templates, client pays late, Dunn vs FreshBooks vs Wave, Net 30). In sitemap.
+- **Legal:** `/terms`, `/privacy` (operator: **Defiance Media LLC**, NY law, contact hello@getdunn.org). Not lawyer-reviewed — get a flat-fee review (SCORE / NYC Bar clinic) before real money.
+- **Dashboard:** click an invoice → Dunn's own invoice box (amount, due, fee, timeline of emails/replies/fee changes, Download PDF, Copy payment link; `GET /invoices/:id`). **Sign out** link (sidebar). "Manage plan" works (`GET /billing/portal`).
+- **Money:** amounts typed with commas parse right (`public/money.js`; "1,500" used to become $1!), boxes format to 1,500.00, and every email/alert/dashboard amount reads $1,500.00 (`src/lib/money.ts`).
+- **Bugs fixed:** Stripe connect used to overwrite the owner's email with `unknown@stripe.com` and, when the strict cookie wasn't sent on Stripe's redirect, invent a stray account (no name/password). Now: signed `state` (15 min) identifies the account, cookie is SameSite=Lax, email never touched, stray account's data moves over. Invoice form says "Connect Stripe first" instead of a raw Stripe error. Typed client name wins over the saved one (same email). `trust proxy` so login rate limits are per visitor.
+- Tests: 108 passing.
+
+**Bashira's account:** signed-up account is connected to Stripe test; owner email = buhshyruh@gmail.com (Settings → Owner email to change). Old stray account (`unknown@stripe.com`, "Your Business") may still exist in the DB, emptied of its Stripe link — harmless.
+
+**LEFT (tomorrow):**
+- Google **Search Console** — Bashira logs in, adds getdunn.org, sends Claude the verification code; submit sitemap.
+- "14 hrs" landing stat is from a mid-sized-firm survey — relabel or replace; add source lines under the stats.
+- `/demo` page on phones (designer bundle, sidebar eats the screen).
+- Review live open invoices (fake test clients like hudsonco.com) → then `SCHEDULER=on`.
+- Gmail "Send mail as" hello@getdunn.org (sending-only Resend API key, smtp.resend.com:465, user `resend`).
+- Revoke the GitHub token embedded in the repo remote URL.
+- Launch: Stripe LIVE (keys, Connect client ID, 4 prices, webhooks) + one real-money test.
+- Later: guides → more pages, reviews/Product Hunt/Reddit for AI findability; route owner replies through Dunn (optional).
+
+---
+
 ## ▶ DECISION (9/29/26) — WHAT MAIL DUNN HANDLES
 
 - Dunn only receives mail sent to its own addresses: `reply-<id>@getdunn.org` (client replies) and hello@/support@ (forwarded to `FORWARD_INBOX_TO`). It never reads anyone's inbox.
@@ -19,7 +47,7 @@ _Last updated: 2026-09-28 (v1.8 — scheduler + one-bill late fees + webhook fix
 
 ---
 
-## ▶ v2.5 (9/29/26) — $39 PLAN = UP TO 5 CLIENTS. Committed locally, NOT deployed.
+## ▶ v2.5 (9/29/26) — $39 PLAN = UP TO 5 CLIENTS. DEPLOYED.
 
 - **Bashira's call:** the $39 plan is **"Up to 5 clients"** (was "10 invoices / month"), billed as often as weekly; $59 is **"Unlimited clients"**. Why: the old cap charged weekly billers (cleaners, tutors, trainers — often one-person, small invoices) for how OFTEN they bill; Dunn can't tell a solo owner from a team, so the cap sorts by clients, not who you are.
 - **Rule (`src/services/planLimits.ts`, 7 tests):** per calendar month, max 5 distinct clients (by email, case-insensitive) and 10 invoices per client (a guardrail nobody should feel — weekly is 4–5). Existing clients can still be invoiced when 5 are in use. Replaces `SOLO_MONTHLY_INVOICE_LIMIT`.
@@ -28,7 +56,7 @@ _Last updated: 2026-09-28 (v1.8 — scheduler + one-bill late fees + webhook fix
 
 ---
 
-## ▶ v2.4 (9/29/26) — YEARLY PRICING. Committed locally, NOT deployed (waiting on 2 Railway variables).
+## ▶ v2.4 (9/29/26) — YEARLY PRICING. DEPLOYED (Railway variables set).
 
 - **Bashira's call:** monthly unchanged ($39 / $59). Yearly: **Solo $390/yr** (2 months free, ~17%), **Unlimited $540/yr** ($45/mo, 24% off). The bigger Unlimited discount nudges people up a plan.
 - **Stripe (test mode):** yearly prices on the same products — `STRIPE_PRICE_SOLO_YEARLY=price_1UL71HRve8cRy3m39KgK3Axn`, `STRIPE_PRICE_BUSINESS_YEARLY=price_1UL71IRve8cRy3m3KHuhiTqI`. In local `.env`; **must be added on Railway by hand before deploying** (Claude's write was blocked). Recreate both in LIVE mode at launch.
@@ -38,7 +66,7 @@ _Last updated: 2026-09-28 (v1.8 — scheduler + one-bill late fees + webhook fix
 
 ---
 
-## ▶ v2.3 (9/29/26) — LANDING PAGE WORKS ON A PHONE. Committed locally, NOT deployed.
+## ▶ v2.3 (9/29/26) — LANDING PAGE WORKS ON A PHONE. DEPLOYED.
 
 - **What was wrong:** `public/landing.html` (designer bundle) had zero phone rules. At 375px the hero buttons were cut off, the 3/4-column sections were squeezed into slivers ("$17,5…"), and the "always late" table was unreadable.
 - **Fix:** `scripts/phone-layout.cjs` tags elements inside the bundle's embedded template (`dm-*` classes, found by a unique piece of their inline style) and adds one `<style id="dunn-phone">` with rules under `@media (max-width: 760px)`. It has to go INSIDE the template: the bundle redraws the whole document from it on load, so outside styles are thrown away.
@@ -48,7 +76,7 @@ _Last updated: 2026-09-28 (v1.8 — scheduler + one-bill late fees + webhook fix
 
 ---
 
-## ▶ v2.2 (9/28/26, night) — CLIENT REPLIES REACH DUNN IN PRODUCTION. DEPLOYED 9/28 (commit d08e154). Waiting on RESEND_WEBHOOK_SECRET on Railway.
+## ▶ v2.2 (9/28/26, night) — CLIENT REPLIES REACH DUNN IN PRODUCTION. DEPLOYED 9/28 (commit d08e154). Secret set 9/29; replies verified end to end.
 
 - **Resend webhook repointed (done 9/28):** the `email.received` webhook now goes to `https://getdunn.org/webhooks/resend/inbound` (was the dead ngrok tunnel from 9/23). Only the URL changed, so its signing secret is the same one as `RESEND_WEBHOOK_SECRET` in the local `.env`.
 - **Bashira does by hand:** put that signing secret on Railway as `RESEND_WEBHOOK_SECRET` (Claude doesn't handle secrets). Until it's set, production answers every reply with 500 "webhook not configured"; Resend retries, so replies in the gap aren't lost right away.
