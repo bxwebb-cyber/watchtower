@@ -16,7 +16,7 @@ async function api(method, path, body) {
   return ct.includes('json') ? res.json() : res.text();
 }
 
-function money(cents) { return '$' + ((cents || 0) / 100).toFixed(2); }
+function money(cents) { return ((cents || 0) / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD' }); }
 
 // The grace period is the owner's choice — never default it. 0 = the late fee
 // applies the day after the due date. Returns null when blank or invalid.
@@ -94,14 +94,60 @@ function invoiceStatus(inv, now) {
 // ---- Shared: invoices (dashboard + invoices views) ----
 let state = { invoices: [], filter: 'all', query: '' };
 
-// Clicking an invoice opens the whole invoice as the client sees it (Stripe's
-// page: every line, the total, a PDF download). Rows are keyed by number || id.
-document.addEventListener('wt:open-invoice', (e) => {
+// Clicking an invoice opens Dunn's own invoice view (a box over the
+// dashboard): the facts, a PDF download, and everything that's happened.
+// Rows are keyed by number || id. Client text goes in via textContent only.
+document.addEventListener('wt:open-invoice', async (e) => {
   const key = e.detail && e.detail.id;
-  const inv = state.invoices.find(i => (i.stripeNumber || i.id) === key);
-  if (!inv) return;
-  if (inv.hostedInvoiceUrl) window.open(inv.hostedInvoiceUrl, '_blank', 'noopener');
-  else alert("This invoice doesn't have a Stripe page yet.");
+  const row = state.invoices.find(i => (i.stripeNumber || i.id) === key);
+  if (!row) return;
+  const modal = document.getElementById('wt-invoice-modal');
+  const $i = (k) => modal.querySelector('[data-inv="' + k + '"]');
+  const put = (k, v) => { $i(k).textContent = v; };
+  put('title', 'Invoice ' + (row.stripeNumber || ''));
+  put('client', 'Loading…'); put('amount', row.amount); put('due', ''); put('sent', ''); put('fee', '');
+  $i('timeline').replaceChildren();
+  $i('pdf').hidden = true; $i('copy').hidden = true;
+  const s = invoiceStatus(row, new Date());
+  $i('status').className = 'wt-pill wt-pill--dot ' + s.pill; put('status', s.label);
+  window.WatchtowerUI.openModal('wt-invoice-modal');
+
+  let d;
+  try { d = await api('GET', '/invoices/' + row.id); }
+  catch (err) { put('client', "Couldn't load this invoice. " + err.message); return; }
+
+  const day = (iso) => new Date(iso.length === 10 ? iso + 'T12:00:00' : iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  put('client', [d.client, d.clientEmail].filter(Boolean).join(' · '));
+  put('amount', money(d.amountCents + (d.feeStatus === 'open' || d.feeStatus === 'paid' ? (d.feeAmountCents || 0) : 0)));
+  put('due', day(d.due));
+  put('sent', day(d.createdAt));
+  const feeState = { pending: ' · waiting for you', open: ' · on the bill', paid: ' · paid', waived: ' · waived' }[d.feeStatus] || '';
+  put('fee', d.fee ? d.fee + feeState : 'None');
+
+  const list = $i('timeline');
+  if (!d.timeline.length) { const li = document.createElement('li'); li.textContent = 'Nothing yet.'; list.append(li); }
+  for (const t of d.timeline) {
+    const li = document.createElement('li');
+    li.dataset.kind = t.kind;
+    li.append(document.createTextNode(t.text));
+    const when = document.createElement('span');
+    when.className = 'wt-inv__when';
+    when.textContent = new Date(t.at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    li.append(when);
+    if (t.body) { const q = document.createElement('p'); q.className = 'wt-inv__quote'; q.textContent = t.body; li.append(q); }
+    list.append(li);
+  }
+
+  if (d.pdfUrl) { $i('pdf').href = d.pdfUrl; $i('pdf').hidden = false; }
+  if (d.hostedInvoiceUrl && d.status === 'open') {
+    const btn = $i('copy');
+    btn.hidden = false;
+    btn.textContent = 'Copy payment link';
+    btn.onclick = async () => {
+      try { await navigator.clipboard.writeText(d.hostedInvoiceUrl); btn.textContent = 'Copied'; }
+      catch { btn.textContent = "Couldn't copy"; }
+    };
+  }
 });
 
 function renderInvoices() {

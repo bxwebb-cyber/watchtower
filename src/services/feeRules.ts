@@ -1,3 +1,4 @@
+import { usd } from '../lib/money';
 // Late-fee amounts. The fee in the invoice terms is a ceiling: the owner can
 // lower it or waive it, never raise it — the client was told that amount in
 // writing, and "never a surprise" is the promise.
@@ -33,7 +34,7 @@ export function checkFeeChange(requestedCents: number, agreedCents: number): str
   if (!Number.isFinite(requestedCents)) return 'Enter the late fee amount.';
   if (requestedCents <= 0) return 'To charge no late fee, waive it instead.';
   if (requestedCents > agreedCents) {
-    return `The late fee can't be more than $${(agreedCents / 100).toFixed(2)}, the amount in the invoice terms.`;
+    return `The late fee can't be more than ${usd(agreedCents)}, the amount in the invoice terms.`;
   }
   return null;
 }

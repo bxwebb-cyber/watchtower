@@ -3,6 +3,7 @@ import Stripe from 'stripe';
 import { sendClientEmail } from './reminderEngine';
 import { monthStart, soloLimitMessage } from './planLimits';
 import { feeWhen } from './feeRules';
+import { usd, usdDollars } from '../lib/money';
 
 const prisma = new PrismaClient();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -192,7 +193,7 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<CreateIn
       });
     }
 
-    const detail = `$${(input.amountCents / 100).toFixed(2)} due ${input.dueDate
+    const detail = `${usd(input.amountCents)} due ${input.dueDate
       .toISOString()
       .slice(0, 10)}${
       fee && fee.kind !== 'none'
@@ -238,7 +239,7 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<CreateIn
         stripeInvoiceId: stripeInvoice.id,
         clientName: input.clientName,
         clientEmail: input.clientEmail,
-        amount: `$${(input.amountCents / 100).toFixed(2)}`,
+        amount: `${usd(input.amountCents)}`,
         dueDate: input.dueDate.toISOString().slice(0, 10),
         fee: fee && fee.kind !== 'none' ? feeLabel(fee) : null,
         hostedInvoiceUrl: finalizedInvoice.hosted_invoice_url ?? null,
@@ -255,5 +256,5 @@ function feeLabel(p: { kind: string; amount?: number; graceDays?: number }): str
   const amount = p.amount ?? 0;
   if (p.kind === 'percent') return `${amount}%`;
   if (amount === 0) return 'no late fee';
-  return `$${amount.toFixed(2)}`;
+  return `${usdDollars(amount)}`;
 }

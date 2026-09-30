@@ -4,6 +4,7 @@ import Stripe from 'stripe';
 import { notifyOwner } from './notify';
 import { isPastFeeDeadline, sendClientEmail } from './reminderEngine';
 import { agreedFeeCents, checkFeeChange } from './feeRules';
+import { usd, usdDollars } from '../lib/money';
 
 const prisma = new PrismaClient();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -383,9 +384,9 @@ async function emailClient(invoiceId: string, step: string, stripeInvoiceId: str
 }
 
 function money(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
+  return `${usd(cents)}`;
 }
 
 function feeLabel(p: { kind: string; amount: number }): string {
-  return p.kind === 'percent' ? `${p.amount}%` : `$${p.amount.toFixed(2)}`;
+  return p.kind === 'percent' ? `${p.amount}%` : `${usdDollars(p.amount)}`;
 }

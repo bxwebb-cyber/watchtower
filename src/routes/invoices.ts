@@ -5,6 +5,8 @@ import { createInvoice, stripeConfigured } from '../services/invoiceCreator';
 import { approveFee, changeBilledFee, waiveFee, FeeActionError } from '../services/feeEngine';
 import { agreedFeeCents, parseGraceDays, GRACE_REQUIRED } from '../services/feeRules';
 import { getAccount } from '../lib/account';
+import { buildTimeline } from '../services/invoiceTimeline';
+import { usd, usdDollars } from '../lib/money';
 
 const prisma = new PrismaClient();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -212,7 +214,7 @@ invoicesRouter.get('/escalations', async (req, res) => {
       return {
         id: inv.id,
         clientName: inv.client?.name ?? 'Unknown',
-        amount: `$${(inv.amount / 100).toFixed(2)}`,
+        amount: `${usd(inv.amount)}`,
         daysLate,
         hasFee: inv.feePolicy != null && inv.feePolicy.kind !== 'none',
       };
@@ -292,7 +294,7 @@ invoicesRouter.get('/', async (req, res) => {
       hostedInvoiceUrl: inv.hostedInvoiceUrl ?? null,
       client: inv.client?.name,
       clientEmail: inv.client?.email ?? null,
-      amount: `$${(inv.amount / 100).toFixed(2)}`,
+      amount: `${usd(inv.amount)}`,
       amountCents: inv.amount,
       due: inv.dueDate.toISOString().slice(0, 10),
       status: inv.status,
@@ -311,6 +313,51 @@ invoicesRouter.get('/', async (req, res) => {
   });
 });
 
+// GET /invoices/:id — one invoice for the owner's invoice view in the
+// dashboard: the facts, a PDF link, and its story (emails, replies, fee).
+invoicesRouter.get('/:id', async (req, res) => {
+  const account = await getAccount(req);
+  if (!account) return res.status(401).json({ error: 'Not authenticated' });
+
+  const inv = await prisma.invoice.findFirst({
+    where: { accountId: account.id, id: String(req.params.id) },
+    include: {
+      client: true,
+      feePolicy: true,
+      reminders: { orderBy: { sentAt: 'asc' } },
+      replies: { orderBy: { createdAt: 'asc' } },
+      auditLog: { orderBy: { createdAt: "asc" } },
+    },
+  });
+  if (!inv) return res.status(404).json({ error: 'Invoice not found.' });
+
+  // The PDF lives in the owner's Stripe; a missing one never blocks the view.
+  let pdfUrl: string | null = null;
+  try {
+    const si = await stripe.invoices.retrieve(inv.stripeInvoiceId, {}, { stripeAccount: account.stripeAccountId });
+    pdfUrl = si.invoice_pdf ?? null;
+  } catch { /* shown without the PDF button */ }
+
+  res.json({
+    id: inv.id,
+    number: inv.stripeNumber ?? null,
+    client: inv.client?.name ?? null,
+    clientEmail: inv.client?.email ?? null,
+    amountCents: inv.amount,
+    due: inv.dueDate.toISOString().slice(0, 10),
+    createdAt: inv.createdAt.toISOString(),
+    status: inv.status,
+    paidAt: inv.paidAt ? inv.paidAt.toISOString() : null,
+    fee: inv.feePolicy && inv.feePolicy.kind !== 'none' ? feeLabel(inv.feePolicy) : null,
+    graceDays: inv.feePolicy?.graceDays ?? null,
+    feeStatus: inv.feeStatus ?? null,
+    feeAmountCents: inv.feeAmountCents ?? null,
+    hostedInvoiceUrl: inv.hostedInvoiceUrl ?? null,
+    pdfUrl,
+    timeline: buildTimeline({ events: inv.auditLog, reminders: inv.reminders, replies: inv.replies }),
+  });
+});
+
 function feeLabel(p: { kind: string; amount: number }): string {
-  return p.kind === 'percent' ? `${p.amount}%` : `$${p.amount.toFixed(2)}`;
+  return p.kind === 'percent' ? `${p.amount}%` : `${usdDollars(p.amount)}`;
 }

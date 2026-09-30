@@ -31,7 +31,13 @@ function validatePassword(password: string): { valid: boolean; error?: string } 
 export function authRouter() {
   const router = Router();
 
-  router.get('/stripe/start', (_req: Request, res: Response) => {
+  router.get('/stripe/start', (req: Request, res: Response) => {
+    // Stripe links to an existing Dunn account. Without one, the callback
+    // would invent an account with no business name and no reachable email.
+    if (!resolveAccountId(req)) {
+      res.redirect('/login?mode=signup');
+      return;
+    }
     const clientId = process.env.STRIPE_CLIENT_ID;
     const redirectUri = process.env.STRIPE_REDIRECT_URI || 'http://localhost:4000/auth/stripe/callback';
     if (!clientId) {
@@ -52,32 +58,44 @@ export function authRouter() {
       const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
       const oauthResp = await stripe.oauth.token({ grant_type: 'authorization_code', code });
       const connectedAccountId = oauthResp.stripe_user_id;
-      const email = oauthResp.email || 'unknown@stripe.com';
 
-      // LINK the Stripe account to whatever account is signed in, so a user
-      // who signed up first (account created with a `pending_` stripeAccountId)
-      // gets their real Stripe id written onto the SAME row — not a second
-      // orphaned account.
+      // LINK the Stripe account to the signed-in Dunn account (created at
+      // signup with a `pending_` stripeAccountId). Only the Stripe id changes:
+      // the owner's email is their sign-in and where alerts go, and Stripe's
+      // (often missing — test accounts return none) must never replace it.
       let accountId: string | null = resolveAccountId(req);
       if (accountId) {
         const existing = await prisma.account.findUnique({ where: { id: accountId } });
         if (!existing) accountId = null;
       }
-
-      if (accountId) {
-        await prisma.account.update({
-          where: { id: accountId },
-          data: { stripeAccountId: connectedAccountId, email },
-        });
-      } else {
-        // Not signed in (direct OAuth): create/link by Stripe account id.
-        const acc = await prisma.account.upsert({
-          where: { stripeAccountId: connectedAccountId },
-          update: { email },
-          create: { stripeAccountId: connectedAccountId, email },
-        });
-        accountId = acc.id;
+      if (!accountId) {
+        res.redirect('/login?mode=signup');
+        return;
       }
+      // This Stripe account may already sit on another Dunn account. If that
+      // one can't be signed into (no password — made by the old connect flow
+      // that invented accounts), it's a stray: move its invoices, clients and
+      // recurring templates here and free the Stripe id. A real account keeps it.
+      const holder = await prisma.account.findUnique({ where: { stripeAccountId: connectedAccountId } });
+      if (holder && holder.id !== accountId) {
+        if (holder.passwordHash) {
+          res.status(409).send('That Stripe account is already connected to another Dunn account. Sign in to that one, or connect a different Stripe account.');
+          return;
+        }
+        const to = accountId;
+        await prisma.$transaction([
+          prisma.account.update({ where: { id: holder.id }, data: { stripeAccountId: 'pending_' + crypto.randomUUID() } }),
+          prisma.client.updateMany({ where: { accountId: holder.id }, data: { accountId: to } }),
+          prisma.feePolicy.updateMany({ where: { accountId: holder.id }, data: { accountId: to } }),
+          prisma.invoice.updateMany({ where: { accountId: holder.id }, data: { accountId: to } }),
+          prisma.invoiceTemplate.updateMany({ where: { accountId: holder.id }, data: { accountId: to } }),
+        ]);
+        console.log(`[auth] moved stray account ${holder.id} (Stripe ${connectedAccountId}) into ${to}`);
+      }
+      await prisma.account.update({
+        where: { id: accountId },
+        data: { stripeAccountId: connectedAccountId },
+      });
 
       setAuthCookie(res, issueToken(accountId!));
 

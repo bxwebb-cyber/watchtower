@@ -21,6 +21,9 @@ import { schedulerEnabled, startScheduler } from './jobs/scheduler';
 import { withJobLock, runSweep } from './jobs/sweep';
 
 const app = express();
+// Railway sits one proxy in front: trust it so rate limits see each visitor's
+// real IP, not the proxy's (otherwise everyone shares one login limit).
+app.set('trust proxy', 1);
 
 // HTTPS redirect must come before EVERYTHING else in production.
 app.use(httpsRedirect);

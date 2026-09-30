@@ -109,7 +109,7 @@ async function loadWidget() {
     const overdue = (invoices.invoices || []).filter(i => i.status === 'open' && new Date(i.due) < now);
     const dueSoon = (invoices.invoices || []).filter(i => i.status === 'open' && new Date(i.due) > now && (now - new Date(i.due)) < 7);
     const paidCount = (invoices.invoices || []).filter(i => i.status === 'paid').length;
-    const overdueTotal = overdue.reduce((sum, i) => sum + parseFloat(i.amount.replace('$','')||'0'), 0);
+    const overdueTotal = overdue.reduce((sum, i) => sum + parseFloat(i.amount.replace(/[$,]/g,'')||'0'), 0);
 
     const collected = reports?.totalCollected ?? reports?.revenue?.totalCollected ?? 0;
     const feeRevenue = reports?.feeRevenue ?? reports?.revenue?.feeRevenue ?? 0;

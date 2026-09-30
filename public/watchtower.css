@@ -473,3 +473,21 @@ input::placeholder { color: var(--wt-faint); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* ---------- Invoice view (wt-invoice-modal) ---------- */
+.wt-inv__top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+.wt-inv__amount { font-family: var(--wt-font-display); font-size: 40px; line-height: 1; color: var(--wt-ink); }
+.wt-inv__facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 0 0 22px; padding: 14px 16px; border-radius: 12px; background: var(--wt-sidebar); }
+.wt-inv__facts dt { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--wt-eyebrow); margin-bottom: 4px; }
+.wt-inv__facts dd { margin: 0; font-size: 14px; color: var(--wt-text-body); }
+.wt-inv__heading { margin: 0 0 10px; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; font-weight: 500; color: var(--wt-eyebrow); }
+.wt-inv__timeline { list-style: none; margin: 0; padding: 0; }
+.wt-inv__timeline li { position: relative; padding: 0 0 14px 20px; font-size: 14px; color: var(--wt-text-body); }
+.wt-inv__timeline li::before { content: ''; position: absolute; left: 0; top: 6px; width: 8px; height: 8px; border-radius: 50%; background: var(--wt-faint); }
+.wt-inv__timeline li[data-kind="reply"]::before { background: var(--wt-amber); }
+.wt-inv__timeline li[data-kind="fee"]::before { background: var(--wt-brick); }
+.wt-inv__timeline li[data-kind="paid"]::before { background: var(--wt-green); }
+.wt-inv__timeline li[data-kind="problem"]::before { background: var(--wt-brick-dark); }
+.wt-inv__when { display: block; font-size: 12px; color: var(--wt-subtle); margin-top: 2px; }
+.wt-inv__quote { margin: 6px 0 0; padding: 10px 12px; border-radius: 10px; background: var(--wt-paper); font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 520px) { .wt-inv__facts { grid-template-columns: 1fr; } .wt-inv__amount { font-size: 34px; } .wt-modal__foot { flex-wrap: wrap; } }

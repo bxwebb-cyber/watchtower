@@ -2,6 +2,7 @@ import { Router } from 'express';
 import Stripe from 'stripe';
 import { PrismaClient } from '@prisma/client';
 import { notifyOwner } from '../services/notify';
+import { usd } from '../lib/money';
 
 const prisma = new PrismaClient();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -197,7 +198,7 @@ async function onInvoicePaid(inv: Stripe.Invoice) {
       ...(paysFee ? { feeStatus: 'paid', feePaidAt: paidAt } : {}),
     },
   });
-  const amount = `$${(inv.amount_paid / 100).toFixed(2)}`;
+  const amount = `${usd(inv.amount_paid)}`;
   const number = invoice.stripeNumber ?? inv.id;
   await prisma.auditEvent.create({
     data: { invoiceId: invoice.id, event: 'invoice_paid', detail: `${amount} ${inv.currency}` },

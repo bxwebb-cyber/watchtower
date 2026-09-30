@@ -4,6 +4,7 @@ import { Resend } from 'resend';
 import { clientMailFrom, replyToFor, notifyOwner, notifyEscalation } from './notify';
 import { renderEmail, EMAIL_TEMPLATES, EmailData } from './emailRenderer';
 import { agreedFeeCents, feeWhen } from './feeRules';
+import { usd, usdDollars } from '../lib/money';
 
 const prisma = new PrismaClient();
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
@@ -155,7 +156,7 @@ export async function runReminderJob(now = new Date()) {
           invoice.id,
           number,
           invoice.client?.name ?? 'Unknown',
-          `$${(invoice.amount / 100).toFixed(2)}`,
+          `${usd(invoice.amount)}`,
           offset,
           process.env.APP_URL ?? 'http://localhost:4000'
         );
@@ -180,7 +181,7 @@ export async function runReminderJob(now = new Date()) {
       await notifyOwner(
         invoice.accountId,
         `Invoice ${number} is past due`,
-        `${invoice.client?.name ?? invoice.client?.email} is ${offset} days late on invoice ${number} for $${(invoice.amount / 100).toFixed(2)}. Watchtower reminded them today (${step.step}). No action needed unless you want to step in.`
+        `${invoice.client?.name ?? invoice.client?.email} is ${offset} days late on invoice ${number} for ${usd(invoice.amount)}. Watchtower reminded them today (${step.step}). No action needed unless you want to step in.`
       );
     }
   }
@@ -262,9 +263,9 @@ function emailDataFor(invoice: EmailInvoice): EmailData {
     ownerFirstName: ownerName ? ownerName.split(/\s+/)[0] : businessName,
     clientFirstName: invoice.client?.name?.split(/\s+/)[0] ?? 'there',
     invoiceId: invoice.stripeNumber || invoice.stripeInvoiceId,
-    amountDue: `$${(invoice.amount / 100).toFixed(2)}`,
-    feeAmount: feeCents > 0 ? `$${(feeCents / 100).toFixed(2)}` : null,
-    balanceDue: `$${((invoice.amount + (feeWaived ? 0 : feeCents)) / 100).toFixed(2)}`,
+    amountDue: `${usd(invoice.amount)}`,
+    feeAmount: feeCents > 0 ? `${usd(feeCents)}` : null,
+    balanceDue: `${usd(invoice.amount + (feeWaived ? 0 : feeCents))}`,
     graceDays,
     dueDateLong: formatDate(due),
     dueWeekday: due.toLocaleDateString('en-US', { weekday: 'long' }),
@@ -280,7 +281,7 @@ function emailDataFor(invoice: EmailInvoice): EmailData {
     hasLateFee,
     feeApplied: invoice.feeApplied,
     feeWaived,
-    termsFeeAmount: termsCents > 0 ? `$${(termsCents / 100).toFixed(2)}` : null,
+    termsFeeAmount: termsCents > 0 ? `${usd(termsCents)}` : null,
     feeWhen: feeWhen(graceDays),
     mascotUrl:
       process.env.MASCOT_URL ??
@@ -316,7 +317,7 @@ function buildFeeClause(invoice: {
   feePolicy: { kind: string; amount: number } | null;
 }): string | undefined {
   if (invoice.feeApplied && invoice.feeAmountCents != null) {
-    return `A late fee of $${(invoice.feeAmountCents / 100).toFixed(2)} has been applied.`;
+    return `A late fee of ${usd(invoice.feeAmountCents)} has been applied.`;
   }
   if (invoice.feePolicy && invoice.feePolicy.kind !== 'none') {
     return `Per the invoice terms, a late fee of ${feePolicyLabel(invoice.feePolicy)} may be added.`;
@@ -376,5 +377,5 @@ export function shouldSkipPreDue(
 }
 
 function feePolicyLabel(p: { kind: string; amount: number }): string {
-  return p.kind === 'percent' ? `${p.amount}%` : `$${p.amount.toFixed(2)}`;
+  return p.kind === 'percent' ? `${p.amount}%` : `${usdDollars(p.amount)}`;
 }

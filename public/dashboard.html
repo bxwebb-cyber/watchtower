@@ -939,6 +939,36 @@
      Edit: change the title to "Edit recurring invoice", the subtitle to "{client} · {frequency_label}",
            unhide [data-edit-only], fill the fields, and set next_invoice_date's data-touched="true" so it isn't recalculated.
      Next-date default: today + interval; recalculates on frequency/day change until the owner edits it by hand. -->
+<!-- Invoice view: opens when an invoice row is clicked. Filled by api.js from GET /invoices/:id. -->
+<div class="wt-modal" id="wt-invoice-modal" role="dialog" aria-modal="true" aria-labelledby="inv-modal-title" hidden>
+  <div class="wt-modal__backdrop" data-close-modal></div>
+  <div class="wt-modal__panel wt-inv">
+    <div class="wt-modal__head">
+      <div>
+        <h2 class="wt-modal__title" id="inv-modal-title" data-inv="title">Invoice</h2>
+        <p class="wt-modal__sub" data-inv="client"></p>
+      </div>
+      <button class="wt-icon-btn" type="button" data-close-modal aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div class="wt-inv__top">
+      <div class="wt-inv__amount" data-inv="amount"></div>
+      <span class="wt-pill wt-pill--dot" data-inv="status"></span>
+    </div>
+    <dl class="wt-inv__facts">
+      <div><dt>Due</dt><dd data-inv="due"></dd></div>
+      <div><dt>Sent</dt><dd data-inv="sent"></dd></div>
+      <div><dt>Late fee</dt><dd data-inv="fee"></dd></div>
+    </dl>
+    <h3 class="wt-inv__heading">What's happened</h3>
+    <ol class="wt-inv__timeline" data-inv="timeline"></ol>
+    <div class="wt-modal__foot">
+      <a class="wt-btn wt-btn--secondary" data-inv="pdf" href="#" download hidden>Download PDF</a>
+      <button class="wt-btn wt-btn--secondary" type="button" data-inv="copy" hidden>Copy payment link</button>
+      <button class="wt-btn wt-btn--primary" type="button" data-close-modal>Done</button>
+    </div>
+  </div>
+</div>
+
 <div class="wt-modal" id="wt-recurring-modal" role="dialog" aria-modal="true" aria-labelledby="rec-modal-title" hidden>
   <div class="wt-modal__backdrop" data-close-modal></div>
   <form class="wt-modal__panel" data-recurring-form novalidate>

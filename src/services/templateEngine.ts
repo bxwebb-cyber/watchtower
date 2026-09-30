@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import { createInvoice, stripeConfigured } from './invoiceCreator';
 import { notifyOwner } from './notify';
+import { usd } from '../lib/money';
 
 const prisma = new PrismaClient();
 
@@ -93,7 +94,7 @@ export async function runTemplateJob(now = new Date()): Promise<number> {
       await notifyOwner(
         tmpl.accountId,
         `Recurring invoice sent to ${tmpl.clientName}`,
-        `A recurring invoice for $${(tmpl.amount / 100).toFixed(2)} was created from your "${tmpl.clientName}" template and sent to ${tmpl.clientEmail}.`
+        `A recurring invoice for ${usd(tmpl.amount)} was created from your "${tmpl.clientName}" template and sent to ${tmpl.clientEmail}.`
       );
 
       created++;
