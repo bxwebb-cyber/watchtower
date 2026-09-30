@@ -93,6 +93,14 @@ app.get('/demo', (_req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, '../public/demo.html'));
 });
 
+// Legal pages at clean URLs.
+app.get('/terms', (_req: Request, res: Response) => {
+  res.sendFile(path.join(__dirname, '../public/terms.html'));
+});
+app.get('/privacy', (_req: Request, res: Response) => {
+  res.sendFile(path.join(__dirname, '../public/privacy.html'));
+});
+
 // First-run onboarding (connect Stripe + set default late-fee terms).
 app.get('/onboarding', (_req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, '../public/onboarding.html'));
