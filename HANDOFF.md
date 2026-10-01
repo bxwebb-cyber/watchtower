@@ -22,7 +22,7 @@ _Last updated: 2026-09-28 (v1.8 — scheduler + one-bill late fees + webhook fix
 **DONE 10/1:** Search Console verified (URL prefix, meta tag in landing.html outer head; property owned by bmwxcf@gmail.com), sitemap submitted (showed "Couldn't fetch" at first — re-submit if it persists). Landing stats: "14 hrs" (mid-sized firms) → "47% of small businesses owed money have invoices 30+ days late", labels tightened, sources linked. Gmail (bmwxcf) can send as hello@getdunn.org via smtp.resend.com. GitHub: remote URL no longer holds a token — pushes use `gh` CLI login (bxwebb-cyber, keyring); old PATs "Hermy Deploy" + "hermy access" deleted (Hermes may need a new token if it pushed anywhere).
 
 **LEFT:**
-- Turn on automatic emails: Railway `SCHEDULER_START` = the day real use starts (jobs skip anything created earlier, so old test invoices are never emailed), then `SCHEDULER=on`. Check boot log: `[scheduler] on` + `only invoices created on/after …`. (`src/jobs/startDate.ts`)
+- ✅ Automatic emails ON (10/1, 14:10): `SCHEDULER=on`, `SCHEDULER_START=2026-10-02`; boot log confirms both. Daily sweep 9:00 ET; invoices created before Oct 2 are never touched.
 - `/demo` phone layout: done 10/1 (`scripts/phone-layout.cjs` now patches landing + demo).
 - Launch: Stripe LIVE (keys, Connect client ID, 4 prices, webhooks) + one real-money test.
 - Later: guides → more pages, reviews/Product Hunt/Reddit for AI findability; route owner replies through Dunn (optional).
