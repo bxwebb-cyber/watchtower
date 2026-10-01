@@ -79,8 +79,8 @@ const DEMO_RULES = [
 const DEMO_CSS = `<style ${MARK}>
   /* Phone layout (scripts/phone-layout.cjs). Desktop never sees these. */
   @media (max-width: 760px) {
-    .dm-shell { grid-template-columns: 1fr !important; }
-    .dm-side { z-index: 30; height: auto !important; flex-direction: row !important; align-items: center; gap: 10px; padding: 8px 12px !important; border-right: none !important; border-bottom: 1px solid rgba(15,48,46,.1); }
+    .dm-shell { grid-template-columns: minmax(0, 1fr) !important; } /* 1fr alone grows to fit the menu */
+    .dm-side { min-width: 0; z-index: 30; height: auto !important; flex-direction: row !important; align-items: center; gap: 10px; padding: 8px 12px !important; border-right: none !important; border-bottom: 1px solid rgba(15,48,46,.1); }
     .dm-logo { padding: 0 !important; flex: none; }
     .dm-logo > div { display: none; }
     .dm-nav { flex-direction: row !important; overflow-x: auto; gap: 4px !important; flex: 1; min-width: 0; scrollbar-width: none; }
