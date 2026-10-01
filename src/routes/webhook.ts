@@ -40,7 +40,7 @@ webhookRouter.post('/', async (req, res) => {
   try {
     switch (event.type) {
       case 'invoice.created':
-        await onInvoiceCreated(event.data.object as Stripe.Invoice);
+        await onInvoiceCreated(event.data.object as Stripe.Invoice, event.account);
         break;
       case 'invoice.finalized':
         await onInvoiceFinalized(event.data.object as Stripe.Invoice);
@@ -87,19 +87,18 @@ webhookRouter.post('/', async (req, res) => {
 
 // ---- handlers ----
 
-async function onInvoiceCreated(inv: Stripe.Invoice) {
+async function onInvoiceCreated(inv: Stripe.Invoice, connectedAccountId?: string) {
   if (inv.metadata?.watchtower === 'true') {
     // An invoice created BY us (e.g. the late-fee invoice) — we don't
     // re-watch our own fee invoices to avoid loops.
     return;
   }
-  // Find the connected account + mirror the invoice into our DB.
-  // Invoices created on connected accounts arrive via webhook with the
-  // connected account id in `account` only when the event is fetched with
-  // the account context. As a robust fallback, we match on the customer's
-  // metadata — but v1 single-account assumption: look up by the first
-  // connected account we know. (Multi-account routing is a later pass.)
-  const account = await prisma.account.findFirst();
+  // Mirror an invoice an owner made directly in their Stripe, onto THAT
+  // owner's Dunn account (event.account = their connected account id).
+  // No connected account = Dunn's own plan billing (a subscription invoice):
+  // never an owner's client invoice. No due date = nothing to chase.
+  if (!connectedAccountId || !inv.due_date) return;
+  const account = await prisma.account.findUnique({ where: { stripeAccountId: connectedAccountId } });
   if (!account || !inv.customer_email) return;
 
   const customerId = inv.customer as string;
@@ -126,7 +125,7 @@ async function onInvoiceCreated(inv: Stripe.Invoice) {
       stripeInvoiceId: inv.id,
       amount: inv.amount_due,
       currency: inv.currency,
-      dueDate: new Date((inv.due_date ?? Date.now()) * 1000),
+      dueDate: new Date(inv.due_date * 1000),
       status: inv.status ?? 'open',
     },
   });
@@ -135,7 +134,7 @@ async function onInvoiceCreated(inv: Stripe.Invoice) {
     data: {
       invoiceId: invoice.id,
       event: 'invoice_created',
-      detail: `${inv.amount_due / 100} ${inv.currency.toUpperCase()} due ${new Date((inv.due_date ?? Date.now()) * 1000).toISOString().slice(0, 10)}`,
+      detail: `${inv.amount_due / 100} ${inv.currency.toUpperCase()} due ${new Date(inv.due_date * 1000).toISOString().slice(0, 10)}`,
     },
   });
 }
@@ -188,6 +187,9 @@ async function onInvoicePaid(inv: Stripe.Invoice) {
   // A fee replacement (metadata.replaces_invoice) is one bill for the original
   // balance + the late fee, so paying it pays the fee too — unless the bill
   // was reissued without the fee (waived: includes_fee = 'false').
+  // Not one of Dunn's invoices (e.g. Dunn's own plan billing): nothing to mark.
+  const existing = await prisma.invoice.findUnique({ where: { stripeInvoiceId: inv.id } });
+  if (!existing) return;
   const paidAt = new Date();
   const paysFee = !!inv.metadata?.replaces_invoice && inv.metadata?.includes_fee !== 'false';
   const invoice = await prisma.invoice.update({
@@ -328,7 +330,7 @@ async function onSubscriptionDeleted(sub: Stripe.Subscription) {
 }
 
 // One source of truth for writing a subscription back to the account row.
-async function syncSubscription(accountId: string, sub: Stripe.Subscription) {
+export async function syncSubscription(accountId: string, sub: Stripe.Subscription) {
   const item = sub.items?.data?.[0];
   const price = item?.price;
   // Map Stripe price id → our plan name via the configured env vars.

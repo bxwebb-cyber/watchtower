@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import Stripe from 'stripe';
 import jwt from 'jsonwebtoken';
+import { syncSubscription } from './webhook';
 
 const prisma = new PrismaClient();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -99,7 +100,9 @@ billingRouter.post('/checkout', async (req, res) => {
       customer_email: account.email,
       client_reference_id: account.id,
       allow_promotion_codes: true,
-      success_url: `${process.env.APP_URL || 'http://localhost:4000'}/dashboard?checkout=success`,
+      // Back through /billing/confirm, which saves the plan straight from
+      // Stripe — so a late or missed webhook can never lose a subscription.
+      success_url: `${process.env.APP_URL || 'http://localhost:4000'}/billing/confirm?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.APP_URL || 'http://localhost:4000'}/dashboard?checkout=cancelled`,
       subscription_data: {
         metadata: { accountId: account.id },
@@ -112,6 +115,23 @@ billingRouter.post('/checkout', async (req, res) => {
     console.error('[billing] checkout failed:', err);
     res.status(500).json({ error: 'Could not start checkout. Is billing configured?' });
   }
+});
+
+// GET /billing/confirm — Stripe sends the owner here after paying. Read the
+// session from Stripe (server-side, so it can't be faked) and save the plan.
+billingRouter.get('/confirm', async (req, res) => {
+  const sessionId = String(req.query.session_id ?? '');
+  try {
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    const accountId = session.client_reference_id;
+    if (session.mode === 'subscription' && session.status === 'complete' && accountId && session.subscription) {
+      const sub = await stripe.subscriptions.retrieve(session.subscription as string);
+      await syncSubscription(accountId, sub);
+    }
+  } catch (err) {
+    console.error('[billing] confirm failed (the webhook will still sync it):', (err as Error).message);
+  }
+  res.redirect('/dashboard?checkout=success');
 });
 
 // GET /billing/portal — the "Manage plan" link: straight to Stripe's billing
