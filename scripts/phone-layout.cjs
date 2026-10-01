@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// Gives the designer's landing page (public/landing.html) a phone layout.
+// Gives the designer's bundles a phone layout: the landing page
+// (public/landing.html) and the demo dashboard (public/demo.html).
 //
 // The file is a bundle: on load it redraws the whole document from a template
 // embedded as JSON in <script type="__bundler/template">, so a stylesheet added
@@ -13,16 +14,15 @@
 // it refuses to write if a rule matches a different number of elements than
 // expected, so a redesign fails loudly instead of tagging the wrong thing.
 //
-// Usage: node scripts/phone-layout.cjs
+// Usage: node scripts/phone-layout.cjs            (both pages)
 
 const fs = require('fs');
 const path = require('path');
 
-const FILE = path.join(__dirname, '../public/landing.html');
 const MARK = 'id="dunn-phone"';
 
 // [match inside a tag's attributes, class to add, how many tags should match]
-const RULES = [
+const LANDING_RULES = [
   ['padding:14px 40px', 'dm-header', 1],
   ['padding:96px 40px 110px', 'dm-hero', 1],
   [/grid-template-columns:(?:1\.08fr \.92fr|1fr 1fr 1fr|repeat\([34],1fr\)|\.85fr 1\.15fr|\.8fr 1\.2fr)/, 'dm-stack', 6],
@@ -40,7 +40,7 @@ const RULES = [
   ['animation:wt-wave', 'dm-still', 1],
 ];
 
-const CSS = `<style ${MARK}>
+const LANDING_CSS = `<style ${MARK}>
   /* Phone layout (scripts/phone-layout.cjs). Desktop never sees these. */
   @media (max-width: 760px) {
     .dm-header { padding: 12px 16px !important; }
@@ -62,48 +62,102 @@ const CSS = `<style ${MARK}>
   }
 </style>`;
 
-const html = fs.readFileSync(FILE, 'utf8');
-const re = /(<script type="__bundler\/template">\s*)([\s\S]*?)(\s*<\/script>)/;
-const found = re.exec(html);
-if (!found) throw new Error('no __bundler/template in landing.html — has the bundle format changed?');
+// The demo dashboard: sidebar → a top bar with a sideways-scrolling menu,
+// wide tables scroll inside their cards, two-column forms stack.
+const DEMO_RULES = [
+  ['grid-template-columns:216px minmax(0,1fr)', 'dm-shell', 1],
+  ['position:sticky; top:0; align-self:start; height:100vh', 'dm-side', 1],
+  ['padding:0 8px 26px', 'dm-logo', 1],
+  [/^nav\b.*display:flex; flex-direction:column; gap:2px/, 'dm-nav', 1],
+  ['margin-top:auto; border-top:1px solid rgba(15,48,46,.1); padding:16px 8px 2px', 'dm-me', 1],
+  ['min-width:0; padding:32px 32px 64px', 'dm-main', 1],
+  [/grid-template-columns:(?:minmax\(0,1\.3fr\) minmax\(110px,1\.2fr\) 64px 72px 84px|minmax\(0,1\.4fr\) minmax\(0,1fr\) minmax\(0,1fr\) 68px 112px|72px minmax\(0,1fr\) 96px 96px 100px)/, 'dm-trow', 6],
+  [/grid-template-columns:(?:1fr 1fr; gap:14px|repeat\(3,1fr\); gap:10px; margin-top:16px|1\.3fr 1fr 1fr)/, 'dm-stack', 7],
+  ['padding:40px 24px; overflow-y:auto', 'dm-modal', 2],
+];
 
-// The bundle escapes "</" so the template can't close its own <script>.
-const encode = (s) => JSON.stringify(s).replace(/<\//g, '<\\u002F');
-let tpl = JSON.parse(found[2]);
-if (encode(tpl) !== found[2]) throw new Error('template does not re-encode byte-for-byte; refusing to rewrite it');
-if (tpl.includes(MARK)) {
-  console.log('landing.html already has the phone layout — nothing to do');
-  process.exit(0);
+const DEMO_CSS = `<style ${MARK}>
+  /* Phone layout (scripts/phone-layout.cjs). Desktop never sees these. */
+  @media (max-width: 760px) {
+    .dm-shell { grid-template-columns: 1fr !important; }
+    .dm-side { z-index: 30; height: auto !important; flex-direction: row !important; align-items: center; gap: 10px; padding: 8px 12px !important; border-right: none !important; border-bottom: 1px solid rgba(15,48,46,.1); }
+    .dm-logo { padding: 0 !important; flex: none; }
+    .dm-logo > div { display: none; }
+    .dm-nav { flex-direction: row !important; overflow-x: auto; gap: 4px !important; flex: 1; min-width: 0; scrollbar-width: none; }
+    .dm-nav::-webkit-scrollbar { display: none; }
+    .dm-nav button { flex: none !important; white-space: nowrap; height: 36px !important; padding: 0 10px !important; }
+    .dm-me { display: none !important; }
+    .dm-main { padding: 16px 16px 48px !important; }
+    .dm-trow { min-width: 600px; }
+    .dm-stack { grid-template-columns: 1fr !important; }
+    .dm-modal { padding: 16px 12px !important; }
+  }
+</style>`;
+
+const TARGETS = [
+  {
+    file: path.join(__dirname, '../public/landing.html'),
+    rules: LANDING_RULES,
+    css: LANDING_CSS,
+    // Only the marketing view: the template also carries an in-page demo that
+    // getdunn.org never shows (See how it works goes to /demo).
+    end: (tpl) => tpl.indexOf('<sc-if value="{{ onApp }}"'),
+    // Right after the designer's own stylesheet (the one with the wt-* keyframes).
+    styleAfter: (part) => part.indexOf('</style>', part.indexOf('@keyframes wt-beam')),
+  },
+  {
+    file: path.join(__dirname, '../public/demo.html'),
+    rules: DEMO_RULES,
+    css: DEMO_CSS,
+    end: (tpl) => tpl.indexOf('class Component'),
+    styleAfter: (part) => part.lastIndexOf('</style>', part.indexOf('grid-template-columns:216px')),
+  },
+];
+
+function apply({ file, rules, css, end, styleAfter }) {
+  const name = path.basename(file);
+  const html = fs.readFileSync(file, 'utf8');
+  const re = /(<script type="__bundler\/template">\s*)([\s\S]*?)(\s*<\/script>)/;
+  const found = re.exec(html);
+  if (!found) throw new Error(`no __bundler/template in ${name} — has the bundle format changed?`);
+
+  // The bundle escapes "</" so the template can't close its own <script>.
+  const encode = (s) => JSON.stringify(s).replace(/<\//g, '<\\u002F');
+  let tpl = JSON.parse(found[2]);
+  if (encode(tpl) !== found[2]) throw new Error(`${name}: template does not re-encode byte-for-byte; refusing to rewrite it`);
+  if (tpl.includes(MARK)) {
+    console.log(`${name} already has the phone layout — nothing to do`);
+    return;
+  }
+
+  const cut = end(tpl);
+  if (cut < 0) throw new Error(`${name}: could not find where the tagged part ends`);
+  let part = tpl.slice(0, cut);
+
+  const counts = new Map(rules.map(([, cls]) => [cls, 0]));
+  part = part.replace(/<([a-zA-Z][\w-]*)(\s[^>]*)?>/g, (tag, tagName, attrs = '') => {
+    const hit = rules.filter(([m]) =>
+      m instanceof RegExp ? m.test(m.source.startsWith('^') ? tagName + attrs : attrs) : attrs.includes(m));
+    if (!hit.length) return tag;
+    const classes = hit.map(([, cls]) => cls);
+    for (const cls of classes) counts.set(cls, counts.get(cls) + 1);
+    const withClass = /\sclass="([^"]*)"/.test(attrs)
+      ? attrs.replace(/\sclass="([^"]*)"/, (_, c) => ` class="${c} ${classes.join(' ')}"`)
+      : ` class="${classes.join(' ')}"${attrs}`;
+    return `<${tagName}${withClass}>`;
+  });
+
+  const wrong = rules.filter(([, cls, n]) => counts.get(cls) !== n)
+    .map(([, cls, n]) => `${cls}: expected ${n}, matched ${counts.get(cls)}`);
+  if (wrong.length) throw new Error(`${name} changed shape — update its rules:\n  ` + wrong.join('\n  '));
+
+  const anchor = styleAfter(part);
+  if (anchor < 0) throw new Error(`${name}: could not find the designer's stylesheet`);
+  part = part.slice(0, anchor + 8) + '\n' + css + part.slice(anchor + 8);
+
+  tpl = part + tpl.slice(cut);
+  fs.writeFileSync(file, html.replace(re, (_, open, _body, close) => open + encode(tpl) + close));
+  console.log(`${name}: phone layout added —`, [...counts].map(([c, n]) => `${c}×${n}`).join(', '));
 }
 
-// Only the marketing view: the template also carries an in-page demo that
-// getdunn.org never shows (See how it works goes to /demo).
-const cut = tpl.indexOf('<sc-if value="{{ onApp }}"');
-if (cut < 0) throw new Error('could not find where the landing view ends');
-let landing = tpl.slice(0, cut);
-
-const counts = new Map(RULES.map(([, cls]) => [cls, 0]));
-landing = landing.replace(/<([a-zA-Z][\w-]*)(\s[^>]*)?>/g, (tag, name, attrs = '') => {
-  const hit = RULES.filter(([m]) =>
-    m instanceof RegExp ? m.test(m.source.startsWith('^') ? name + attrs : attrs) : attrs.includes(m));
-  if (!hit.length) return tag;
-  const classes = hit.map(([, cls]) => cls);
-  for (const cls of classes) counts.set(cls, counts.get(cls) + 1);
-  const withClass = /\sclass="([^"]*)"/.test(attrs)
-    ? attrs.replace(/\sclass="([^"]*)"/, (_, c) => ` class="${c} ${classes.join(' ')}"`)
-    : ` class="${classes.join(' ')}"${attrs}`;
-  return `<${name}${withClass}>`;
-});
-
-const wrong = RULES.filter(([, cls, n]) => counts.get(cls) !== n)
-  .map(([, cls, n]) => `${cls}: expected ${n}, matched ${counts.get(cls)}`);
-if (wrong.length) throw new Error('the landing page changed shape — update RULES:\n  ' + wrong.join('\n  '));
-
-// Right after the designer's own stylesheet (the one with the wt-* keyframes).
-const anchor = landing.indexOf('</style>', landing.indexOf('@keyframes wt-beam'));
-if (anchor < 0) throw new Error("could not find the designer's stylesheet");
-landing = landing.slice(0, anchor + 8) + '\n' + CSS + landing.slice(anchor + 8);
-
-tpl = landing + tpl.slice(cut);
-fs.writeFileSync(FILE, html.replace(re, (_, open, _body, close) => open + encode(tpl) + close));
-console.log('landing.html: phone layout added —', [...counts].map(([c, n]) => `${c}×${n}`).join(', '));
+for (const t of TARGETS) apply(t);

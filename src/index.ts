@@ -18,6 +18,7 @@ import { authMiddleware } from './middleware/auth';
 import { apiLimiter } from './middleware/rateLimit';
 import { httpsRedirect } from './middleware/https';
 import { schedulerEnabled, startScheduler } from './jobs/scheduler';
+import { jobsStartDate } from './jobs/startDate';
 import { withJobLock, runSweep } from './jobs/sweep';
 
 const app = express();
@@ -126,6 +127,8 @@ app.listen(port, () => {
   console.log(`[watchtower] listening on :${port}`);
   if (schedulerEnabled()) {
     startScheduler(() => withJobLock(() => runSweep()));
+    const start = jobsStartDate();
+    console.log(start ? `[scheduler] only invoices created on/after ${start.toISOString().slice(0, 10)} (SCHEDULER_START)` : '[scheduler] all open invoices are eligible (no SCHEDULER_START)');
   } else {
     const why = process.env.SCHEDULER === 'off' ? 'SCHEDULER=off' : 'local dev';
     console.log(`[scheduler] off (${why}) — reminders and fees won't send on their own; run jobs with npm run job:*, or set SCHEDULER=on`);

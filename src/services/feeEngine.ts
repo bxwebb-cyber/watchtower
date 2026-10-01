@@ -5,6 +5,7 @@ import { notifyOwner } from './notify';
 import { isPastFeeDeadline, sendClientEmail } from './reminderEngine';
 import { agreedFeeCents, checkFeeChange } from './feeRules';
 import { usd, usdDollars } from '../lib/money';
+import { createdSinceStart } from '../jobs/startDate';
 
 const prisma = new PrismaClient();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -17,7 +18,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 // owner at invoice creation, so this is enforcement of an agreed-upon term.
 export async function runFeeJob(now = new Date()) {
   const openInvoices = await prisma.invoice.findMany({
-    where: { status: 'open', feeApplied: false, feePolicy: { isNot: null } },
+    where: { status: 'open', feeApplied: false, feePolicy: { isNot: null }, ...createdSinceStart() },
     include: { feePolicy: true, client: true, account: true },
   });
 
