@@ -29,6 +29,8 @@ _Last updated: 2026-09-28 (v1.8 — scheduler + one-bill late fees + webhook fix
 - Launch: Stripe LIVE (keys, Connect client ID, 4 prices, webhooks) + one real-money test.
 - Later: guides → more pages, reviews/Product Hunt/Reddit for AI findability; route owner replies through Dunn (optional).
 
+**FUTURE — Dunn as a ChatGPT app (after launch, Bashira 9/30):** ChatGPT apps run on MCP. Phase 1 (small): free "late-payment helper" — drafts reminder emails, suggests late-fee terms, links to Dunn signup; no login. Phase 2 (bigger): connect a Dunn account (OAuth) → "who owes me?", "send Dana an invoice for $1,500 due Friday with a $25 fee", reuse existing invoice/fee code. Check OpenAI's current app rules + review process first; the "1.2B users / mid-chat recommendations" claim came from a social post, unverified.
+
 ---
 
 ## ▶ DECISION (9/29/26) — WHAT MAIL DUNN HANDLES
