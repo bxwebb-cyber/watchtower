@@ -21,6 +21,15 @@ _Last updated: 2026-09-28 (v1.8 — scheduler + one-bill late fees + webhook fix
 
 **DONE 10/1:** Search Console verified (URL prefix, meta tag in landing.html outer head; property owned by bmwxcf@gmail.com), sitemap submitted (showed "Couldn't fetch" at first — re-submit if it persists). Landing stats: "14 hrs" (mid-sized firms) → "47% of small businesses owed money have invoices 30+ days late", labels tightened, sources linked. Gmail (bmwxcf) can send as hello@getdunn.org via smtp.resend.com. GitHub: remote URL no longer holds a token — pushes use `gh` CLI login (bxwebb-cyber, keyring); old PATs "Hermy Deploy" + "hermy access" deleted (Hermes may need a new token if it pushed anywhere).
 
+**LIVE TEST-MODE CHECKS (before Stripe live):**
+- ✅ #1 Client pays an invoice (10/1): WSCZXZZZ-0001 $50 paid with 4242 → connected-account webhooks verified (invoice.paid etc.), owner alert "Invoice paid — WSCZXZZZ-0001 ($50.00)". Proves `STRIPE_WEBHOOK_SECRET_2`.
+- ⬜ #2 Subscribe to a Dunn plan (test card) → plan shows in Settings.
+- ⬜ #3 Manage plan: Stripe customer portal (must be enabled in Stripe → Settings → Billing → Customer portal), cancel / switch.
+- ⬜ #4 6th client blocked on the $39 plan.
+- ⬜ #5 Recurring invoice sends on its own (needs SCHEDULER_START ≤ creation date).
+- ⬜ #6 Late fee fires automatically (invoice created ≥ Oct 2, short due date).
+- ⬜ #7 Brand-new user: sign up → connect Stripe → first invoice.
+
 **LEFT:**
 - ✅ Automatic emails ON (10/1, 14:10): `SCHEDULER=on`, `SCHEDULER_START=2026-10-02`; boot log confirms both. Daily sweep 9:00 ET; invoices created before Oct 2 are never touched.
 - `/demo` phone layout: done 10/1 (`scripts/phone-layout.cjs` now patches landing + demo).
