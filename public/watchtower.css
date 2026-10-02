@@ -511,3 +511,9 @@ input::placeholder { color: var(--wt-faint); }
 .wt-waivers__notes { grid-column: 1 / -1; margin: 0; font-size: 13px; color: var(--wt-text-body); font-style: italic; }
 .wt-waivers__empty { margin: 0; font-size: 14px; color: var(--wt-subtle); }
 @media (max-width: 640px) { .wt-waivers__months { grid-template-columns: repeat(6, 1fr); } }
+.wt-waivers__opp { display: flex; gap: 18px; align-items: center; margin: 0 0 20px; padding: 16px 18px; border-radius: 12px; background: var(--wt-paper); }
+.wt-waivers__opp-num { flex: none; font-family: var(--wt-font-display); font-size: 34px; line-height: 1; color: var(--wt-brick); }
+.wt-waivers__opp-num small { font-family: Inter, sans-serif; font-size: 13px; color: var(--wt-subtle); }
+.wt-waivers__opp-text { font-size: 14px; color: var(--wt-text-body); }
+.wt-waivers__opp-note { margin-top: 4px; font-size: 12px; color: var(--wt-subtle); }
+@media (max-width: 640px) { .wt-waivers__opp { flex-direction: column; align-items: flex-start; } }

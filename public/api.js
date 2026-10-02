@@ -407,6 +407,17 @@ async function loadWaivers(selectedMonth) {
   const data = await api('GET', '/reports/waivers?months=12').catch(() => null);
   if (!data) return;
   const sel = (data.months || []).find(m => m.month === selectedMonth);
+  const o = data.opportunity;
+  const opp = document.querySelector('[data-waiver-opp]');
+  if (opp) {
+    opp.hidden = !(o && o.perMonthCents > 0);
+    if (!opp.hidden) {
+      const parts = [];
+      if (o.waivedCents) parts.push(money(o.waivedCents) + ' waived');
+      if (o.noFeeCents) parts.push('about ' + money(o.noFeeCents) + ' on ' + o.lateNoFeeCount + ' late ' + (o.lateNoFeeCount === 1 ? 'invoice' : 'invoices') + ' with no fee');
+      bind({ opp_month: money(o.perMonthCents), opp_year: money(o.perYearCents), opp_parts: parts.join(' + ') + (o.monthsSeen < 12 ? ' over ' + o.monthsSeen + (o.monthsSeen === 1 ? ' month' : ' months') : ' this year') });
+    }
+  }
   bind({ fees_waived_count: sel ? (sel.count === 1 ? '1 fee' : sel.count + ' fees') : '0 fees' });
 
   const strip = document.querySelector('[data-waiver-months]');

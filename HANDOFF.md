@@ -34,6 +34,9 @@ _Last updated: 2026-09-28 (v1.8 — scheduler + one-bill late fees + webhook fix
 
 **Reports → "Who you waive fees for" (10/1, the third data view in ~/Desktop/gettdunn-product-notes.md):** `GET /reports/waivers` (`src/services/waivers.ts`, 3 tests) — fees waived per month (dated by the waive, from the audit log) as a 12-month strip, and clients ranked by fees waived with "paid late X of Y" (red at ≥50%), how often a fee came due, and the owner's own waive notes. Never guesses the why. Monthly "Fees waived" line now shows the count.
 
+**Founder emails (10/1):** `notifyFounder` → FOUNDER_EMAIL else FORWARD_INBOX_TO (bmwxcf). Sent on new subscription (plan, monthly/yearly, price) and on cancel (the moment they schedule it, with the end date; no duplicate when it actually ends). NOT on sign-up (Bashira: not needed). **Sign-up requires a plan:** sign-in page links to /#pricing; /login?mode=signup without a plan redirects there.
+**Waived-fee estimate (10/1):** "Who you waive fees for" leads with "Up to about $X a month" = exact waived fees + late invoices that had NO fee, priced at the owner's usual fee rate for that invoice size (<$500, $500–2K, $2K–10K, $10K+; else Settings default; else not estimated), averaged over the months Dunn has seen. Worded as an upper bound, never "money lost". `feeOpportunity` in `src/services/waivers.ts`.
+
 **LEFT:**
 - ✅ Automatic emails ON (10/1, 14:10): `SCHEDULER=on`, `SCHEDULER_START=2026-10-02`; boot log confirms both. Daily sweep 9:00 ET; invoices created before Oct 2 are never touched.
 - `/demo` phone layout: done 10/1 (`scripts/phone-layout.cjs` now patches landing + demo).

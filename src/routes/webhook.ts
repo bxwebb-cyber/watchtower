@@ -320,14 +320,25 @@ async function onCheckoutCompleted(session: Stripe.Checkout.Session) {
 async function onSubscriptionUpdated(sub: Stripe.Subscription) {
   const accountId = sub.metadata?.accountId as string | undefined;
   if (!accountId) return;
+  const before = await prisma.account.findUnique({ where: { id: accountId } });
   await syncSubscription(accountId, sub);
+  // Cancelling in Stripe's portal usually means "at the end of the period":
+  // the plan stays active and only `deleted` arrives later. Tell the founder
+  // the moment they click cancel.
+  if (before && !before.cancelAtPeriodEnd && sub.cancel_at_period_end) {
+    const end = sub.items?.data?.[0]?.current_period_end;
+    await notifyFounder(
+      `Cancelled: ${before.businessName ?? before.email}`,
+      `${before.ownerName ?? ''} (${before.email}) cancelled their Dunn plan.${end ? ` It ends ${new Date(end * 1000).toDateString()}.` : ''}`
+    );
+  }
 }
 
 async function onSubscriptionDeleted(sub: Stripe.Subscription) {
   const accountId = sub.metadata?.accountId as string | undefined;
   if (!accountId) return;
   const acct = await prisma.account.findUnique({ where: { id: accountId } });
-  if (acct) await notifyFounder(`Cancelled: ${acct.businessName ?? acct.email}`, `${acct.ownerName ?? ''} (${acct.email}) cancelled their Dunn plan.`);
+  if (acct && !acct.cancelAtPeriodEnd) await notifyFounder(`Cancelled: ${acct.businessName ?? acct.email}`, `${acct.ownerName ?? ''} (${acct.email}) cancelled their Dunn plan.`);
   await prisma.account.update({
     where: { id: accountId },
     data: {

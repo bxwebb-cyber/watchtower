@@ -37,3 +37,34 @@ describe('waiverReport', () => {
     expect(r.clients[0].waivedCents).toBe(5000);
   });
 });
+
+import { feeOpportunity } from './waivers';
+
+describe('feeOpportunity', () => {
+  const NOW2 = new Date('2026-10-15T12:00:00Z');
+  const base = (o: Partial<WaiverInvoice>) => inv({ createdAt: new Date('2026-08-01'), ...o });
+
+  it('adds waived fees and late no-fee invoices priced at the owner\'s usual rate for that size', () => {
+    const r = feeOpportunity([
+      base({ feeStatus: 'waived', feeAmountCents: 2500, waivedAt: new Date('2026-09-01') }), // $1,000 + $25 flat → 2.5%
+      base({ feeStatus: 'paid', feeAmountCents: 2500 }),
+      base({ feePolicy: null, paidAt: new Date('2026-09-10'), dueDate: new Date('2026-09-01') }), // late, no fee → est. 2.5% of $1,000 = $25
+      base({ feePolicy: null, paidAt: new Date('2026-08-20'), dueDate: new Date('2026-09-01') }), // on time → nothing
+    ], NOW2, null);
+    expect(r).toMatchObject({ waivedCount: 1, waivedCents: 2500, lateNoFeeCount: 1, noFeeCents: 2500, monthsSeen: 3 });
+    expect(r.perMonthCents).toBe(Math.round(5000 / 3));
+    expect(r.perYearCents).toBe(Math.round((5000 / 3) * 12));
+  });
+
+  it('falls back to the default fee when the owner has never charged one', () => {
+    const r = feeOpportunity([
+      base({ feePolicy: null, amount: 200000, paidAt: new Date('2026-09-10'), dueDate: new Date('2026-09-01') }),
+    ], NOW2, { kind: 'percent', amount: 2 });
+    expect(r.noFeeCents).toBe(4000);
+  });
+
+  it('estimates nothing without any basis', () => {
+    const r = feeOpportunity([base({ feePolicy: null, paidAt: new Date('2026-09-10'), dueDate: new Date('2026-09-01') })], NOW2, null);
+    expect(r.noFeeCents).toBe(0);
+  });
+});

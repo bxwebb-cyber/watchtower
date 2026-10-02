@@ -5,7 +5,6 @@ import crypto from 'crypto';
 import { PrismaClient } from '@prisma/client';
 import { authLimiter } from '../middleware/rateLimit';
 import { stripePublicName } from '../lib/stripeName';
-import { notifyFounder } from '../services/notify';
 
 const prisma = new PrismaClient();
 
@@ -201,8 +200,6 @@ export function authRouter() {
         setAuthCookie(res, token);
         res.json({ token, account: { id: account.id, email, businessName, ownerName } });
       }
-      const plan = String(req.body.plan ?? '');
-      notifyFounder(`New sign-up: ${businessName}`, `${ownerName || 'Someone'} (${email}) signed up for Dunn.\nBusiness: ${businessName}${plan ? `\nPicked plan: ${plan === 'business' ? 'Unlimited' : 'Up to 5 clients'} (checkout next)` : '\nNo plan picked yet.'}`);
     } catch (err: any) {
       console.error('Signup error:', err);
       res.status(500).json({ error: 'Something went wrong.' });

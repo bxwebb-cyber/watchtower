@@ -68,3 +68,63 @@ export function waiverReport(invoices: WaiverInvoice[], now: Date, months = 12) 
 
   return { months: [...byMonth.values()], clients: waived };
 }
+
+// "Up to about $X a month" — late fees the owner didn't collect, to put the
+// grace in perspective. An upper bound, never "money lost": some clients would
+// simply pay on time if a fee were coming.
+//   waived: the exact fees the owner waived.
+//   noFee:  invoices paid late that had no late fee at all, priced at what the
+//           owner usually charges on invoices of a similar size (by fee rate),
+//           else their default fee from Settings. No basis → not estimated.
+const SIZE_BUCKETS = [50000, 200000, 1000000]; // <$500, $500–2K, $2K–10K, $10K+
+const bucketOf = (cents: number) => SIZE_BUCKETS.filter((b) => cents >= b).length;
+const median = (xs: number[]) => {
+  const s = [...xs].sort((a, b) => a - b);
+  return s.length ? (s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2) : null;
+};
+
+export function feeOpportunity(
+  invoices: WaiverInvoice[],
+  now: Date,
+  defaultFee: { kind: string; amount: number } | null,
+  months = 12,
+) {
+  const since = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (months - 1), 1));
+  const inWindow = invoices.filter((i) => (i.waivedAt ?? i.paidAt ?? i.createdAt) >= since);
+  const hasFee = (i: WaiverInvoice) => !!i.feePolicy && i.feePolicy.kind !== 'none';
+
+  // The owner's usual fee, as a share of the invoice, overall and per size.
+  const rated = invoices.filter((i) => hasFee(i) && i.amount > 0);
+  const rate = (i: WaiverInvoice) => agreedFeeCents(i.amount, i.feePolicy!) / i.amount;
+  const overall = median(rated.map(rate));
+  const byBucket = new Map<number, number | null>();
+  for (let b = 0; b <= SIZE_BUCKETS.length; b++) byBucket.set(b, median(rated.filter((i) => bucketOf(i.amount) === b).map(rate)));
+
+  const estimate = (i: WaiverInvoice) => {
+    const r = byBucket.get(bucketOf(i.amount)) ?? overall;
+    if (r != null) return Math.round(i.amount * r);
+    if (defaultFee && defaultFee.kind !== 'none') return agreedFeeCents(i.amount, defaultFee);
+    return 0;
+  };
+
+  const waived = inWindow.filter((i) => i.feeStatus === 'waived');
+  const waivedCents = waived.reduce((s, i) => s + (i.feeAmountCents ?? (i.feePolicy ? agreedFeeCents(i.amount, i.feePolicy) : 0)), 0);
+  const lateNoFee = inWindow.filter((i) => !hasFee(i) && i.paidAt && i.paidAt > i.dueDate);
+  const noFeeCents = lateNoFee.reduce((s, i) => s + estimate(i), 0);
+
+  // Average over the months Dunn has actually seen, not a flat 12.
+  const first = invoices.reduce((m, i) => Math.min(m, i.createdAt.getTime()), now.getTime());
+  const monthsSeen = Math.max(1, Math.min(months,
+    (now.getUTCFullYear() - new Date(first).getUTCFullYear()) * 12 + now.getUTCMonth() - new Date(first).getUTCMonth() + 1));
+
+  const totalCents = waivedCents + noFeeCents;
+  return {
+    waivedCount: waived.length,
+    waivedCents,
+    lateNoFeeCount: lateNoFee.length,
+    noFeeCents,
+    monthsSeen,
+    perMonthCents: Math.round(totalCents / monthsSeen),
+    perYearCents: Math.round((totalCents / monthsSeen) * 12),
+  };
+}

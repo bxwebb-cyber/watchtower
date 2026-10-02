@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { getAccount } from '../lib/account';
-import { waiverReport } from '../services/waivers';
+import { waiverReport, feeOpportunity } from '../services/waivers';
 
 const prisma = new PrismaClient();
 
@@ -49,7 +49,9 @@ reportsRouter.get('/waivers', async (req, res) => {
     },
   });
   const rows = invoices.map((i) => ({ ...i, waivedAt: i.auditLog[0]?.createdAt ?? null }));
-  res.json(waiverReport(rows, now, months));
+  const settings = await prisma.settings.findUnique({ where: { accountId: account.id } });
+  const defaultFee = settings?.defaultFeeKind ? { kind: settings.defaultFeeKind, amount: settings.defaultFeeAmount ?? 0 } : null;
+  res.json({ ...waiverReport(rows, now, months), opportunity: feeOpportunity(rows, now, defaultFee, months) });
 });
 
 // ── GET /reports/revenue — monthly report data ──
