@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import Stripe from 'stripe';
 import { PrismaClient } from '@prisma/client';
-import { notifyOwner } from '../services/notify';
+import { notifyFounder, notifyOwner } from '../services/notify';
 import { usd } from '../lib/money';
 
 const prisma = new PrismaClient();
@@ -307,6 +307,13 @@ async function onCheckoutCompleted(session: Stripe.Checkout.Session) {
     'Subscription active',
     'Your Dunn subscription is now active. Dunn is keeping watch.'
   );
+  const price = subscription.items?.data?.[0]?.price;
+  const planName = session.metadata?.plan === 'business' ? 'Unlimited clients' : 'Up to 5 clients';
+  const billed = price?.recurring?.interval === 'year' ? 'yearly' : 'monthly';
+  await notifyFounder(
+    `New subscription: ${account.businessName ?? account.email}`,
+    `${account.ownerName ?? ''} (${account.email}) subscribed.\nBusiness: ${account.businessName ?? '—'}\nPlan: ${planName}, billed ${billed} (${price?.unit_amount != null ? '$' + (price.unit_amount / 100).toFixed(2) : '?'})`
+  );
 }
 
 // Subscription state changed (renewed, past-due, plan changed, etc.).
@@ -319,6 +326,8 @@ async function onSubscriptionUpdated(sub: Stripe.Subscription) {
 async function onSubscriptionDeleted(sub: Stripe.Subscription) {
   const accountId = sub.metadata?.accountId as string | undefined;
   if (!accountId) return;
+  const acct = await prisma.account.findUnique({ where: { id: accountId } });
+  if (acct) await notifyFounder(`Cancelled: ${acct.businessName ?? acct.email}`, `${acct.ownerName ?? ''} (${acct.email}) cancelled their Dunn plan.`);
   await prisma.account.update({
     where: { id: accountId },
     data: {

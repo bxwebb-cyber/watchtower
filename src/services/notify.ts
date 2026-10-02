@@ -99,3 +99,20 @@ export async function notifyEscalation(
     console.error('[notify-escalation] send failed', (err as Error).message);
   }
 }
+// Bashira's own heads-up when someone signs up, subscribes or cancels. Goes
+// to FOUNDER_EMAIL, else the hello@ forward address (FORWARD_INBOX_TO). Never
+// blocks the customer's action if it fails.
+export async function notifyFounder(subject: string, text: string): Promise<void> {
+  const to = process.env.FOUNDER_EMAIL || process.env.FORWARD_INBOX_TO;
+  if (!to) return;
+  if (!resend) {
+    console.log(`[notify-founder] (dry-run) ${subject}`);
+    return;
+  }
+  try {
+    await resend.emails.send({ from: mailFrom(), to, subject: `Dunn: ${subject}`, text });
+    console.log(`[notify-founder] ${subject}`);
+  } catch (err) {
+    console.error('[notify-founder] send failed', (err as Error).message);
+  }
+}
