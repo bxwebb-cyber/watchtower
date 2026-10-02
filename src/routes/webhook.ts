@@ -350,7 +350,7 @@ async function onSubscriptionUpdated(sub: Stripe.Subscription, previous?: Partia
     const describe = (p: Stripe.Price) =>
       `${planNameFor(p.id)}, ${p.recurring?.interval === 'year' ? 'yearly' : 'monthly'} ($${((p.unit_amount ?? 0) / 100).toFixed(2)})`;
     await notifyFounder(
-      `Plan changed: ${before.businessName ?? before.email}`,
+      `Plan changed: ${before.businessName ?? before.email} → ${planNameFor(newPrice.id)}, ${newPrice.recurring?.interval === 'year' ? 'yearly' : 'monthly'}`,
       `${before.ownerName ?? ''} (${before.email}) changed their Dunn plan.\nFrom: ${describe(oldPrice)}\nTo:   ${describe(newPrice)}`
     );
     await notifyOwner(
@@ -368,7 +368,7 @@ async function onSubscriptionUpdated(sub: Stripe.Subscription, previous?: Partia
   if (before && !before.cancelAtPeriodEnd && isEnding(sub)) {
     const end = sub.cancel_at ?? sub.items?.data?.[0]?.current_period_end;
     await notifyFounder(
-      `Cancelled: ${before.businessName ?? before.email}`,
+      `Cancelled: ${before.businessName ?? before.email}${end ? ` (ends ${new Date(end * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})` : ''}`,
       `${before.ownerName ?? ''} (${before.email}) cancelled their Dunn plan.${end ? ` It ends ${new Date(end * 1000).toDateString()}.` : ''}`
     );
     const until = end ? new Date(end * 1000).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'the end of this billing period';

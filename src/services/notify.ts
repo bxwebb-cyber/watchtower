@@ -110,7 +110,10 @@ export async function notifyFounder(subject: string, text: string): Promise<void
     return;
   }
   try {
-    await resend.emails.send({ from: mailFrom(), to, subject: `Dunn: ${subject}`, text });
+    // The time keeps Gmail from stacking a repeat alert (same subject) into an
+    // old thread, where it's easy to miss.
+    const at = new Date().toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' });
+    await resend.emails.send({ from: mailFrom(), to, subject: `Dunn: ${subject} · ${at}`, text });
     console.log(`[notify-founder] ${subject}`);
   } catch (err) {
     console.error('[notify-founder] send failed', (err as Error).message);
