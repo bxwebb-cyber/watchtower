@@ -399,15 +399,8 @@
     </header>
 
     <div class="wt-stack">
-      <!-- FAILURE BANNER: one per ACTIVE template whose last run failed (last_run_ok = false) -->
-      <div class="wt-banner wt-banner--error" role="alert">
-        <span class="wt-banner__dot"></span>
-        <div class="wt-banner__text">
-          <div class="wt-banner__title">Quill &amp; Anchor's invoice couldn't be created on Sep 18, 2026.</div>
-          <div>Stripe account disconnected. It stays active and retries on Oct 2, 2026. We logged it and emailed you at marta@riverastudio.co.</div>
-        </div>
-        <a class="wt-btn wt-btn--secondary wt-btn--sm" href="#settings">Check Stripe connection</a>
-      </div>
+      <!-- FAILURE BANNERS: one per ACTIVE template whose last run failed. Filled by api.js (loadRecurring). -->
+      <div class="wt-stack" data-recurring-failures></div>
 
       <section class="wt-card wt-recurring" aria-labelledby="rec-title">
         <div class="wt-card__head">
@@ -943,7 +936,7 @@
         <h2 class="wt-h2" id="alerts-title">Owner alerts</h2>
         <p class="wt-setting__sub">Where Dunn writes to you. Your clients never see this address.</p>
         <div class="wt-setting__body">
-          <label class="wt-field wt-field--narrow">Owner email<input class="wt-input" type="email" name="owner_email" value="marta@riverastudio.co" required></label>
+          <label class="wt-field wt-field--narrow">Owner email<input class="wt-input" type="email" name="owner_email" value="" required></label>
           <div style="margin-top:18px">
             <label class="wt-toggle-row"><input type="checkbox" name="alert_approve" checked><span class="wt-toggle-row__text"><span class="wt-toggle-row__label">A late fee needs my approval</span><span class="wt-toggle-row__sub">So nothing is charged without you</span></span></label>
             <label class="wt-toggle-row"><input type="checkbox" name="alert_overdue" checked><span class="wt-toggle-row__text"><span class="wt-toggle-row__label">An invoice goes overdue</span><span class="wt-toggle-row__sub">Sent the morning after the due date</span></span></label>

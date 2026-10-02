@@ -313,6 +313,28 @@ async function loadRecurring() {
   const data = await api('GET', '/templates').catch(() => ({ templates: [] }));
   const templates = data.templates || [];
   bind({ recurring_count: templates.length });
+
+  // A banner per active recurring invoice whose last run failed, with the
+  // real reason and retry date. textContent only.
+  const fails = document.querySelector('[data-recurring-failures]');
+  if (fails) {
+    const day = (d) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    fails.replaceChildren(...templates.filter(t => t.active && t.lastRunAt && !t.lastRunOk).map(t => {
+      const box = document.createElement('div'); box.className = 'wt-banner wt-banner--error'; box.setAttribute('role', 'alert');
+      const dot = document.createElement('span'); dot.className = 'wt-banner__dot';
+      const text = document.createElement('div'); text.className = 'wt-banner__text';
+      const title = document.createElement('div'); title.className = 'wt-banner__title';
+      title.textContent = t.clientName + "'s invoice couldn't be created on " + day(t.lastRunAt) + '.';
+      const why = document.createElement('div');
+      why.textContent = (t.lastError || 'Something went wrong.') + ' It stays active and retries ' + (t.nextRunDate ? 'on ' + day(t.nextRunDate) : 'soon') + '.';
+      text.append(title, why);
+      const plan = /plan/i.test(t.lastError || '');
+      const link = document.createElement('a'); link.className = 'wt-btn wt-btn--secondary wt-btn--sm'; link.href = '#settings';
+      link.textContent = plan ? 'See your plan' : 'Check Stripe connection';
+      box.append(dot, text, link);
+      return box;
+    }));
+  }
   renderList('recurring', templates, (t) => {
     const freq = t.frequency === 'monthly' ? 'Monthly' : t.frequency === 'weekly' ? 'Weekly' : t.frequency === 'biweekly' ? 'Every 2 weeks' : ('Monthly, ' + (t.customDay || '') + (t.customDay === 1 ? 'st' : t.customDay === 2 ? 'nd' : t.customDay === 3 ? 'rd' : 'th'));
     const feeLabel = t.feeKind === 'none' ? 'No late fee' : t.feeKind === 'percent' ? (t.feeAmount + '% late fee') : ('$' + t.feeAmount + ' late fee');
