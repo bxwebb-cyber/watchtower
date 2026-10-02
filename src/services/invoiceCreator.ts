@@ -1,7 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import Stripe from 'stripe';
 import { sendClientEmail } from './reminderEngine';
-import { monthStart, soloLimitMessage } from './planLimits';
+import { monthStart, soloLimitMessage, hasActivePlan, planRequired, NO_PLAN_MESSAGE } from './planLimits';
 import { feeWhen } from './feeRules';
 import { usd, usdDollars } from '../lib/money';
 
@@ -48,7 +48,7 @@ export type CreateInvoiceResult =
         stripeNumber: string | null;
       };
     }
-  | { ok: false; code: 'not_configured' | 'no_account' | 'plan_limit' | 'stripe_error'; message: string };
+  | { ok: false; code: 'not_configured' | 'no_account' | 'no_plan' | 'plan_limit' | 'stripe_error'; message: string };
 
 // Solo ($39) limits live in planLimits (5 clients, 10 invoices per client, a
 // month). Business ($59) is unlimited. Un-subscribed accounts (plan null,
@@ -76,6 +76,10 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<CreateIn
       code: 'no_account',
       message: 'Connect your Stripe account first (Settings → Connect Stripe). Dunn creates invoices in your Stripe, so it needs that link.',
     };
+  }
+
+  if (planRequired() && !hasActivePlan(account)) {
+    return { ok: false, code: 'no_plan', message: NO_PLAN_MESSAGE };
   }
 
   // Plan cap: Solo covers 5 clients a month, 10 invoices each. The cap sorts

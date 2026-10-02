@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { soloLimitMessage, monthStart, clientsUsed } from './planLimits';
+import { soloLimitMessage, monthStart, clientsUsed, hasActivePlan, planRequired } from './planLimits';
 
 const weekly = (email: string, n: number) => Array.from({ length: n }, () => email);
 
@@ -43,5 +43,21 @@ describe('monthStart', () => {
 describe('clientsUsed', () => {
   it('counts different clients, not invoices', () => {
     expect(clientsUsed(['a@x.com', 'A@x.com ', 'b@x.com', null])).toBe(2);
+  });
+});
+
+describe('hasActivePlan / planRequired', () => {
+  it('needs a plan and a paying status', () => {
+    expect(hasActivePlan({ plan: null, subscriptionStatus: null })).toBe(false);
+    expect(hasActivePlan({ plan: 'solo', subscriptionStatus: 'active' })).toBe(true);
+    expect(hasActivePlan({ plan: 'solo', subscriptionStatus: 'past_due' })).toBe(true);
+    expect(hasActivePlan({ plan: 'solo', subscriptionStatus: 'canceled' })).toBe(false);
+  });
+  it('is required in production, not in local dev, and can be overridden', () => {
+    expect(planRequired({ NODE_ENV: 'production' })).toBe(true);
+    expect(planRequired({ RAILWAY_ENVIRONMENT_NAME: 'production' })).toBe(true);
+    expect(planRequired({})).toBe(false);
+    expect(planRequired({ REQUIRE_PLAN: 'on' })).toBe(true);
+    expect(planRequired({ NODE_ENV: 'production', REQUIRE_PLAN: 'off' })).toBe(false);
   });
 });

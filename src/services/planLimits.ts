@@ -31,3 +31,18 @@ export function soloLimitMessage(clientEmailsThisMonth: (string | null | undefin
 export function clientsUsed(clientEmailsThisMonth: (string | null | undefined)[]): number {
   return new Set(clientEmailsThisMonth.map(norm).filter(Boolean)).size;
 }
+
+// A plan is required to send invoices (Bashira 10/1: no free use, no trial).
+// past_due still counts: Stripe is retrying the card and the owner keeps
+// working meanwhile. Off in local dev (test accounts have no plan) unless
+// REQUIRE_PLAN=on; on in production, where REQUIRE_PLAN=off can override.
+const PAYING = new Set(['active', 'trialing', 'past_due']);
+export function hasActivePlan(account: { plan: string | null; subscriptionStatus: string | null }): boolean {
+  return !!account.plan && PAYING.has(account.subscriptionStatus ?? '');
+}
+export function planRequired(env: NodeJS.ProcessEnv = process.env): boolean {
+  if (env.REQUIRE_PLAN === 'on') return true;
+  if (env.REQUIRE_PLAN === 'off') return false;
+  return env.NODE_ENV === 'production' || !!env.RAILWAY_ENVIRONMENT_NAME;
+}
+export const NO_PLAN_MESSAGE = 'Choose a plan to start sending invoices: getdunn.org/#pricing';

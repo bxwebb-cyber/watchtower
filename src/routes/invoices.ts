@@ -89,6 +89,7 @@ invoicesRouter.post('/', async (req, res) => {
     const status =
       result.code === 'not_configured' ? 503 :
       result.code === 'no_account' ? 409 :
+      result.code === 'no_plan' ? 402 :
       result.code === 'plan_limit' ? 402 : 502;
     return res.status(status).json({ error: result.message, code: result.code });
   }

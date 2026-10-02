@@ -213,7 +213,12 @@ async function loadDashboard() {
 
   // $39 plan: warn at 4 and 5 of 5 clients, before a new client gets blocked.
   const warn = document.querySelector('[data-plan-warning]');
-  if (warn) {
+  if (warn && settings.needsPlan) {
+    warn.hidden = false;
+    warn.replaceChildren(document.createTextNode('Choose a plan to start sending invoices. '));
+    const a = document.createElement('a'); a.href = '/#pricing'; a.textContent = 'See plans'; a.style.textDecoration = 'underline'; a.style.color = 'inherit';
+    warn.append(a);
+  } else if (warn) {
     const used = settings.clientsThisMonth, limit = settings.clientLimit;
     warn.hidden = !(limit && used >= limit - 1);
     if (!warn.hidden) {

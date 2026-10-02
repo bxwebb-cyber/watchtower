@@ -3,7 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import { getAccount } from '../lib/account';
 import { stripePublicName } from '../lib/stripeName';
 import { parseGraceDays, GRACE_REQUIRED } from '../services/feeRules';
-import { clientsUsed, monthStart, SOLO_CLIENTS_PER_MONTH } from '../services/planLimits';
+import { clientsUsed, monthStart, SOLO_CLIENTS_PER_MONTH, hasActivePlan, planRequired } from '../services/planLimits';
 
 const prisma = new PrismaClient();
 export const settingsRouter = Router();
@@ -35,6 +35,7 @@ settingsRouter.get('/', async (req, res) => {
 
   res.json({
     plan: account.plan ?? null,
+    needsPlan: planRequired() && !hasActivePlan(account),
     clientsThisMonth,
     clientLimit: account.plan === 'solo' ? SOLO_CLIENTS_PER_MONTH : null,
     ownerEmail: settings.ownerEmail ?? account.email,

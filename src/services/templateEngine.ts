@@ -46,7 +46,7 @@ export async function runTemplateJob(now = new Date()): Promise<number> {
         console.error(`[template] failed for ${tmpl.id}: ${result.message}`);
         // Over the plan limit: the client isn't invoiced until the owner acts,
         // so tell them — once, not on every daily retry.
-        if (result.code === 'plan_limit' && tmpl.lastError !== result.message) {
+        if ((result.code === 'plan_limit' || result.code === 'no_plan') && tmpl.lastError !== result.message) {
           await notifyOwner(
             tmpl.accountId,
             `Recurring invoice for ${tmpl.clientName} not sent`,
