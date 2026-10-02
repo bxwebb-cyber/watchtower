@@ -14,6 +14,12 @@ _Last updated: 2026-09-28 (v1.8 — scheduler + one-bill late fees + webhook fix
 4. 9am founder daily summary arrives (first one Oct 2/3).
 **TEST NEXT (can do any time):** failed client payment (card 4000 0000 0000 0002 → owner + founder emails) · no-plan account (buhshyruh) shows "Choose a plan" and can't invoice · waive a fee → Reports "Who you waive fees for" + "up to about $X a month" · dashboard on iPhone · disconnect + reconnect Stripe · Reports → Download CSV.
 
+**RIGHT AFTER GO-LIVE (Bashira 10/2): AI distribution.**
+- Build ONE MCP server at getdunn.org (same Express app), free, no login: draft a reminder email, suggest fair late-fee terms, explain payment terms; every answer ends with "want this done automatically? Try Dunn" → sign-up. Purpose = discovery.
+- List it: ChatGPT apps (verify current rules/review), Claude connectors directory, Hermes Agent (MCP setup steps), Muse (submitted Sept 2026 per ~/Desktop/gettdunn-muse-connector-submission.md; Meta had no SDK/specs — build only when they publish; reuse the same MCP server if Muse speaks MCP).
+- Later: account tools via OAuth ("who owes me?", "invoice Dana $1,500") — never send without the owner's yes.
+- ⚠ Name: Muse submission uses "gettdunn"; site/brand is "Dunn" at getdunn.org. Use one spelling everywhere (recommend "Dunn" + getdunn.org) so AIs learn one name.
+
 **GO-LIVE (Stripe test → live), in order:**
 1. Stripe LIVE mode: create products "Dunn — Up to 5 clients" / "Dunn — Unlimited clients" with 4 prices ($39/mo, $390/yr, $59/mo, $540/yr).
 2. LIVE webhooks to https://getdunn.org/webhooks/stripe — platform endpoint: invoice.*, payment_intent.*, checkout.session.completed, customer.subscription.created/updated/deleted, invoice.voided/marked_uncollectible/deleted; connected-accounts endpoint: invoice.* (incl. voided/marked_uncollectible/deleted), payment_intent.*.
