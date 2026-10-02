@@ -46,6 +46,9 @@ _Last updated: 2026-09-28 (v1.8 — scheduler + one-bill late fees + webhook fix
 
 **Plan lifecycle emails (10/1, all verified live):** customer gets "plan is cancelled (works until …; click Don't cancel subscription to keep it)", "plan will keep going" (un-cancel), "plan is now X" (switch), "plan has ended"; founder gets New subscription / Plan changed / Cancelled / Un-cancelled. Settings shows "Cancelled. Works until …". `src/publicScripts.test.ts` parses every dashboard script + inline page script (an unescaped apostrophe briefly broke the live dashboard 10/1).
 
+**More live checks passed (10/1):** password reset (email link → new password → signed in); $39 plan blocks a 6th client with the upgrade message (second run).
+**Still untested live:** recurring auto-send, 4-day reminder, automatic late fee + approve/lower/waive, 9am summary (all need Oct 2+); yearly payment ($390 actually paid); failed client payment (card 4000 0000 0000 0002) → owner + founder emails; no-plan block on buhshyruh; waived-fee report with real data; dashboard on iPhone; disconnect/reconnect Stripe; Reports CSV.
+
 **LEFT:**
 - ✅ Automatic emails ON (10/1, 14:10): `SCHEDULER=on`, `SCHEDULER_START=2026-10-02`; boot log confirms both. Daily sweep 9:00 ET; invoices created before Oct 2 are never touched.
 - `/demo` phone layout: done 10/1 (`scripts/phone-layout.cjs` now patches landing + demo).
