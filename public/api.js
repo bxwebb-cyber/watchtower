@@ -223,7 +223,7 @@ async function loadDashboard() {
     warn.hidden = !(limit && used >= limit - 1);
     if (!warn.hidden) {
       warn.replaceChildren(document.createTextNode(used >= limit
-        ? `You've invoiced ${used} of ${limit} clients this month. A new client needs Unlimited. `
+        ? `You've invoiced ${used} ${used > limit ? 'clients this month, more than the ' + limit + ' included' : 'of ' + limit + ' clients this month'}. A new client needs Unlimited. `
         : `You've invoiced ${used} of ${limit} clients this month. One more new client fits. `));
       const a = document.createElement('a'); a.href = '/#pricing'; a.textContent = 'See Unlimited'; a.style.textDecoration = 'underline'; a.style.color = 'inherit';
       warn.append(a);
@@ -564,9 +564,12 @@ async function loadSettings() {
   bind({
     plan_label: noPlan ? 'No plan yet. Pick one to start sending invoices.' : plan === 'business' ? 'Unlimited clients' : 'Up to 5 clients',
     plan_usage: noPlan ? '' : settings.planEnding && settings.planPeriodEnd
-      ? 'Cancelled. Works until ' + new Date(settings.planPeriodEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + '. Manage plan → "Don't cancel subscription" to keep it.'
+      ? 'Cancelled. Works until ' + new Date(settings.planPeriodEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + '. Manage plan → "Don\u2019t cancel subscription" to keep it.'
       : plan === 'business' ? 'No limits'
-      : settings.clientsThisMonth != null ? `${settings.clientsThisMonth} of ${settings.clientLimit} clients this month · billed as often as weekly`
+      : settings.clientsThisMonth != null
+        ? (settings.clientsThisMonth > settings.clientLimit
+          ? `${settings.clientsThisMonth} clients this month (over the ${settings.clientLimit} included, so new clients need Unlimited)`
+          : `${settings.clientsThisMonth} of ${settings.clientLimit} clients this month · billed as often as weekly`)
       : 'Billed as often as weekly',
   });
 }
