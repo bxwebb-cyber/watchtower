@@ -564,7 +564,7 @@ async function loadSettings() {
   bind({
     plan_label: noPlan ? 'No plan yet. Pick one to start sending invoices.' : plan === 'business' ? 'Unlimited clients' : 'Up to 5 clients',
     plan_usage: noPlan ? '' : settings.planEnding && settings.planPeriodEnd
-      ? 'Cancelled. Works until ' + new Date(settings.planPeriodEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + '. Manage plan to keep it.'
+      ? 'Cancelled. Works until ' + new Date(settings.planPeriodEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + '. Manage plan → "Don't cancel subscription" to keep it.'
       : plan === 'business' ? 'No limits'
       : settings.clientsThisMonth != null ? `${settings.clientsThisMonth} of ${settings.clientLimit} clients this month · billed as often as weekly`
       : 'Billed as often as weekly',

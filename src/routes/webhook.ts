@@ -369,7 +369,7 @@ async function onSubscriptionUpdated(sub: Stripe.Subscription, previous?: Partia
     await notifyOwner(
       before.id,
       'Your Dunn plan is cancelled',
-      `Your Dunn plan is cancelled. It keeps working until ${until}: reminders, late fees and replies all carry on until then.\n\nChanged your mind? Go to Dunn → Settings → Manage plan and choose "Renew" before ${until}.`
+      `Your Dunn plan is cancelled. It keeps working until ${until}: reminders, late fees and replies all carry on until then.\n\nChanged your mind? Go to Dunn → Settings → Manage plan and click "Don't cancel subscription" before ${until}.`
     );
   }
 }
