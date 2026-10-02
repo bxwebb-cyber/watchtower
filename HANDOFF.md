@@ -24,7 +24,7 @@ _Last updated: 2026-09-28 (v1.8 — scheduler + one-bill late fees + webhook fix
 **LIVE TEST-MODE CHECKS (before Stripe live):**
 - ✅ #1 Client pays an invoice (10/1): WSCZXZZZ-0001 $50 paid with 4242 → connected-account webhooks verified (invoice.paid etc.), owner alert "Invoice paid — WSCZXZZZ-0001 ($50.00)". Proves `STRIPE_WEBHOOK_SECRET_2`.
 - ✅ #2 Subscribe (10/1): checkout → founder email "New subscription: Unlimited, monthly" (after the webhook-events fix).
-- ◐ #3 Manage plan: portal opens (configured via API, test mode). Switch + cancel not yet confirmed — Bashira didn't click the final Confirm; re-test, expect founder "Cancelled" email.
+- ✅ #3 Manage plan (10/1): portal switch Unlimited ↔ Up to 5 → founder "Plan changed"; cancel → founder "Cancelled … ends Nov 1" (fixed: Stripe's newer API schedules cancels via `cancel_at`, not cancel_at_period_end). Settings shows "Cancelled. Works until …".
 - ✅ #4 6th client blocked (10/1): "Your plan covers 5 clients a month, and you've invoiced 5 this month…"
 - ⬜ #5 Recurring invoice sends on its own (needs SCHEDULER_START ≤ creation date).
 - ⬜ #6 Late fee fires automatically (invoice created ≥ Oct 2, short due date).
