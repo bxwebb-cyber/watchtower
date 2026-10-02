@@ -69,8 +69,7 @@
           </span>
           <span class="wt-helper" data-signup-only hidden>At least 12 characters, with an uppercase letter, a lowercase letter and a number.</span>
         </label>
-        <!-- Password reset isn't built yet — the link stays hidden until /login/forgot exists (engineering 9/28). -->
-        <a class="wt-auth__forgot" href="/login/forgot" hidden>Forgot password?</a>
+        <a class="wt-auth__forgot" href="/login/forgot" data-signin-only>Forgot password?</a>
 
         <button class="wt-btn wt-btn--primary" type="submit" data-mode-text="Sign in|Create account">Sign in</button>
         <span class="wt-helper" data-signup-only hidden style="text-align:center">By creating an account you agree to the <a href="/terms" target="_blank">Terms</a> and <a href="/privacy" target="_blank">Privacy Policy</a>.</span>

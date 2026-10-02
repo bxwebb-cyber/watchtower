@@ -68,6 +68,12 @@ app.use('/webhooks/resend/inbound', express.raw({ type: 'application/json' }), i
 app.get('/login', (_req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, '../public/login.html'));
 });
+app.get('/login/forgot', (_req: Request, res: Response) => {
+  res.sendFile(path.join(__dirname, '../public/forgot.html'));
+});
+app.get('/login/reset', (_req: Request, res: Response) => {
+  res.sendFile(path.join(__dirname, '../public/reset.html'));
+});
 
 app.use('/dashboard', (req: Request, res: Response, _next: NextFunction) => {
   const authHeader = req.headers.authorization || '';

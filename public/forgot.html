@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reset your password · Dunn</title>
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+<link rel="stylesheet" href="/watchtower.css">
+</head>
+<body>
+<div class="wt-auth">
+  <aside class="wt-auth__side">
+    <a class="wt-auth__brand" href="/"><img src="/lighthouse-transparent.png" alt="">Dunn</a>
+    <p class="wt-auth__quote">We keep watch, <em>so you don't have to.</em></p>
+    <p class="wt-auth__foot">Reminders, follow-ups and the late fee you agreed on.</p>
+  </aside>
+  <main class="wt-auth__main">
+    <div class="wt-auth__panel">
+      <h1 class="wt-auth__title">Forgot your password?</h1>
+      <p class="wt-auth__sub">Enter your email and we'll send a link to set a new one.</p>
+      <form class="wt-auth__form" data-forgot novalidate>
+        <div class="wt-auth__error" role="alert" hidden></div>
+        <div class="wt-note wt-note--green" data-done hidden></div>
+        <label class="wt-field">Email<input class="wt-input" name="email" type="email" autocomplete="email" required placeholder="you@business.com"></label>
+        <button class="wt-btn wt-btn--primary" type="submit">Send reset link</button>
+      </form>
+      <p class="wt-auth__switch"><a href="/login">Back to sign in</a></p>
+    </div>
+  </main>
+</div>
+<script>
+(function () {
+  var form = document.querySelector('[data-forgot]');
+  var err = form.querySelector('.wt-auth__error'), done = form.querySelector('[data-done]'), btn = form.querySelector('button');
+  form.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    err.hidden = true;
+    var email = form.email.value.trim();
+    if (!email) { err.textContent = 'Enter your email.'; err.hidden = false; return; }
+    btn.disabled = true; btn.textContent = 'Sending…';
+    try {
+      var r = await fetch('/auth/forgot', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email }) });
+      var out = await r.json().catch(function () { return {}; });
+      if (!r.ok) throw new Error(out.error || 'Something went wrong. Try again.');
+      done.textContent = out.message; done.hidden = false;
+      btn.textContent = 'Sent';
+    } catch (x) {
+      err.textContent = x.message || 'Could not reach Dunn. Try again.'; err.hidden = false;
+      btn.disabled = false; btn.textContent = 'Send reset link';
+    }
+  });
+})();
+</script>
+</body>
+</html>

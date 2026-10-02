@@ -5,6 +5,9 @@ import crypto from 'crypto';
 import { PrismaClient } from '@prisma/client';
 import { authLimiter } from '../middleware/rateLimit';
 import { stripePublicName } from '../lib/stripeName';
+import { makeResetToken, checkResetToken, readResetAccount } from '../lib/resetToken';
+import { Resend } from 'resend';
+import { mailFrom } from '../services/notify';
 
 const prisma = new PrismaClient();
 
@@ -204,6 +207,50 @@ export function authRouter() {
       console.error('Signup error:', err);
       res.status(500).json({ error: 'Something went wrong.' });
     }
+  });
+
+  // POST /auth/forgot { email } — email a reset link. Always the same answer,
+  // so this can't be used to find out who has an account.
+  router.post('/forgot', authLimiter, async (req: Request, res: Response) => {
+    const email = String(req.body?.email ?? '').trim().toLowerCase();
+    res.json({ ok: true, message: "If there's a Dunn account for that email, we sent a link to reset the password. It works for 1 hour." });
+    if (!email) return;
+    try {
+      const account = await prisma.account.findFirst({ where: { email: { equals: email, mode: 'insensitive' }, passwordHash: { not: null } } });
+      if (!account?.passwordHash || !process.env.RESEND_API_KEY) return;
+      const link = `${process.env.APP_URL || 'http://localhost:4000'}/login/reset?token=${encodeURIComponent(makeResetToken(account.id, account.passwordHash, jwtSecret))}`;
+      await new Resend(process.env.RESEND_API_KEY).emails.send({
+        from: mailFrom(),
+        to: account.email,
+        subject: 'Reset your Dunn password',
+        text: `Someone asked to reset the password for your Dunn account.\n\nSet a new one here (the link works for 1 hour, once):\n${link}\n\nIf this wasn't you, ignore this email. Your password stays the same.`,
+        html: `<p>Someone asked to reset the password for your Dunn account.</p><p><a href="${link}" style="display:inline-block;padding:12px 20px;border-radius:10px;background:#0F302E;color:#F3F0E8;text-decoration:none;font-weight:600">Set a new password</a></p><p style="color:#5D6E6B;font-size:13px">The link works for 1 hour, once. If this wasn't you, ignore this email. Your password stays the same.</p>`,
+      });
+      console.log('[auth] password reset link sent');
+    } catch (err) {
+      console.error('[auth] forgot failed', (err as Error).message);
+    }
+  });
+
+  // POST /auth/reset { token, password } — set the new password, sign in.
+  router.post('/reset', authLimiter, async (req: Request, res: Response) => {
+    const token = String(req.body?.token ?? '');
+    const password = String(req.body?.password ?? '');
+    const accountId = readResetAccount(token, jwtSecret);
+    const account = accountId ? await prisma.account.findUnique({ where: { id: accountId } }) : null;
+    const valid = account && checkResetToken(token, jwtSecret, () => account.passwordHash);
+    if (!account || !valid) {
+      res.status(400).json({ error: 'This reset link has expired or was already used. Ask for a new one.' });
+      return;
+    }
+    const check = validatePassword(password);
+    if (!check.valid) {
+      res.status(400).json({ error: check.error });
+      return;
+    }
+    await prisma.account.update({ where: { id: account.id }, data: { passwordHash: await bcrypt.hash(password, 12) } });
+    setAuthCookie(res, issueToken(account.id));
+    res.json({ ok: true });
   });
 
   router.post('/login', authLimiter, async (req: Request, res: Response) => {

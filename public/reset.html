@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Set a new password · Dunn</title>
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+<link rel="stylesheet" href="/watchtower.css">
+</head>
+<body>
+<div class="wt-auth">
+  <aside class="wt-auth__side">
+    <a class="wt-auth__brand" href="/"><img src="/lighthouse-transparent.png" alt="">Dunn</a>
+    <p class="wt-auth__quote">We keep watch, <em>so you don't have to.</em></p>
+    <p class="wt-auth__foot">Reminders, follow-ups and the late fee you agreed on.</p>
+  </aside>
+  <main class="wt-auth__main">
+    <div class="wt-auth__panel">
+      <h1 class="wt-auth__title">Set a new password.</h1>
+      <p class="wt-auth__sub">At least 12 characters, with an uppercase letter, a lowercase letter and a number.</p>
+      <form class="wt-auth__form" data-reset novalidate>
+        <div class="wt-auth__error" role="alert" hidden></div>
+        <label class="wt-field">New password<input class="wt-input" name="password" type="password" autocomplete="new-password" required></label>
+        <label class="wt-field">Type it again<input class="wt-input" name="confirm" type="password" autocomplete="new-password" required></label>
+        <button class="wt-btn wt-btn--primary" type="submit">Save and sign in</button>
+      </form>
+      <p class="wt-auth__switch"><a href="/login/forgot">Need a new link?</a></p>
+    </div>
+  </main>
+</div>
+<script>
+(function () {
+  var token = new URLSearchParams(location.search).get('token') || '';
+  // Keep the token out of the address bar (and browser history) once read.
+  history.replaceState(null, '', '/login/reset');
+  var form = document.querySelector('[data-reset]');
+  var err = form.querySelector('.wt-auth__error'), btn = form.querySelector('button');
+  function show(m) { err.textContent = m; err.hidden = false; }
+  if (!token) show('This link is missing its code. Ask for a new one.');
+  form.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    err.hidden = true;
+    var pw = form.password.value;
+    if (pw.length < 12 || !/[A-Z]/.test(pw) || !/[a-z]/.test(pw) || !/[0-9]/.test(pw)) return show('At least 12 characters, with an uppercase letter, a lowercase letter and a number.');
+    if (pw !== form.confirm.value) return show("The two passwords don't match.");
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      var r = await fetch('/auth/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ token: token, password: pw }) });
+      var out = await r.json().catch(function () { return {}; });
+      if (!r.ok) throw new Error(out.error || 'Something went wrong. Try again.');
+      location.href = '/dashboard';
+    } catch (x) {
+      show(x.message); btn.disabled = false; btn.textContent = 'Save and sign in';
+    }
+  });
+})();
+</script>
+</body>
+</html>
