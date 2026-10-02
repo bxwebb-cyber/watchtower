@@ -44,6 +44,8 @@ _Last updated: 2026-09-28 (v1.8 — scheduler + one-bill late fees + webhook fix
 
 **Stripe product names (test, 10/1):** renamed "Watchtower — Up to 10 invoices" / "Watchtower — Unlimited" → "Dunn — Up to 5 clients" / "Dunn — Unlimited clients" (customers see these in checkout, the billing portal and receipts). Use these names when creating LIVE products. Founder also gets "Plan changed" emails (old → new plan, monthly↔yearly).
 
+**Plan lifecycle emails (10/1, all verified live):** customer gets "plan is cancelled (works until …; click Don't cancel subscription to keep it)", "plan will keep going" (un-cancel), "plan is now X" (switch), "plan has ended"; founder gets New subscription / Plan changed / Cancelled / Un-cancelled. Settings shows "Cancelled. Works until …". `src/publicScripts.test.ts` parses every dashboard script + inline page script (an unescaped apostrophe briefly broke the live dashboard 10/1).
+
 **LEFT:**
 - ✅ Automatic emails ON (10/1, 14:10): `SCHEDULER=on`, `SCHEDULER_START=2026-10-02`; boot log confirms both. Daily sweep 9:00 ET; invoices created before Oct 2 are never touched.
 - `/demo` phone layout: done 10/1 (`scripts/phone-layout.cjs` now patches landing + demo).
