@@ -68,7 +68,7 @@ webhookRouter.post('/', async (req, res) => {
         await onCheckoutCompleted(event.data.object as Stripe.Checkout.Session);
         break;
       case 'customer.subscription.updated':
-        await onSubscriptionUpdated(event.data.object as Stripe.Subscription);
+        await onSubscriptionUpdated(event.data.object as Stripe.Subscription, (event.data as { previous_attributes?: Partial<Stripe.Subscription> }).previous_attributes);
         break;
       case 'customer.subscription.deleted':
         await onSubscriptionDeleted(event.data.object as Stripe.Subscription);
@@ -334,7 +334,7 @@ async function onCheckoutCompleted(session: Stripe.Checkout.Session) {
 }
 
 // Subscription state changed (renewed, past-due, plan changed, etc.).
-async function onSubscriptionUpdated(sub: Stripe.Subscription) {
+async function onSubscriptionUpdated(sub: Stripe.Subscription, previous?: Partial<Stripe.Subscription>) {
   const accountId = sub.metadata?.accountId as string | undefined;
   if (!accountId) return;
   const before = await prisma.account.findUnique({ where: { id: accountId } });
@@ -342,6 +342,18 @@ async function onSubscriptionUpdated(sub: Stripe.Subscription) {
   // Cancelling in Stripe's portal usually means "at the end of the period":
   // the plan stays active and only `deleted` arrives later. Tell the founder
   // the moment they click cancel.
+  // Upgrade / downgrade / monthly↔yearly: Stripe lists the old items in
+  // previous_attributes when the price changed.
+  const oldPrice = previous?.items?.data?.[0]?.price;
+  const newPrice = sub.items?.data?.[0]?.price;
+  if (before && oldPrice && newPrice && oldPrice.id !== newPrice.id) {
+    const describe = (p: Stripe.Price) =>
+      `${planNameFor(p.id)}, ${p.recurring?.interval === 'year' ? 'yearly' : 'monthly'} ($${((p.unit_amount ?? 0) / 100).toFixed(2)})`;
+    await notifyFounder(
+      `Plan changed: ${before.businessName ?? before.email}`,
+      `${before.ownerName ?? ''} (${before.email}) changed their Dunn plan.\nFrom: ${describe(oldPrice)}\nTo:   ${describe(newPrice)}`
+    );
+  }
   if (before && !before.cancelAtPeriodEnd && sub.cancel_at_period_end) {
     const end = sub.items?.data?.[0]?.current_period_end;
     await notifyFounder(
@@ -364,6 +376,12 @@ async function onSubscriptionDeleted(sub: Stripe.Subscription) {
       currentPeriodEnd: null,
     },
   });
+}
+
+function planNameFor(priceId: string): string {
+  if ([process.env.STRIPE_PRICE_BUSINESS, process.env.STRIPE_PRICE_BUSINESS_YEARLY].includes(priceId)) return 'Unlimited clients';
+  if ([process.env.STRIPE_PRICE_SOLO, process.env.STRIPE_PRICE_SOLO_YEARLY].includes(priceId)) return 'Up to 5 clients';
+  return 'Unknown plan';
 }
 
 // One source of truth for writing a subscription back to the account row.
