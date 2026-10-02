@@ -4,6 +4,7 @@ import { Resend } from 'resend';
 import { Webhook } from 'svix';
 import { notifyOwner, mailFrom } from '../services/notify';
 import { replyText } from '../lib/replyText';
+import { reportProblem } from '../services/problems';
 
 const prisma = new PrismaClient();
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
@@ -93,6 +94,41 @@ inboundRouter.post('/', async (req, res) => {
   // both the bare shape and a {type, data} wrapper.
   const type = event.type;
   const data = event.data ?? event;
+
+  // A client email bounced (bad address) or was marked as spam: find which
+  // invoice it was for and tell the owner (and the founder) to fix it.
+  if (type === 'email.bounced' || type === 'email.complained') {
+    const reminder = data.email_id
+      ? await prisma.reminder.findFirst({ where: { messageId: data.email_id }, include: { invoice: { include: { client: true } } } })
+      : null;
+    const to = Array.isArray(data.to) ? data.to.join(', ') : String(data.to ?? '');
+    if (reminder) {
+      const inv = reminder.invoice;
+      const number = inv.stripeNumber ?? inv.stripeInvoiceId;
+      const bounced = type === 'email.bounced';
+      await prisma.auditEvent.create({
+        data: { invoiceId: inv.id, event: 'email_failed', detail: `${bounced ? 'bounced' : 'marked as spam'}: ${reminder.subject} → ${to}` },
+      });
+      await reportProblem({
+        kind: bounced ? 'Client email bounced' : 'Client marked email as spam',
+        key: `${type}:${inv.id}`,
+        accountId: inv.accountId,
+        detail: `Invoice ${number}, "${reminder.subject}" → ${to}: ${data.bounce?.message ?? type}`,
+        owner: bounced
+          ? {
+              subject: `Your email to ${inv.client?.name ?? to} bounced`,
+              text: `Dunn's email about invoice ${number} to ${to} bounced, so ${inv.client?.name ?? 'your client'} didn't get it.\n\nThe address may be wrong or the inbox full. Check the address and create the invoice again with the right one, or contact them another way.`,
+            }
+          : {
+              subject: `${inv.client?.name ?? to} marked your email as spam`,
+              text: `${inv.client?.name ?? 'Your client'} (${to}) marked Dunn's email about invoice ${number} as spam. Future emails may not reach them. You may want to contact them directly.`,
+            },
+      });
+    } else {
+      await reportProblem({ kind: 'Email bounced (unknown invoice)', key: `${type}:${data.email_id}`, detail: `${type} → ${to}: ${data.bounce?.message ?? ''}` });
+    }
+    return res.json({ received: true });
+  }
 
   if (type && type !== 'email.received') {
     return res.json({ received: true });

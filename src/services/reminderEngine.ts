@@ -6,6 +6,7 @@ import { renderEmail, EMAIL_TEMPLATES, EmailData } from './emailRenderer';
 import { agreedFeeCents, feeWhen } from './feeRules';
 import { usd, usdDollars } from '../lib/money';
 import { createdSinceStart } from '../jobs/startDate';
+import { reportProblem } from './problems';
 
 const prisma = new PrismaClient();
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
@@ -197,6 +198,12 @@ type EmailInvoice = Invoice & { client: Client | null; account: Account; feePoli
 // the business ("Hudson & Co. via Dunn"), and record it. Dry-run (no
 // RESEND_API_KEY) records without sending. Returns false when nothing went
 // out — no client email, or the send failed (not recorded, so it retries).
+// Plain names for the emails Dunn sends, for problem reports.
+const STEP_LABEL: Record<string, string> = {
+  new_invoice: 'invoice email', 't-4': 'reminder', fee_warning: 'late-fee warning', 't+3': 'past-due notice',
+  't+14': 'final notice', fee_applied: 'late-fee notice', fee_updated: 'late-fee update',
+};
+
 export async function sendClientEmail(
   invoice: EmailInvoice,
   step: string,
@@ -227,6 +234,17 @@ export async function sendClientEmail(
     console.error(`[email] ${step} for invoice ${invoice.id} failed:`, msg.error.message);
     await prisma.auditEvent.create({
       data: { invoiceId: invoice.id, event: 'email_failed', detail: `${step}: ${msg.error.message}` },
+    });
+    const number = invoice.stripeNumber ?? invoice.stripeInvoiceId;
+    await reportProblem({
+      kind: 'Client email not sent',
+      key: `email_failed:${invoice.id}:${step}`,
+      accountId: invoice.accountId,
+      detail: `Invoice ${number}, step ${step}, to ${to}: ${msg.error.message}`,
+      owner: {
+        subject: `An email to ${invoice.client?.name ?? to} couldn't be sent`,
+        text: `Dunn couldn't send the ${STEP_LABEL[step] ?? 'email'} for invoice ${number} to ${to}.\n\nReason: ${msg.error.message}\n\nCheck that the client's email address is right. Dunn keeps watching the invoice and sends its next scheduled email as usual.`,
+      },
     });
     return false;
   }

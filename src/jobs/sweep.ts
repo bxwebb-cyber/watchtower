@@ -2,6 +2,9 @@ import { PrismaClient } from '@prisma/client';
 import { runReminderJob } from '../services/reminderEngine';
 import { runFeeJob } from '../services/feeEngine';
 import { runTemplateJob } from '../services/templateEngine';
+import { reportProblem, takeProblemsForSummary } from '../services/problems';
+import { notifyFounder } from '../services/notify';
+import { easternClock, RUN_HOUR_ET } from './scheduler';
 
 const prisma = new PrismaClient();
 
@@ -27,21 +30,42 @@ export async function withJobLock<T>(fn: () => Promise<T>): Promise<LockOutcome<
 }
 
 // The daily sweep: reminders → fees → templates. Each job still runs if an
-// earlier one failed. Returns true only when all three succeeded.
+// earlier one failed. Returns true only when all three succeeded. A failed
+// step alerts the founder at once; every run ends with the founder's summary.
 export async function runSweep(now = new Date()): Promise<boolean> {
-  const jobs: [string, (now: Date) => Promise<number>][] = [
-    ['reminders', runReminderJob],
-    ['fees', runFeeJob],
-    ['templates', runTemplateJob],
+  const jobs: [string, string, (now: Date) => Promise<number>][] = [
+    ['reminders', 'Reminder emails sent', runReminderJob],
+    ['fees', 'Late fees added', runFeeJob],
+    ['templates', 'Recurring invoices created', runTemplateJob],
   ];
+  const day = now.toISOString().slice(0, 10);
+  const lines: string[] = [];
   let ok = true;
-  for (const [name, job] of jobs) {
+  for (const [name, label, job] of jobs) {
     try {
-      await job(now);
+      lines.push(`${label}: ${await job(now)}`);
     } catch (err) {
       ok = false;
+      lines.push(`${label}: FAILED`);
       console.error(`[job] ${name} failed`, err);
+      await reportProblem({
+        kind: 'Daily run step failed',
+        key: `sweep:${name}:${day}`,
+        detail: `The ${name} step of the ${day} daily run crashed. It retries on the next check (up to 3 times today).\n\n${(err as Error).stack ?? (err as Error).message}`,
+      });
     }
   }
+  // The summary comes from the scheduled 9am run. A catch-up run after a
+  // deploy stays quiet unless something went wrong.
+  const scheduledHour = easternClock(now).hour === RUN_HOUR_ET;
+  const problems = scheduledHour || !ok ? takeProblemsForSummary() : [];
+  if (!scheduledHour && ok && !problems.length) return ok;
+  await notifyFounder(
+    `Daily run ${day}: ${ok ? 'all good' : 'something failed'}${problems.length ? `, ${problems.length} issue${problems.length === 1 ? '' : 's'}` : ''}`,
+    `${ok ? 'Every step ran.' : 'At least one step failed (you were emailed about it).'}\n\n${lines.join('\n')}\n\n` +
+      (problems.length
+        ? `Issues since the last summary (each was emailed when it happened):\n${problems.map((p) => `- ${p.kind} — ${p.who}: ${p.detail.split('\n')[0]}`).join('\n')}`
+        : 'No issues since the last summary.')
+  );
   return ok;
 }

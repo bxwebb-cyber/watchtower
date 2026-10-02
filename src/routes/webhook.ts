@@ -3,6 +3,7 @@ import Stripe from 'stripe';
 import { PrismaClient } from '@prisma/client';
 import { notifyFounder, notifyOwner } from '../services/notify';
 import { usd } from '../lib/money';
+import { reportProblem } from '../services/problems';
 
 const prisma = new PrismaClient();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -79,6 +80,11 @@ webhookRouter.post('/', async (req, res) => {
     res.json({ received: true });
   } catch (err) {
     console.error('[webhook] handler failed', err);
+    await reportProblem({
+      kind: 'Stripe update not processed',
+      key: `webhook:${event.type}:${(err as Error).message}`,
+      detail: `${event.type} (${event.id}): ${(err as Error).stack ?? (err as Error).message}`,
+    });
     // Still 200 so Stripe doesn't retry forever on our bugs;
     // we log and can replay from the audit trail.
     res.json({ received: true, error: (err as Error).message });
@@ -220,6 +226,17 @@ async function onInvoicePaymentFailed(inv: Stripe.Invoice) {
   if (!invoice) return;
   await prisma.auditEvent.create({
     data: { invoiceId: invoice.id, event: 'payment_failed', detail: 'auto-charge failed; reminder schedule continues' },
+  });
+  const number = invoice.stripeNumber ?? invoice.stripeInvoiceId;
+  await reportProblem({
+    kind: 'Client payment failed',
+    key: `payment_failed:${inv.id}`,
+    accountId: invoice.accountId,
+    detail: `Invoice ${number}: ${inv.last_finalization_error?.message ?? 'payment attempt failed'}`,
+    owner: {
+      subject: `A payment on invoice ${number} failed`,
+      text: `Your client tried to pay invoice ${number}, but the payment didn't go through (for example, a declined card).\n\nThe invoice is still open and Dunn keeps the reminders going. You may want to let your client know.`,
+    },
   });
 }
 

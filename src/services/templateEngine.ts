@@ -3,6 +3,7 @@ import { createInvoice, stripeConfigured } from './invoiceCreator';
 import { notifyOwner } from './notify';
 import { usd } from '../lib/money';
 import { createdSinceStart } from '../jobs/startDate';
+import { reportProblem } from './problems';
 
 const prisma = new PrismaClient();
 
@@ -44,14 +45,24 @@ export async function runTemplateJob(now = new Date()): Promise<number> {
 
       if (!result.ok) {
         console.error(`[template] failed for ${tmpl.id}: ${result.message}`);
-        // Over the plan limit: the client isn't invoiced until the owner acts,
-        // so tell them — once, not on every daily retry.
-        if ((result.code === 'plan_limit' || result.code === 'no_plan') && tmpl.lastError !== result.message) {
+        // The client isn't invoiced until this is fixed, so tell the owner
+        // (once per new reason, not on every daily retry) and the founder.
+        await reportProblem({
+          kind: 'Recurring invoice not created',
+          key: `template:${tmpl.id}:${result.code}`,
+          accountId: tmpl.accountId,
+          detail: `${tmpl.clientName} <${tmpl.clientEmail}>: ${result.code} — ${result.message}`,
+        });
+        if (tmpl.lastError !== result.message) {
           await notifyOwner(
             tmpl.accountId,
             `Recurring invoice for ${tmpl.clientName} not sent`,
-            `Dunn didn't send ${tmpl.clientName}'s recurring invoice. ${result.message}` +
-              `\n\nUpgrade in Settings and Dunn sends it on the next daily run. Otherwise it goes out when your plan resets on the 1st.`
+            `Dunn didn't send ${tmpl.clientName}'s recurring invoice. ${result.message}\n\n` +
+              (result.code === 'plan_limit'
+                ? 'Upgrade in Settings and Dunn sends it on the next daily run. Otherwise it goes out when your plan resets on the 1st.'
+                : result.code === 'no_plan'
+                  ? 'Pick a plan in Settings and Dunn sends it on the next daily run.'
+                  : 'Check that your Stripe account is still connected (Dunn → Settings). Dunn tries again every day until it goes through.')
           );
         }
         await prisma.invoiceTemplate.update({
@@ -104,6 +115,12 @@ export async function runTemplateJob(now = new Date()): Promise<number> {
       await prisma.invoiceTemplate.update({
         where: { id: tmpl.id },
         data: { lastRunAt: now, lastRunOk: false, lastError: (err as Error).message },
+      });
+      await reportProblem({
+        kind: 'Recurring invoice crashed',
+        key: `template:${tmpl.id}:crash`,
+        accountId: tmpl.accountId,
+        detail: `${tmpl.clientName} <${tmpl.clientEmail}>: ${(err as Error).stack ?? (err as Error).message}`,
       });
       await notifyOwner(
         tmpl.accountId,

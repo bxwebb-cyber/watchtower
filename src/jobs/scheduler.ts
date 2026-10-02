@@ -7,6 +7,7 @@
 // nothing new to do. At 9am ET the server's UTC date matches the New York
 // date, so the jobs' "today" math lands on the right calendar day.
 import type { LockOutcome } from './sweep';
+import { reportProblem } from '../services/problems';
 
 export const RUN_HOUR_ET = 9;
 const TICK_MS = 15 * 60_000;
@@ -68,6 +69,11 @@ export function startScheduler(sweep: () => Promise<LockOutcome<boolean>>): void
       if (failures >= MAX_ATTEMPTS_PER_DAY) {
         lastRunDay = day;
         console.error(`[scheduler] sweep failed ${failures}x on ${day} — giving up until tomorrow`, err);
+        void reportProblem({
+          kind: 'Daily run gave up',
+          key: `sweep-gave-up:${day}`,
+          detail: `The daily run failed ${failures} times on ${day} and stops until tomorrow. Reminders, late fees and recurring invoices for today did not all go out.\n\n${(err as Error).stack ?? (err as Error).message}`,
+        });
       } else {
         console.error(`[scheduler] sweep failed on ${day} — retrying next tick`, err);
       }

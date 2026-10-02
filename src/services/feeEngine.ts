@@ -6,6 +6,7 @@ import { isPastFeeDeadline, sendClientEmail } from './reminderEngine';
 import { agreedFeeCents, checkFeeChange } from './feeRules';
 import { usd, usdDollars } from '../lib/money';
 import { createdSinceStart } from '../jobs/startDate';
+import { reportProblem } from './problems';
 
 const prisma = new PrismaClient();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -84,6 +85,17 @@ export async function runFeeJob(now = new Date()) {
           invoiceId: invoice.id,
           event: 'fee_error',
           detail: (err as Error).message,
+        },
+      });
+      const number = invoice.stripeNumber ?? invoice.stripeInvoiceId;
+      await reportProblem({
+        kind: 'Late fee not added',
+        key: `fee_error:${invoice.id}`,
+        accountId: invoice.accountId,
+        detail: `Invoice ${number}: ${(err as Error).message}`,
+        owner: {
+          subject: `Late fee couldn't be added — invoice ${number}`,
+          text: `Dunn tried to add the late fee to invoice ${number} and Stripe said no.\n\nReason: ${(err as Error).message}\n\nCheck the invoice in Stripe and that your Stripe account is still connected (Dunn → Settings). Dunn will try again tomorrow.`,
         },
       });
     }
