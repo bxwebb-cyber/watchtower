@@ -42,6 +42,8 @@ _Last updated: 2026-09-28 (v1.8 — scheduler + one-bill late fees + webhook fix
 
 **Problem alerts (10/1, Bashira: "I need to know about all the issues"):** `src/services/problems.ts` `reportProblem()` — owner gets one plain email (what happened + what to do), founder (FOUNDER_EMAIL / FORWARD_INBOX_TO) gets every issue with the business + account id, same issue max once a day. Wired to: client email not sent, client email **bounced / marked spam** (Resend webhook now also sends email.bounced + email.complained → `/webhooks/resend/inbound`, matched to the invoice via Reminder.messageId), late fee not added, recurring invoice not created (any reason; owner email wording per reason) or crashed, client payment failed, Stripe webhook handler crash, daily-run step crash, daily run giving up. **Daily summary** to the founder from the 9am run (counts + every issue since the last summary); catch-up runs after a deploy only email if something failed. Test a bounce: invoice to `bounced@resend.dev`.
 
+**Stripe product names (test, 10/1):** renamed "Watchtower — Up to 10 invoices" / "Watchtower — Unlimited" → "Dunn — Up to 5 clients" / "Dunn — Unlimited clients" (customers see these in checkout, the billing portal and receipts). Use these names when creating LIVE products. Founder also gets "Plan changed" emails (old → new plan, monthly↔yearly).
+
 **LEFT:**
 - ✅ Automatic emails ON (10/1, 14:10): `SCHEDULER=on`, `SCHEDULER_START=2026-10-02`; boot log confirms both. Daily sweep 9:00 ET; invoices created before Oct 2 are never touched.
 - `/demo` phone layout: done 10/1 (`scripts/phone-layout.cjs` now patches landing + demo).
