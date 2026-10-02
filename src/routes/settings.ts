@@ -36,6 +36,8 @@ settingsRouter.get('/', async (req, res) => {
   res.json({
     plan: account.plan ?? null,
     needsPlan: planRequired() && !hasActivePlan(account),
+    planEnding: account.cancelAtPeriodEnd,
+    planPeriodEnd: account.currentPeriodEnd ? account.currentPeriodEnd.toISOString() : null,
     clientsThisMonth,
     clientLimit: account.plan === 'solo' ? SOLO_CLIENTS_PER_MONTH : null,
     ownerEmail: settings.ownerEmail ?? account.email,

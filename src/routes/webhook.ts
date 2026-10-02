@@ -354,8 +354,8 @@ async function onSubscriptionUpdated(sub: Stripe.Subscription, previous?: Partia
       `${before.ownerName ?? ''} (${before.email}) changed their Dunn plan.\nFrom: ${describe(oldPrice)}\nTo:   ${describe(newPrice)}`
     );
   }
-  if (before && !before.cancelAtPeriodEnd && sub.cancel_at_period_end) {
-    const end = sub.items?.data?.[0]?.current_period_end;
+  if (before && !before.cancelAtPeriodEnd && isEnding(sub)) {
+    const end = sub.cancel_at ?? sub.items?.data?.[0]?.current_period_end;
     await notifyFounder(
       `Cancelled: ${before.businessName ?? before.email}`,
       `${before.ownerName ?? ''} (${before.email}) cancelled their Dunn plan.${end ? ` It ends ${new Date(end * 1000).toDateString()}.` : ''}`
@@ -376,6 +376,10 @@ async function onSubscriptionDeleted(sub: Stripe.Subscription) {
       currentPeriodEnd: null,
     },
   });
+}
+
+function isEnding(sub: Stripe.Subscription): boolean {
+  return sub.cancel_at_period_end || !!sub.cancel_at;
 }
 
 function planNameFor(priceId: string): string {
@@ -400,10 +404,13 @@ export async function syncSubscription(accountId: string, sub: Stripe.Subscripti
       stripeSubscriptionId: sub.id,
       subscriptionStatus: sub.status,
       plan,
-      currentPeriodEnd: item?.current_period_end
-        ? new Date(item.current_period_end * 1000)
-        : null,
-      cancelAtPeriodEnd: sub.cancel_at_period_end,
+      // When a cancel is scheduled, the plan ends on cancel_at.
+      currentPeriodEnd: sub.cancel_at
+        ? new Date(sub.cancel_at * 1000)
+        : item?.current_period_end ? new Date(item.current_period_end * 1000) : null,
+      // Newer Stripe API versions schedule a cancel with `cancel_at` (a date)
+      // and leave cancel_at_period_end false. Either one means "ending".
+      cancelAtPeriodEnd: isEnding(sub),
     },
   });
 }
