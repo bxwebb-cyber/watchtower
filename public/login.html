@@ -69,7 +69,7 @@
       </form>
 
       <p class="wt-auth__switch">
-        <span data-signin-only>New to Dunn? <button type="button" data-set-mode="signup">Create an account</button></span>
+        <span data-signin-only>New to Dunn? <a href="/#pricing">Pick a plan to get started</a></span>
         <span data-signup-only hidden>Already have an account? <button type="button" data-set-mode="signin">Sign in</button></span>
       </p>
     </div>
@@ -84,6 +84,8 @@
     ? { solo: 'Up to 5 clients · $390 a year', business: 'Unlimited clients · $540 a year' }
     : { solo: 'Up to 5 clients · $39 a month', business: 'Unlimited clients · $59 a month' };
   var form = document.querySelector('[data-auth-form]');
+  // A Dunn account starts with a plan: sign-up without one goes to pricing.
+  if (q.get('mode') === 'signup' && !plan) { location.replace('/#pricing'); return; }
   var mode = (plan || q.get('mode') === 'signup') ? 'signup' : 'signin';
   if (PLANS[plan]) {
     form.plan.value = plan;
