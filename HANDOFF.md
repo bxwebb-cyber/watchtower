@@ -51,6 +51,8 @@ _Last updated: 2026-09-28 (v1.8 — scheduler + one-bill late fees + webhook fix
 
 **Billing portal proration (10/1):** plan switches now charge the difference immediately (`proration_behavior: always_invoice`). Before, a $39/mo → $540/yr switch got the year free and a $1,040.99 bill a year later. **Set the same on the LIVE portal config.** (bthepoint's test sub still carries that ~$501 pending item — test data, ignore.) Yearly sign-up verified live (bashira.webb+yearly → $390/yr, founder email).
 
+**Email deliverability (10/1):** SPF + DKIM (Resend) were already set; added DMARC `_dmarc.getdunn.org TXT "v=DMARC1; p=none;"` in Cloudflare (verified). Founder alerts land in spam sometimes: Bashira marked "not spam" + Gmail filter. Founder alert subjects now include plan/date + time so Gmail doesn't stack repeats into old threads. Later: move DMARC to p=quarantine with an rua report address once mail looks clean.
+
 **LEFT:**
 - ✅ Automatic emails ON (10/1, 14:10): `SCHEDULER=on`, `SCHEDULER_START=2026-10-02`; boot log confirms both. Daily sweep 9:00 ET; invoices created before Oct 2 are never touched.
 - `/demo` phone layout: done 10/1 (`scripts/phone-layout.cjs` now patches landing + demo).
