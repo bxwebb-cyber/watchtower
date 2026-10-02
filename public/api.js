@@ -216,7 +216,7 @@ async function loadDashboard() {
   if (warn && settings.needsPlan) {
     warn.hidden = false;
     warn.replaceChildren(document.createTextNode('Choose a plan to start sending invoices. '));
-    const a = document.createElement('a'); a.href = '/#pricing'; a.textContent = 'See plans'; a.style.textDecoration = 'underline'; a.style.color = 'inherit';
+    const a = document.createElement('a'); a.href = '/dashboard#settings'; a.textContent = 'Pick a plan'; a.style.textDecoration = 'underline'; a.style.color = 'inherit';
     warn.append(a);
   } else if (warn) {
     const used = settings.clientsThisMonth, limit = settings.clientLimit;
@@ -533,9 +533,15 @@ async function loadSettings() {
 
   // Plan
   const plan = settings.plan || 'solo';
+  // No plan yet: show the plan buttons instead of "Manage plan".
+  const noPlan = !settings.plan || settings.needsPlan;
+  const choose = document.querySelector('[data-choose-plan]');
+  const manage = document.querySelector('[data-billing-portal]');
+  if (choose) choose.hidden = !noPlan;
+  if (manage) manage.hidden = noPlan;
   bind({
-    plan_label: plan === 'business' ? 'Unlimited clients' : 'Up to 5 clients',
-    plan_usage: plan === 'business' ? 'No limits'
+    plan_label: noPlan ? 'No plan yet. Pick one to start sending invoices.' : plan === 'business' ? 'Unlimited clients' : 'Up to 5 clients',
+    plan_usage: noPlan ? '' : plan === 'business' ? 'No limits'
       : settings.clientsThisMonth != null ? `${settings.clientsThisMonth} of ${settings.clientLimit} clients this month · billed as often as weekly`
       : 'Billed as often as weekly',
   });

@@ -65,6 +65,36 @@ billingRouter.get('/status', async (req, res) => {
   });
 });
 
+// GET /billing/start?plan=solo|business&billing=monthly|yearly — the plan
+// buttons in Settings for a signed-in owner with no plan: straight to Stripe.
+billingRouter.get('/start', async (req, res) => {
+  const accountId = resolveAccountId(req);
+  if (!accountId) return res.redirect('/login');
+  const plan = String(req.query.plan ?? '');
+  const billing = (req.query.billing === 'yearly' ? 'yearly' : 'monthly') as Billing;
+  if (plan !== 'solo' && plan !== 'business') return res.redirect('/dashboard');
+  const account = await prisma.account.findUnique({ where: { id: accountId } });
+  if (!account) return res.redirect('/login');
+  if (account.subscriptionStatus === 'active' || account.subscriptionStatus === 'trialing') return res.redirect('/billing/portal');
+  try {
+    const session = await stripe.checkout.sessions.create({
+      mode: 'subscription',
+      line_items: [{ price: priceIdFor(plan, billing), quantity: 1 }],
+      customer_email: account.email,
+      client_reference_id: account.id,
+      allow_promotion_codes: true,
+      success_url: `${process.env.APP_URL || 'http://localhost:4000'}/billing/confirm?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.APP_URL || 'http://localhost:4000'}/dashboard`,
+      subscription_data: { metadata: { accountId: account.id } },
+      metadata: { accountId: account.id, plan, billing },
+    });
+    res.redirect(303, session.url!);
+  } catch (err) {
+    console.error('[billing] start failed:', err);
+    res.status(500).send('Could not start checkout. Try again in a minute.');
+  }
+});
+
 // POST /billing/checkout — start a subscription for the given plan.
 // Body: { plan: "solo" | "business", billing?: "monthly" | "yearly" }.
 // Returns the hosted checkout URL.
@@ -140,7 +170,7 @@ billingRouter.get('/portal', async (req, res) => {
   const accountId = resolveAccountId(req);
   if (!accountId) return res.redirect('/login');
   const account = await prisma.account.findUnique({ where: { id: accountId } });
-  if (!account?.stripeCustomerId) return res.redirect('/#pricing');
+  if (!account?.stripeCustomerId) return res.redirect('/dashboard#settings');
   try {
     const session = await stripe.billingPortal.sessions.create({
       customer: account.stripeCustomerId,

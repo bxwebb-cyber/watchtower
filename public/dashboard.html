@@ -902,8 +902,15 @@
             <!-- plan "solo" → "Up to 5 clients" · plan "business" → "Unlimited clients". Never show "solo"/"business". -->
             <p class="wt-setting__sub"><span data-bind="plan_label">Up to 5 clients</span><br><span data-bind="plan_usage">Billed as often as weekly</span></p>
           </div>
-          <!-- POST /billing/portal → redirect to the returned url -->
+          <!-- GET /billing/portal → Stripe's billing page (switch plans, cancel) -->
           <a class="wt-btn wt-btn--secondary wt-btn--sm" href="/billing/portal" data-billing-portal>Manage plan</a>
+        </div>
+        <!-- No plan yet: pick one here, straight to Stripe checkout (GET /billing/start). -->
+        <div class="wt-planbtns" data-choose-plan hidden>
+          <a class="wt-btn wt-btn--primary wt-btn--sm" href="/billing/start?plan=solo">Up to 5 clients · $39/mo</a>
+          <a class="wt-btn wt-btn--primary wt-btn--sm" href="/billing/start?plan=business">Unlimited · $59/mo</a>
+          <a class="wt-btn wt-btn--secondary wt-btn--sm" href="/billing/start?plan=solo&amp;billing=yearly">$390/yr</a>
+          <a class="wt-btn wt-btn--secondary wt-btn--sm" href="/billing/start?plan=business&amp;billing=yearly">$540/yr</a>
         </div>
       </section>
 
