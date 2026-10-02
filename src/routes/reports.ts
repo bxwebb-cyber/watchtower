@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { getAccount } from '../lib/account';
+import { waiverReport } from '../services/waivers';
 
 const prisma = new PrismaClient();
 
@@ -28,6 +29,28 @@ function averageDays(msDeltas: number[]): number | null {
   const totalDays = msDeltas.reduce((s, d) => s + d / 86_400_000, 0);
   return Math.round((totalDays / msDeltas.length) * 10) / 10;
 }
+
+// ── GET /reports/waivers — "who do I waive a fee for" ──
+// Fees waived per month (by the day they were waived), and per client with
+// how often that client pays late and the owner's own notes on why.
+reportsRouter.get('/waivers', async (req, res) => {
+  const account = await getAccount(req);
+  if (!account) return res.status(401).json({ error: 'Not authenticated' });
+  const months = parseTrendMonths(req.query.months as string | undefined);
+  const now = new Date();
+  const since = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (months - 1), 1));
+
+  const invoices = await prisma.invoice.findMany({
+    where: { accountId: account.id, createdAt: { gte: new Date(since.getTime() - 92 * 86_400_000) } },
+    include: {
+      client: true,
+      feePolicy: true,
+      auditLog: { where: { event: 'fee_waived' }, orderBy: { createdAt: 'desc' }, take: 1 },
+    },
+  });
+  const rows = invoices.map((i) => ({ ...i, waivedAt: i.auditLog[0]?.createdAt ?? null }));
+  res.json(waiverReport(rows, now, months));
+});
 
 // ── GET /reports/revenue — monthly report data ──
 

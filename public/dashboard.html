@@ -793,7 +793,7 @@
 
         <div class="wt-breakdown"><div><div class="wt-breakdown__label">Invoices paid</div><div class="wt-breakdown__sub"><span data-bind="invoices_paid_count">15</span> invoices</div></div><div class="wt-breakdown__value" data-bind="invoice_revenue">$12,900</div></div>
         <div class="wt-breakdown"><div><div class="wt-breakdown__label">Late fees collected</div><div class="wt-breakdown__sub"><span data-bind="fees_collected_count">4</span> fees</div></div><div class="wt-breakdown__value wt-breakdown__value--fee" data-bind="fee_revenue">$325</div></div>
-        <div class="wt-breakdown"><div><div class="wt-breakdown__label">Fees waived</div><div class="wt-breakdown__sub">Not counted as revenue</div></div><div class="wt-breakdown__value wt-breakdown__value--muted" data-bind="fees_waived_amount">$32</div></div>
+        <div class="wt-breakdown"><div><div class="wt-breakdown__label">Fees waived</div><div class="wt-breakdown__sub"><span data-bind="fees_waived_count">0 fees</span> · not counted as revenue</div></div><div class="wt-breakdown__value wt-breakdown__value--muted" data-bind="fees_waived_amount">$32</div></div>
         <div class="wt-breakdown wt-breakdown--total"><div><div class="wt-breakdown__label">Total collected</div></div><div class="wt-breakdown__value" data-bind="total_collected">$13,225</div></div>
         <p class="wt-footnote">The CSV has all 12 months and imports into QuickBooks, Xero, or Wave.</p>
       </section>
@@ -834,6 +834,15 @@
           <span>A</span>
           <span class="is-selected">S</span>
         </div>
+      </section>
+
+      <!-- "Who do I waive a fee for" (product notes: the third data view). Filled by api.js from GET /reports/waivers. -->
+      <section class="wt-card wt-waivers" aria-labelledby="waivers-title">
+        <h2 class="wt-h2" id="waivers-title">Who you waive fees for</h2>
+        <p class="wt-caption">A loyal client you're giving grace to, or a late payer you haven't noticed? Dunn shows the pattern. You know the why.</p>
+        <div class="wt-waivers__months" data-waiver-months aria-label="Fees waived each month"></div>
+        <ol class="wt-waivers__list" data-waiver-clients></ol>
+        <p class="wt-waivers__empty" data-waiver-empty hidden>No fees waived in the last 12 months.</p>
       </section>
     </div>
     </div>

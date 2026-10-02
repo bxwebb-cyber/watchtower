@@ -398,6 +398,54 @@ async function loadReports(month) {
   });
 
   renderTrend(trend);
+  loadWaivers(yyyymm);
+}
+
+// Who you waive fees for: a 12-month strip + clients ranked by fees waived,
+// with how often they pay late and the owner's own notes. textContent only.
+async function loadWaivers(selectedMonth) {
+  const data = await api('GET', '/reports/waivers?months=12').catch(() => null);
+  if (!data) return;
+  const sel = (data.months || []).find(m => m.month === selectedMonth);
+  bind({ fees_waived_count: sel ? (sel.count === 1 ? '1 fee' : sel.count + ' fees') : '0 fees' });
+
+  const strip = document.querySelector('[data-waiver-months]');
+  if (strip) {
+    strip.replaceChildren(...data.months.map(m => {
+      const d = document.createElement('div');
+      d.className = 'wt-waivers__month' + (m.count ? '' : ' is-zero');
+      d.title = m.count + ' waived · ' + money(m.cents);
+      const b = document.createElement('b'); b.textContent = String(m.count);
+      const s = document.createElement('span'); s.textContent = new Date(m.month + '-15').toLocaleDateString('en-US', { month: 'short' });
+      d.append(b, s);
+      return d;
+    }));
+  }
+  const list = document.querySelector('[data-waiver-clients]');
+  const empty = document.querySelector('[data-waiver-empty]');
+  if (!list) return;
+  empty.hidden = data.clients.length > 0;
+  list.replaceChildren(...data.clients.map(c => {
+    const li = document.createElement('li'); li.className = 'wt-waivers__row';
+    const left = document.createElement('div');
+    const name = document.createElement('div'); name.className = 'wt-waivers__name'; name.textContent = c.name;
+    const meta = document.createElement('div'); meta.className = 'wt-waivers__meta';
+    const late = c.paidCount ? `Paid late ${c.paidLateCount} of ${c.paidCount}` : 'No paid invoices yet';
+    const lateSpan = document.createElement('span'); lateSpan.textContent = late;
+    if (c.paidCount && c.paidLateCount / c.paidCount >= 0.5) lateSpan.className = 'wt-waivers__late';
+    meta.append(lateSpan, document.createTextNode(` · a fee came due ${c.feesDue} ${c.feesDue === 1 ? 'time' : 'times'}`));
+    left.append(name, meta);
+    const right = document.createElement('div'); right.className = 'wt-waivers__count';
+    right.textContent = c.waivedCount + ' waived';
+    const sm = document.createElement('small'); sm.textContent = money(c.waivedCents); right.append(sm);
+    li.append(left, right);
+    if (c.notes.length) {
+      const n = document.createElement('p'); n.className = 'wt-waivers__notes';
+      n.textContent = 'Your notes: ' + c.notes.map(x => '“' + x + '”').join(' · ');
+      li.append(n);
+    }
+    return li;
+  }));
 }
 
 function renderTrend(trend) {

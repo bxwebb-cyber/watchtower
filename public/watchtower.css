@@ -493,3 +493,21 @@ input::placeholder { color: var(--wt-faint); }
 .wt-inv__when { display: block; font-size: 12px; color: var(--wt-subtle); margin-top: 2px; }
 .wt-inv__quote { margin: 6px 0 0; padding: 10px 12px; border-radius: 10px; background: var(--wt-paper); font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
 @media (max-width: 520px) { .wt-inv__facts { grid-template-columns: 1fr; } .wt-inv__amount { font-size: 34px; } .wt-modal__foot { flex-wrap: wrap; } }
+
+/* ---------- Who you waive fees for (Reports) ---------- */
+.wt-waivers .wt-caption { margin: 4px 0 18px; max-width: 620px; }
+.wt-waivers__months { display: grid; grid-template-columns: repeat(12, 1fr); gap: 6px; margin-bottom: 22px; }
+.wt-waivers__month { padding: 8px 4px; border-radius: 9px; background: var(--wt-sidebar); text-align: center; }
+.wt-waivers__month b { display: block; font-family: var(--wt-font-display); font-weight: 400; font-size: 20px; color: var(--wt-ink); }
+.wt-waivers__month.is-zero b { color: var(--wt-faint); }
+.wt-waivers__month span { font-size: 11px; color: var(--wt-subtle); }
+.wt-waivers__list { list-style: none; margin: 0; padding: 0; }
+.wt-waivers__row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 16px; padding: 14px 0; border-top: 1px solid var(--wt-line); }
+.wt-waivers__name { font-size: 15px; font-weight: 500; color: var(--wt-ink); }
+.wt-waivers__meta { font-size: 13px; color: var(--wt-muted); }
+.wt-waivers__count { text-align: right; font-family: var(--wt-font-display); font-size: 20px; color: var(--wt-ink); white-space: nowrap; }
+.wt-waivers__count small { display: block; font-family: inherit; font-size: 12px; color: var(--wt-subtle); }
+.wt-waivers__late { color: var(--wt-brick); }
+.wt-waivers__notes { grid-column: 1 / -1; margin: 0; font-size: 13px; color: var(--wt-text-body); font-style: italic; }
+.wt-waivers__empty { margin: 0; font-size: 14px; color: var(--wt-subtle); }
+@media (max-width: 640px) { .wt-waivers__months { grid-template-columns: repeat(6, 1fr); } }

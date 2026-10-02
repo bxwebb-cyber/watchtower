@@ -32,6 +32,8 @@ _Last updated: 2026-09-28 (v1.8 — scheduler + one-bill late fees + webhook fix
 
 **10/1 later:** Billing fixed — Stripe test webhook (platform) now sends checkout.session.completed + customer.subscription.*; both endpoints send invoice.voided/marked_uncollectible/deleted (**redo this on the LIVE webhooks at launch**). `/billing/confirm` saves the plan from Stripe right after checkout (backup for missed webhooks). invoice.created only mirrors connected-account invoices with a due date onto THAT owner (was: any invoice → first account, bad date). **A plan is required to send invoices** (no free use/trial, Bashira 10/1): `hasActivePlan` (active/trialing/past_due), on in production (`REQUIRE_PLAN=off` overrides), dashboard banner "Choose a plan". All "Start watching"/"Get started" buttons → /#pricing.
 
+**Reports → "Who you waive fees for" (10/1, the third data view in ~/Desktop/gettdunn-product-notes.md):** `GET /reports/waivers` (`src/services/waivers.ts`, 3 tests) — fees waived per month (dated by the waive, from the audit log) as a 12-month strip, and clients ranked by fees waived with "paid late X of Y" (red at ≥50%), how often a fee came due, and the owner's own waive notes. Never guesses the why. Monthly "Fees waived" line now shows the count.
+
 **LEFT:**
 - ✅ Automatic emails ON (10/1, 14:10): `SCHEDULER=on`, `SCHEDULER_START=2026-10-02`; boot log confirms both. Daily sweep 9:00 ET; invoices created before Oct 2 are never touched.
 - `/demo` phone layout: done 10/1 (`scripts/phone-layout.cjs` now patches landing + demo).
