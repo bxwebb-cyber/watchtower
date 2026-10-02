@@ -3,6 +3,28 @@ _Last updated: 2026-09-28 (v1.8 — scheduler + one-bill late fees + webhook fix
 
 ---
 
+## ▶▶▶ READ FIRST — STATUS 10/2/26 (end of session). getdunn.org is LIVE, Stripe still TEST mode, scheduler ON (SCHEDULER_START=2026-10-02).
+
+**Verified live in test mode:** client pays invoice (+ webhooks) · subscribe monthly + yearly · Manage plan (switch, cancel, un-cancel) with customer + founder emails · plan required (sign-up picker, server check, 5-client limit blocks a 6th) · client replies end to end · hello@getdunn.org in/out (Gmail send-as) · bounce alerts · password reset · new user sign-up → plan → connect Stripe → invoices · phone layouts (landing, demo, sign-in) · Search Console + sitemap · DMARC.
+
+**TEST NEXT (needs real days to pass):**
+1. Oct 2: create a recurring invoice starting today → next 9am run sends it (+ owner email).
+2. Oct 2: one-off invoice due Oct 3, late fee, 0 grace days → Oct 4 9am: fee waits for approval (owner email) → approve / lower / waive → client gets the updated bill.
+3. Any invoice due in 4 days → reminder email arrives at 9am.
+4. 9am founder daily summary arrives (first one Oct 2/3).
+**TEST NEXT (can do any time):** failed client payment (card 4000 0000 0000 0002 → owner + founder emails) · no-plan account (buhshyruh) shows "Choose a plan" and can't invoice · waive a fee → Reports "Who you waive fees for" + "up to about $X a month" · dashboard on iPhone · disconnect + reconnect Stripe · Reports → Download CSV.
+
+**GO-LIVE (Stripe test → live), in order:**
+1. Stripe LIVE mode: create products "Dunn — Up to 5 clients" / "Dunn — Unlimited clients" with 4 prices ($39/mo, $390/yr, $59/mo, $540/yr).
+2. LIVE webhooks to https://getdunn.org/webhooks/stripe — platform endpoint: invoice.*, payment_intent.*, checkout.session.completed, customer.subscription.created/updated/deleted, invoice.voided/marked_uncollectible/deleted; connected-accounts endpoint: invoice.* (incl. voided/marked_uncollectible/deleted), payment_intent.*.
+3. LIVE customer portal: cancel at period end, switch among the 4 prices, no quantity, **proration always_invoice**, card + invoice history, terms/privacy links.
+4. LIVE Connect: Standard OAuth enabled, live client ID, redirect https://getdunn.org/auth/stripe/callback.
+5. Railway (Bashira sets; Claude can't write secrets): STRIPE_SECRET_KEY (sk_live), STRIPE_CLIENT_ID (live ca_), STRIPE_WEBHOOK_SECRET + _2 (live whsec), STRIPE_PRICE_SOLO / _YEARLY / BUSINESS / _YEARLY (live price ids).
+6. One real-money run: subscribe with a real card, refund it; one real client invoice paid end to end.
+7. Optional before launch: lawyer review of /terms + /privacy (none available now — accepted risk).
+
+---
+
 ## ▶▶ START HERE — SESSION 9/29–9/30 (night). EVERYTHING BELOW IS LIVE on getdunn.org.
 
 **Done tonight (all deployed, Stripe still TEST mode, scheduler still OFF):**
