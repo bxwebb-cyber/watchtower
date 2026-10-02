@@ -23,12 +23,12 @@ _Last updated: 2026-09-28 (v1.8 — scheduler + one-bill late fees + webhook fix
 
 **LIVE TEST-MODE CHECKS (before Stripe live):**
 - ✅ #1 Client pays an invoice (10/1): WSCZXZZZ-0001 $50 paid with 4242 → connected-account webhooks verified (invoice.paid etc.), owner alert "Invoice paid — WSCZXZZZ-0001 ($50.00)". Proves `STRIPE_WEBHOOK_SECRET_2`.
-- ⬜ #2 Subscribe to a Dunn plan (test card) → plan shows in Settings.
-- ⬜ #3 Manage plan: Stripe customer portal (must be enabled in Stripe → Settings → Billing → Customer portal), cancel / switch.
-- ⬜ #4 6th client blocked on the $39 plan.
+- ✅ #2 Subscribe (10/1): checkout → founder email "New subscription: Unlimited, monthly" (after the webhook-events fix).
+- ◐ #3 Manage plan: portal opens (configured via API, test mode). Switch + cancel not yet confirmed — Bashira didn't click the final Confirm; re-test, expect founder "Cancelled" email.
+- ✅ #4 6th client blocked (10/1): "Your plan covers 5 clients a month, and you've invoiced 5 this month…"
 - ⬜ #5 Recurring invoice sends on its own (needs SCHEDULER_START ≤ creation date).
 - ⬜ #6 Late fee fires automatically (invoice created ≥ Oct 2, short due date).
-- ⬜ #7 Brand-new user: sign up → connect Stripe → first invoice.
+- ✅ #7 Brand-new user (10/1): sign up with plan → checkout → connect Stripe (test bank) → invoices.
 
 **10/1 later:** Billing fixed — Stripe test webhook (platform) now sends checkout.session.completed + customer.subscription.*; both endpoints send invoice.voided/marked_uncollectible/deleted (**redo this on the LIVE webhooks at launch**). `/billing/confirm` saves the plan from Stripe right after checkout (backup for missed webhooks). invoice.created only mirrors connected-account invoices with a due date onto THAT owner (was: any invoice → first account, bad date). **A plan is required to send invoices** (no free use/trial, Bashira 10/1): `hasActivePlan` (active/trialing/past_due), on in production (`REQUIRE_PLAN=off` overrides), dashboard banner "Choose a plan". All "Start watching"/"Get started" buttons → /#pricing.
 
