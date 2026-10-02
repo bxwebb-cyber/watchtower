@@ -40,10 +40,18 @@
       <p class="wt-auth__sub" data-mode-text="Sign in to your Dunn account.|Create your account. Connecting Stripe comes next.">Sign in to your Dunn account.</p>
 
       <form class="wt-auth__form" data-auth-form novalidate>
-        <div class="wt-auth__plan" data-plan-strip hidden>
-          <span>Plan: <strong data-bind="plan_label">Up to 5 clients · $39 a month</strong></span>
-          <a href="/#pricing">Change</a>
-        </div>
+        <!-- Plan picker (sign-up only): pick or change a plan without leaving the page. -->
+        <fieldset class="wt-planpick" data-plan-picker hidden>
+          <div class="wt-planpick__head">
+            <legend>Your plan</legend>
+            <div class="wt-planpick__toggle" role="group" aria-label="Billing period">
+              <button type="button" data-billing="monthly">Monthly</button>
+              <button type="button" data-billing="yearly">Yearly <em>save up to 24%</em></button>
+            </div>
+          </div>
+          <label class="wt-planpick__opt"><input type="radio" name="plan_choice" value="solo"><span class="wt-planpick__name">Up to 5 clients<small>Billed as often as weekly</small></span><span class="wt-planpick__price" data-price="solo">$39 a month</span></label>
+          <label class="wt-planpick__opt"><input type="radio" name="plan_choice" value="business"><span class="wt-planpick__name">Unlimited clients<small>No cap</small></span><span class="wt-planpick__price" data-price="business">$59 a month</span></label>
+        </fieldset>
         <input type="hidden" name="plan" value="">
         <div class="wt-auth__error" role="alert" hidden></div>
 
@@ -69,7 +77,7 @@
       </form>
 
       <p class="wt-auth__switch">
-        <span data-signin-only>New to Dunn? <a href="/#pricing">Pick a plan to get started</a></span>
+        <span data-signin-only>New to Dunn? <button type="button" data-set-mode="signup">Create an account</button></span>
         <span data-signup-only hidden>Already have an account? <button type="button" data-set-mode="signin">Sign in</button></span>
       </p>
     </div>
@@ -79,24 +87,32 @@
 (function () {
   var q = new URLSearchParams(location.search);
   var plan = q.get('plan');
-  var yearly = q.get('billing') === 'yearly';
-  var PLANS = yearly
-    ? { solo: 'Up to 5 clients · $390 a year', business: 'Unlimited clients · $540 a year' }
-    : { solo: 'Up to 5 clients · $39 a month', business: 'Unlimited clients · $59 a month' };
+  var billing = q.get('billing') === 'yearly' ? 'yearly' : 'monthly';
+  var PRICES = { monthly: { solo: '$39 a month', business: '$59 a month' }, yearly: { solo: '$390 a year', business: '$540 a year' } };
   var form = document.querySelector('[data-auth-form]');
-  // A Dunn account starts with a plan: sign-up without one goes to pricing.
-  if (q.get('mode') === 'signup' && !plan) { location.replace('/#pricing'); return; }
   var mode = (plan || q.get('mode') === 'signup') ? 'signup' : 'signin';
-  if (PLANS[plan]) {
-    form.plan.value = plan;
-    document.querySelector('[data-bind="plan_label"]').textContent = PLANS[plan];
+  // The picker writes its choice into the URL (?plan=…&billing=…), which is
+  // what login.js reads when it starts checkout after sign-up.
+  function renderPlan() {
+    if (plan !== 'solo' && plan !== 'business') plan = null;
+    form.plan.value = plan || '';
+    form.querySelectorAll('[name="plan_choice"]').forEach(function (r) { r.checked = r.value === plan; r.closest('label').classList.toggle('is-selected', r.checked); });
+    form.querySelectorAll('[data-billing]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.billing === billing)); });
+    form.querySelectorAll('[data-price]').forEach(function (el) { el.textContent = PRICES[billing][el.dataset.price]; });
+    var u = new URLSearchParams(location.search);
+    if (plan) u.set('plan', plan); else u.delete('plan');
+    if (billing === 'yearly') u.set('billing', 'yearly'); else u.delete('billing');
+    history.replaceState(null, '', location.pathname + (u.toString() ? '?' + u : ''));
   }
+  form.querySelectorAll('[name="plan_choice"]').forEach(function (r) { r.addEventListener('change', function () { plan = r.value; renderPlan(); }); });
+  form.querySelectorAll('[data-billing]').forEach(function (b) { b.addEventListener('click', function () { billing = b.dataset.billing; renderPlan(); }); });
+  renderPlan();
   function setMode(m) {
     mode = m;
     var up = m === 'signup';
     document.querySelectorAll('[data-signup-only]').forEach(function (el) { el.hidden = !up; });
     document.querySelectorAll('[data-signin-only]').forEach(function (el) { el.hidden = up; });
-    document.querySelector('[data-plan-strip]').hidden = !(up && PLANS[plan]);
+    document.querySelector('[data-plan-picker]').hidden = !up;
     document.querySelectorAll('[data-mode-text]').forEach(function (el) { el.textContent = el.dataset.modeText.split('|')[up ? 1 : 0]; });
     form.owner_name.required = form.business_name.required = up;
     form.password.autocomplete = up ? 'new-password' : 'current-password';

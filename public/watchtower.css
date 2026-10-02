@@ -517,3 +517,19 @@ input::placeholder { color: var(--wt-faint); }
 .wt-waivers__opp-text { font-size: 14px; color: var(--wt-text-body); }
 .wt-waivers__opp-note { margin-top: 4px; font-size: 12px; color: var(--wt-subtle); }
 @media (max-width: 640px) { .wt-waivers__opp { flex-direction: column; align-items: flex-start; } }
+
+/* ---------- Sign-up plan picker ---------- */
+.wt-planpick { margin: 0 0 4px; padding: 0; border: none; display: grid; gap: 8px; }
+.wt-planpick__head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.wt-planpick legend { float: left; padding: 0; font-size: 12.5px; color: var(--wt-muted); }
+.wt-planpick__toggle { display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px; background: var(--wt-paper); }
+.wt-planpick__toggle button { border: none; background: transparent; padding: 5px 11px; border-radius: 999px; font: 600 12.5px Inter, sans-serif; color: var(--wt-ink); cursor: pointer; }
+.wt-planpick__toggle button em { font-style: normal; font-weight: 500; color: var(--wt-brick); }
+.wt-planpick__toggle button[aria-pressed="true"] { background: var(--wt-ink); color: var(--wt-paper); }
+.wt-planpick__toggle button[aria-pressed="true"] em { color: var(--wt-gold); }
+.wt-planpick__opt { display: flex; align-items: center; gap: 10px; padding: 11px 13px; border: 1px solid var(--wt-border); border-radius: 10px; background: var(--wt-white); cursor: pointer; }
+.wt-planpick__opt.is-selected { border-color: var(--wt-ink); box-shadow: 0 0 0 1px var(--wt-ink); }
+.wt-planpick__opt input { accent-color: var(--wt-ink); margin: 0; }
+.wt-planpick__name { flex: 1; font-size: 14px; font-weight: 500; color: var(--wt-ink); }
+.wt-planpick__name small { display: block; font-weight: 400; font-size: 12px; color: var(--wt-subtle); }
+.wt-planpick__price { font-size: 13.5px; font-weight: 600; color: var(--wt-ink); white-space: nowrap; }

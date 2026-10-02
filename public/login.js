@@ -45,6 +45,7 @@
       if (!businessName) return showError("Add your business name. It's what your clients see in every email.");
       const problem = passwordProblem(password);
       if (problem) return showError(problem);
+      if (data.plan !== 'solo' && data.plan !== 'business') return showError('Pick a plan above. You can change it any time.');
     }
 
     const label = submit.textContent;
