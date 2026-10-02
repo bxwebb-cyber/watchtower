@@ -353,12 +353,23 @@ async function onSubscriptionUpdated(sub: Stripe.Subscription, previous?: Partia
       `Plan changed: ${before.businessName ?? before.email}`,
       `${before.ownerName ?? ''} (${before.email}) changed their Dunn plan.\nFrom: ${describe(oldPrice)}\nTo:   ${describe(newPrice)}`
     );
+    await notifyOwner(
+      before.id,
+      `Your Dunn plan is now ${planNameFor(newPrice.id)}`,
+      `Your plan changed to ${describe(newPrice)}.\n\nYou can see or change it any time in Dunn → Settings → Plan.`
+    );
   }
   if (before && !before.cancelAtPeriodEnd && isEnding(sub)) {
     const end = sub.cancel_at ?? sub.items?.data?.[0]?.current_period_end;
     await notifyFounder(
       `Cancelled: ${before.businessName ?? before.email}`,
       `${before.ownerName ?? ''} (${before.email}) cancelled their Dunn plan.${end ? ` It ends ${new Date(end * 1000).toDateString()}.` : ''}`
+    );
+    const until = end ? new Date(end * 1000).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'the end of this billing period';
+    await notifyOwner(
+      before.id,
+      'Your Dunn plan is cancelled',
+      `Your Dunn plan is cancelled. It keeps working until ${until}: reminders, late fees and replies all carry on until then.\n\nChanged your mind? Go to Dunn → Settings → Manage plan and choose "Renew" before ${until}.`
     );
   }
 }
@@ -367,6 +378,13 @@ async function onSubscriptionDeleted(sub: Stripe.Subscription) {
   const accountId = sub.metadata?.accountId as string | undefined;
   if (!accountId) return;
   const acct = await prisma.account.findUnique({ where: { id: accountId } });
+  if (acct) {
+    await notifyOwner(
+      accountId,
+      'Your Dunn plan has ended',
+      `Your Dunn plan has ended, so Dunn can't create new or recurring invoices for you.\n\nYour invoices and history are still here. Pick a plan any time in Dunn → Settings → Plan to start again.`
+    );
+  }
   if (acct && !acct.cancelAtPeriodEnd) await notifyFounder(`Cancelled: ${acct.businessName ?? acct.email}`, `${acct.ownerName ?? ''} (${acct.email}) cancelled their Dunn plan.`);
   await prisma.account.update({
     where: { id: accountId },
