@@ -58,7 +58,7 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
-        body: JSON.stringify(signup ? { email, password, ownerName, businessName } : { email, password }),
+        body: JSON.stringify(signup ? { email, password, ownerName, businessName, plan: data.plan } : { email, password }),
       });
       const out = await res.json().catch(() => ({}));
       if (!res.ok) { reset(); return showError(out.error || 'Something went wrong. Try again.'); }

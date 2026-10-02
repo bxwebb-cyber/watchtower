@@ -161,6 +161,12 @@ export function authRouter() {
         res.status(400).json({ error: 'Business name is required — reminders are sent in your business\'s name.' });
         return;
       }
+      // Every Dunn account starts with a plan (Bashira 10/1). Checkout follows.
+      const plan = String(req.body.plan ?? '');
+      if (plan !== 'solo' && plan !== 'business') {
+        res.status(400).json({ error: 'Pick a plan first. You can change it any time.' });
+        return;
+      }
       const ownerName = String(req.body.ownerName ?? '').trim();
       if (!ownerName) {
         res.status(400).json({ error: 'Add your name — emails sign off with it.' });
