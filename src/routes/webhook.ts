@@ -359,6 +359,12 @@ async function onSubscriptionUpdated(sub: Stripe.Subscription, previous?: Partia
       `Your plan changed to ${describe(newPrice)}.\n\nYou can see or change it any time in Dunn → Settings → Plan.`
     );
   }
+  // "Don't cancel subscription": a scheduled cancel was taken back.
+  if (before && before.cancelAtPeriodEnd && !isEnding(sub) && sub.status !== 'canceled') {
+    const name = newPrice ? planNameFor(newPrice.id) : 'their plan';
+    await notifyFounder(`Un-cancelled: ${before.businessName ?? before.email}`, `${before.ownerName ?? ''} (${before.email}) took back their cancellation and is staying on ${name}.`);
+    await notifyOwner(before.id, 'Your Dunn plan will keep going', `You're staying on ${name}. Your plan renews as usual, and Dunn keeps watching your invoices.`);
+  }
   if (before && !before.cancelAtPeriodEnd && isEnding(sub)) {
     const end = sub.cancel_at ?? sub.items?.data?.[0]?.current_period_end;
     await notifyFounder(
