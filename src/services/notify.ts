@@ -26,9 +26,14 @@ export function replyToFor(invoiceId: string): string {
 
 // Notify the owner about something that happened. Plain-text fallback.
 // replyTo: where the owner's Reply goes (e.g. the client, on a reply alert).
-export async function notifyOwner(accountId: string, subject: string, text: string, replyTo?: string): Promise<void> {
+// alert: an email the owner can switch off in Settings → Alerts. Everything
+// else (fee heads-up, problems, replies, plan changes) always sends.
+export type OwnerAlert = 'overdue' | 'payment';
+export async function notifyOwner(accountId: string, subject: string, text: string, replyTo?: string, alert?: OwnerAlert): Promise<void> {
   const account = await prisma.account.findUnique({ where: { id: accountId } });
   const settings = await prisma.settings.findUnique({ where: { accountId } });
+  if (alert === 'overdue' && settings && !settings.alertOverdue) return;
+  if (alert === 'payment' && settings && !settings.alertPayment) return;
   const to = settings?.ownerEmail || account?.email;
   if (!to) {
     console.log(`[notify-owner] no owner email for account ${accountId}; skipped: ${subject}`);

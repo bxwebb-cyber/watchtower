@@ -566,7 +566,6 @@ async function loadSettings() {
     form.querySelector('[name="owner_name"]').value = settings.ownerName || '';
     form.querySelector('[name="business_name"]').value = settings.businessName || '';
     form.querySelector('[name="owner_email"]').value = settings.ownerEmail || '';
-    form.querySelector('[name="alert_approve"]').checked = settings.alertFeeApproval !== false;
     form.querySelector('[name="alert_overdue"]').checked = settings.alertOverdue !== false;
     form.querySelector('[name="alert_paid"]').checked = !!settings.alertPayment;
 
@@ -739,7 +738,6 @@ document.addEventListener('wt:settings-save', async e => {
     ownerName: (d.owner_name || '').trim(),
     businessName: (d.business_name || '').trim(),
     ownerEmail: d.owner_email,
-    alertFeeApproval: !!d.alert_approve,
     alertOverdue: !!d.alert_overdue,
     alertPayment: !!d.alert_paid,
     defaultFeeKind: feeKind,

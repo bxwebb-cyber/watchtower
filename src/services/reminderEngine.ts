@@ -171,15 +171,28 @@ export async function runReminderJob(now = new Date()) {
     }
 
     if (await sendClientEmail(invoice, step.step)) sent++;
+  }
 
-    // Owner alert on past-due reminders.
-    if (offset >= 7) {
-      await notifyOwner(
-        invoice.accountId,
-        `Invoice ${number} is past due`,
-        `${invoice.client?.name ?? invoice.client?.email} is ${offset} days late on invoice ${number} for ${usd(invoice.amount)}. Watchtower reminded them today (${step.step}). No action needed unless you want to step in.`
-      );
-    }
+  // Owner alert, once, the morning after the due date (Settings → Alerts →
+  // "An invoice goes overdue"). Invoices with a late fee skip it: the owner
+  // already gets the fee heads-up and the "fee added" email.
+  for (const invoice of openInvoices) {
+    if (invoice.feePolicy && invoice.feePolicy.kind !== 'none') continue;
+    const offset = dayOffset(now, invoice.dueDate);
+    if (offset < 1) continue;
+    const told = await prisma.auditEvent.findFirst({ where: { invoiceId: invoice.id, event: 'owner_overdue_alert' } });
+    if (told) continue;
+    const fresh = await prisma.invoice.findUnique({ where: { id: invoice.id }, select: { status: true } });
+    if (fresh?.status !== 'open') continue;
+    await prisma.auditEvent.create({ data: { invoiceId: invoice.id, event: 'owner_overdue_alert', detail: `${offset} day(s) late` } });
+    const number = invoice.stripeNumber || invoice.stripeInvoiceId;
+    await notifyOwner(
+      invoice.accountId,
+      `Invoice ${number} is overdue`,
+      `${invoice.client?.name ?? invoice.client?.email} didn't pay invoice ${number} (${usd(invoice.amount)}) by its due date.\n\nDunn keeps reminding them. No action needed unless you want to step in.`,
+      undefined,
+      'overdue'
+    );
   }
 
   console.log(`[job] reminder run: ${sent} sent/recorded`);

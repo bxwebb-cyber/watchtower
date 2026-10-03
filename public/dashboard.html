@@ -937,9 +937,9 @@
         <div class="wt-setting__body">
           <label class="wt-field wt-field--narrow">Owner email<input class="wt-input" type="email" name="owner_email" value="" required></label>
           <div style="margin-top:18px">
-            <label class="wt-toggle-row"><input type="checkbox" name="alert_approve" checked><span class="wt-toggle-row__text"><span class="wt-toggle-row__label">A late fee is coming</span><span class="wt-toggle-row__sub">The day before Dunn adds it, so you can lower or waive it</span></span></label>
-            <label class="wt-toggle-row"><input type="checkbox" name="alert_overdue" checked><span class="wt-toggle-row__text"><span class="wt-toggle-row__label">An invoice goes overdue</span><span class="wt-toggle-row__sub">Sent the morning after the due date</span></span></label>
+            <label class="wt-toggle-row"><input type="checkbox" name="alert_overdue" checked><span class="wt-toggle-row__text"><span class="wt-toggle-row__label">An invoice goes overdue</span><span class="wt-toggle-row__sub">The morning after the due date. Invoices with a late fee get the fee emails instead</span></span></label>
             <label class="wt-toggle-row"><input type="checkbox" name="alert_paid"><span class="wt-toggle-row__text"><span class="wt-toggle-row__label">A client pays</span><span class="wt-toggle-row__sub">One email per payment</span></span></label>
+            <p class="wt-helper" style="margin:10px 0 0">Always on: the day before a late fee is added (your chance to lower or waive it), client replies, and anything that goes wrong.</p>
           </div>
         </div>
       </section>

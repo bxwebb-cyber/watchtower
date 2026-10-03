@@ -9,7 +9,7 @@ _Last updated: 2026-09-28 (v1.8 — scheduler + one-bill late fees + webhook fix
 - **Due dates:** Stripe gets the END of the due day in New York (was midnight UTC → "due_date in the past" for next-day invoices after 8pm ET). Day math is time-zone-proof (tests pass in NY and UTC).
 - **Recurring edit fixes:** edit no longer wipes the late fee; Active/Paused loads + saves; real sent count; "Edit" title; Next-invoice-date edits save; PATCH validates.
 - Invoice list: real "(N)" count; 13-char Stripe numbers no longer overlap; phone rows stack.
-- **Known gap:** Settings → Alerts toggles (fee coming / overdue / paid) are saved but NOT honored anywhere — every alert always sends.
+- **Alerts switches work (10/3):** "overdue" (once, morning after due date, only invoices without a late fee) and "a client pays" can be turned off. Fee heads-up, replies, problems always send (switch removed).
 - **Timed tests pending:** fee heads-up Oct 3 → fee Oct 4 (the $25,000 invoice due Oct 3, $10, 0 grace); reminder Oct 6 ($25 invoice due Oct 10); recurring next Oct 10. (Pre-due reminder is skipped when it would land ≤2 days after the invoice was sent.)
 
 ## ▶▶▶ READ FIRST — STATUS 10/2/26 (end of session). getdunn.org is LIVE, Stripe still TEST mode, scheduler ON (SCHEDULER_START=2026-10-02).

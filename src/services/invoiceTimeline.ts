@@ -31,6 +31,7 @@ const EVENT_TEXT: Record<string, { kind: TimelineEntry['kind']; text: string } |
   client_replied: null,
   invoice_updated: null,
   fee_skipped: null,
+  owner_overdue_alert: null,
   missing_business_name: null,
 };
 
