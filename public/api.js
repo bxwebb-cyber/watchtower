@@ -123,7 +123,7 @@ document.addEventListener('wt:open-invoice', async (e) => {
   put('amount', money(d.amountCents + (d.feeStatus === 'open' || d.feeStatus === 'paid' ? (d.feeAmountCents || 0) : 0)));
   put('due', day(d.due));
   put('sent', day(d.createdAt));
-  const feeState = { pending: ' · waiting for you', open: ' · on the bill', paid: ' · paid', waived: ' · waived' }[d.feeStatus] || '';
+  const feeState = { pending: ' · added if still unpaid', open: ' · on the bill', paid: ' · paid', waived: ' · waived' }[d.feeStatus] || '';
   put('fee', d.fee ? d.fee + feeState : 'None');
 
   const list = $i('timeline');
@@ -327,7 +327,7 @@ async function loadDashboard() {
   });
 
   renderList('pending_fees', pendingFees, (inv) => Object.assign(feeRow(inv), {
-    grace_note: inv.graceDays > 0 ? inv.graceDays + '-day grace period passed' : 'due date passed',
+    lands: feeLandsText(inv),
     fee_kind: inv.feeKind === 'percent' ? inv.fee + ' fee' : 'flat fee',
   }));
   renderList('billed_fees', billedFees, (inv) => Object.assign(feeRow(inv), {
@@ -339,6 +339,16 @@ async function loadDashboard() {
   if (pendingSection) pendingSection.hidden = pendingFees.length === 0;
   const billedSection = document.querySelector('[data-section="billed_fees"]');
   if (billedSection) billedSection.hidden = billedFees.length === 0;
+}
+
+// When a coming fee is added: the morning after due date + grace days.
+function feeLandsText(inv) {
+  const due = new Date(inv.due + 'T12:00:00');
+  const lands = new Date(due.getFullYear(), due.getMonth(), due.getDate() + (inv.graceDays || 0) + 1, 12);
+  const today = new Date(); today.setHours(12, 0, 0, 0);
+  const days = Math.round((lands - today) / 86400000);
+  if (days <= 1) return 'Added tomorrow morning';
+  return 'Added ' + lands.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
 // ---- Recurring ----
@@ -635,7 +645,7 @@ document.addEventListener('wt:approve-fee', async e => {
   // amount is set when the owner lowered the fee before approving.
   const body = e.detail.amount !== undefined ? { amount: e.detail.amount } : {};
   try { await api('POST', '/invoices/' + e.detail.invoiceId + '/fee/approve', body); }
-  catch (err) { alert('Approve failed: ' + err.message); return; }
+  catch (err) { alert("Couldn't save the fee: " + err.message); return; }
   loadDashboard();
 });
 document.addEventListener('wt:change-fee', async e => {

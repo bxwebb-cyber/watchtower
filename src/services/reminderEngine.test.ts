@@ -9,20 +9,24 @@ import {
   scheduleFor,
 } from './reminderEngine';
 
+// The morning run: 9am New York (13:00 UTC). Due dates are stored as UTC midnight.
+const run = (day: string) => new Date(`${day}T13:00:00Z`);
+
 describe('isPastFeeDeadline', () => {
   const due = new Date('2026-09-18');
+  const morning = run('2026-09-18');
 
   it('is not past on the deadline day itself (due + grace)', () => {
-    expect(isPastFeeDeadline(addDays(due, 7), due, 7)).toBe(false);
+    expect(isPastFeeDeadline(addDays(morning, 7), due, 7)).toBe(false);
   });
 
   it('is past the morning after the deadline', () => {
-    expect(isPastFeeDeadline(addDays(due, 8), due, 7)).toBe(true);
+    expect(isPastFeeDeadline(addDays(morning, 8), due, 7)).toBe(true);
   });
 
   it('respects a custom grace period', () => {
-    expect(isPastFeeDeadline(addDays(due, 3), due, 3)).toBe(false);
-    expect(isPastFeeDeadline(addDays(due, 4), due, 3)).toBe(true);
+    expect(isPastFeeDeadline(addDays(morning, 3), due, 3)).toBe(false);
+    expect(isPastFeeDeadline(addDays(morning, 4), due, 3)).toBe(true);
   });
 });
 
@@ -54,37 +58,36 @@ describe('isStaleFeeWarning', () => {
 
 describe('dayOffset', () => {
   it('returns 0 on the due date', () => {
-    const d = new Date('2026-10-01');
-    expect(dayOffset(d, d)).toBe(0);
+    expect(dayOffset(run('2026-10-01'), new Date('2026-10-01'))).toBe(0);
   });
 
   it('returns negative before the due date', () => {
     const due = new Date('2026-10-08');
-    const today = new Date('2026-10-01');
+    const today = run('2026-10-01');
     expect(dayOffset(today, due)).toBe(-7);
   });
 
   it('returns positive after the due date', () => {
     const due = new Date('2026-10-01');
-    const today = new Date('2026-10-08');
+    const today = run('2026-10-08');
     expect(dayOffset(today, due)).toBe(7);
   });
 
-  it('handles same-day different time', () => {
-    const due = new Date('2026-10-01T23:00:00');
-    const today = new Date('2026-10-01T01:00:00');
-    expect(dayOffset(today, due)).toBe(0);
+  it('uses the New York date: early morning and late evening are the same day', () => {
+    const due = new Date('2026-10-01');
+    expect(dayOffset(new Date('2026-10-01T01:00:00-04:00'), due)).toBe(0);
+    expect(dayOffset(new Date('2026-10-01T23:30:00-04:00'), due)).toBe(0); // already Oct 2 in UTC
   });
 
   it('returns 1 for one day after due', () => {
     const due = new Date('2026-10-01');
-    const today = new Date('2026-10-02');
+    const today = run('2026-10-02');
     expect(dayOffset(today, due)).toBe(1);
   });
 
   it('returns -1 for one day before due', () => {
     const due = new Date('2026-10-02');
-    const today = new Date('2026-10-01');
+    const today = run('2026-10-01');
     expect(dayOffset(today, due)).toBe(-1);
   });
 });
@@ -120,7 +123,7 @@ describe('scheduleFor (at most one reminder before, one after)', () => {
 describe('computeNextStep', () => {
   const schedule = scheduleFor({ hasLateFee: true, graceDays: 7 });
   const due = new Date('2026-10-01');
-  const at = (d: number) => dayOffset(addDays(due, d), due);
+  const at = (d: number) => dayOffset(addDays(run('2026-10-01'), d), due);
 
   it('nothing before 4 days out', () => {
     expect(computeNextStep(at(-10), new Set(), schedule)).toBeUndefined();

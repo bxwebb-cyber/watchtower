@@ -84,7 +84,7 @@
         row.classList.remove('is-changing');
         break;
       case 'confirm-change': {
-        // Pending fee → approve at this amount. Fee on the bill → lower it.
+        // Fee coming → add it at this amount. Fee on the bill → lower it.
         const amount = row.querySelector('.wt-fees__change input').value;
         emit(row.dataset.feeMode === 'billed' ? 'wt:change-fee' : 'wt:approve-fee', { invoiceId: row.dataset.invoiceId, amount });
         break;

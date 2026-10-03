@@ -110,10 +110,8 @@ export async function runReminderJob(now = new Date()) {
       continue;
     }
 
-    const due = new Date(invoice.dueDate);
-    const dueDay = new Date(due.getFullYear(), due.getMonth(), due.getDate());
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const offset = Math.round((today.getTime() - dueDay.getTime()) / 86_400_000);
+    const dueDay = dueDayStart(invoice.dueDate);
+    const offset = dayOffset(now, invoice.dueDate);
 
     const sentSteps = new Set(
       (await prisma.reminder.findMany({ where: { invoiceId: invoice.id } })).map((r) => r.step)
@@ -124,11 +122,7 @@ export async function runReminderJob(now = new Date()) {
     const step = computeNextStep(offset, sentSteps, scheduleFor({ hasLateFee, graceDays }));
     if (!step) continue;
 
-    const createdAtDay = new Date(
-      invoice.createdAt.getFullYear(),
-      invoice.createdAt.getMonth(),
-      invoice.createdAt.getDate()
-    );
+    const createdAtDay = nyDayStart(invoice.createdAt);
     if (step.offsetDays < 0) {
       const scheduledDay = addDays(dueDay, step.offsetDays);
       const daysAfterCreation = Math.round(
@@ -360,15 +354,22 @@ function formatDate(d: Date): string {
 }
 
 export function addDays(d: Date, days: number): Date {
-  const copy = new Date(d);
-  copy.setDate(copy.getDate() + days);
-  return copy;
+  return new Date(d.getTime() + days * 86_400_000);
+}
+
+// Calendar days, independent of the server's time zone. A due date is stored
+// as midnight UTC of that date; "today" is the date in New York (the business
+// day the 9am run belongs to), so an evening catch-up run doesn't jump ahead.
+export function dueDayStart(dueDate: Date): Date {
+  return new Date(Date.UTC(dueDate.getUTCFullYear(), dueDate.getUTCMonth(), dueDate.getUTCDate()));
+}
+export function nyDayStart(moment: Date): Date {
+  const [y, m, d] = moment.toLocaleDateString('en-CA', { timeZone: 'America/New_York' }).split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d));
 }
 
 export function dayOffset(today: Date, dueDate: Date): number {
-  const dueDay = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
-  const todayDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  return Math.round((todayDay.getTime() - dueDay.getTime()) / 86_400_000);
+  return Math.round((nyDayStart(today).getTime() - dueDayStart(dueDate).getTime()) / 86_400_000);
 }
 
 export function computeNextStep(

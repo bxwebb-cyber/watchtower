@@ -135,24 +135,24 @@
           <div class="wt-kpi__sub"><span data-bind="fees_collected">$125</span> collected · <span data-bind="fees_billed">$120</span> billed</div>
         </article>
         <article class="wt-card wt-kpi wt-kpi--pending">
-          <div class="wt-kpi__top"><span class="wt-kpi__label">Pending fees</span><span class="wt-pill wt-pill--sm wt-pill--due-soon">Review</span></div>
+          <div class="wt-kpi__top"><span class="wt-kpi__label">Fees coming</span><span class="wt-pill wt-pill--sm wt-pill--due-soon">Review</span></div>
           <!-- When 0: value "$0", sub "Nothing to approve", pill "Clear" -->
           <div class="wt-kpi__value" data-bind="pending_fees_total">$107</div>
-          <div class="wt-kpi__sub"><span data-bind="pending_fee_count">2</span> awaiting your approval</div>
+          <div class="wt-kpi__sub"><span data-bind="pending_fee_count">2</span> added if still unpaid</div>
         </article>
       </section>
 
-      <!-- PENDING FEES: render only when count > 0.
-           Approve → wt:approve-fee {invoiceId} → your fee engine. On success, remove the row; the invoice becomes status "fee-applied".
-           Change  → reveals the amount box (max = the fee in the invoice terms) → wt:approve-fee {invoiceId, amount}. (engineering 9/28)
+      <!-- FEES COMING UP (Bashira 10/3): render only when count > 0. Fees are added automatically the morning
+           after the deadline; the owner gets a heads-up the day before and can act here first.
+           Lower → reveals the amount box (max = the fee in the invoice terms) → wt:approve-fee {invoiceId, amount}: saved, added at that amount.
            Waive   → reveals the note field → wt:waive-fee {invoiceId, note}. Send the note with the request. -->
       <section class="wt-card wt-fees" aria-labelledby="fees-title" data-section="pending_fees">
         <div class="wt-fees__head">
           <div class="wt-fees__title">
-            <h2 class="wt-h2" id="fees-title">Fees awaiting your approval</h2>
+            <h2 class="wt-h2" id="fees-title">Late fees coming up</h2>
             <span class="wt-count" data-bind="pending_fee_count">2</span>
           </div>
-          <p class="wt-caption" style="margin:0">Nothing is charged until you approve.</p>
+          <p class="wt-caption" style="margin:0">Dunn adds these if the invoice is still unpaid. Lower or waive one before then if you want.</p>
         </div>
         <div data-list="pending_fees">
       <div class="wt-fees__row" data-invoice-id="WT-2236">
@@ -194,20 +194,19 @@
       <div class="wt-fees__row" data-invoice-id="{row_id}" data-fee-mode="pending">
         <div>
           <div class="wt-fees__client">{client_name} <span>· {invoice_id}</span></div>
-          <div class="wt-fees__note">{days_late} days late · {grace_note} · {fee_kind}</div>
+          <div class="wt-fees__note">{lands} · {fee_kind}</div>
         </div>
         <div class="wt-fees__amount">{fee_amount}</div>
         <div class="wt-fees__actions">
           <button class="wt-btn wt-btn--secondary wt-btn--sm" type="button" data-action="waive-fee">Waive</button>
-          <button class="wt-btn wt-btn--secondary wt-btn--sm" type="button" data-action="change-fee">Change</button>
-          <button class="wt-btn wt-btn--primary wt-btn--sm" type="button" data-action="approve-fee">Approve fee</button>
+          <button class="wt-btn wt-btn--secondary wt-btn--sm" type="button" data-action="change-fee">Lower</button>
         </div>
         <div class="wt-fees__change">
           <label class="wt-fees__change-label" for="fee-{row_id}">Late fee $</label>
           <input class="wt-input" id="fee-{row_id}" type="number" inputmode="decimal" min="0.01" step="0.01" max="{fee_max}" value="{fee_value}">
           <span class="wt-fees__hint">Up to {fee_terms}, the amount in the invoice terms.</span>
           <button class="wt-btn wt-btn--secondary wt-btn--sm" type="button" data-action="cancel-change">Cancel</button>
-          <button class="wt-btn wt-btn--primary wt-btn--sm" type="button" data-action="confirm-change" data-verb="Approve">Approve {fee_amount}</button>
+          <button class="wt-btn wt-btn--primary wt-btn--sm" type="button" data-action="confirm-change" data-verb="Set to">Set to {fee_amount}</button>
         </div>
         <div class="wt-fees__waive">
           <label class="wt-sr-only" for="waive-{row_id}">Reason for waiving</label>
@@ -938,7 +937,7 @@
         <div class="wt-setting__body">
           <label class="wt-field wt-field--narrow">Owner email<input class="wt-input" type="email" name="owner_email" value="" required></label>
           <div style="margin-top:18px">
-            <label class="wt-toggle-row"><input type="checkbox" name="alert_approve" checked><span class="wt-toggle-row__text"><span class="wt-toggle-row__label">A late fee needs my approval</span><span class="wt-toggle-row__sub">So nothing is charged without you</span></span></label>
+            <label class="wt-toggle-row"><input type="checkbox" name="alert_approve" checked><span class="wt-toggle-row__text"><span class="wt-toggle-row__label">A late fee is coming</span><span class="wt-toggle-row__sub">The day before Dunn adds it, so you can lower or waive it</span></span></label>
             <label class="wt-toggle-row"><input type="checkbox" name="alert_overdue" checked><span class="wt-toggle-row__text"><span class="wt-toggle-row__label">An invoice goes overdue</span><span class="wt-toggle-row__sub">Sent the morning after the due date</span></span></label>
             <label class="wt-toggle-row"><input type="checkbox" name="alert_paid"><span class="wt-toggle-row__text"><span class="wt-toggle-row__label">A client pays</span><span class="wt-toggle-row__sub">One email per payment</span></span></label>
           </div>

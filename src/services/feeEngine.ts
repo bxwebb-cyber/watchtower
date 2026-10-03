@@ -14,9 +14,18 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 // One bill: when an invoice is still unpaid the day after its fee deadline
 // (due date + grace days), replace it with a single invoice for the original
 // balance + the late fee, and email the client "a late fee has been added —
-// pay $X". With auto-apply off (the default) the fee waits for the owner to
-// approve, lower or waive it in the dashboard. The fee terms were set by the
-// owner at invoice creation, so this is enforcement of an agreed-upon term.
+// pay $X". The fee terms were set by the owner at invoice creation, so this is
+// enforcement of an agreed-upon term.
+//
+// Automatic, with a heads-up (Bashira 10/3): the day before the fee lands the
+// owner gets "tomorrow Dunn adds the $X fee", and the dashboard lets them
+// lower or waive it first. If they do nothing, the fee goes on the next
+// morning and the client gets the new bill. (Waiting for an approval left a
+// gap: the client could still pay the old, fee-free link meanwhile.) The owner
+// always gets at least one day: a fee is never added the same day as its
+// heads-up, even when a missed run catches up.
+export const HEADS_UP_EVENTS = ['fee_heads_up', 'fee_pending_approval'];
+
 export async function runFeeJob(now = new Date()) {
   const openInvoices = await prisma.invoice.findMany({
     where: { status: 'open', feeApplied: false, feePolicy: { isNot: null }, ...createdSinceStart() },
@@ -26,55 +35,50 @@ export async function runFeeJob(now = new Date()) {
   let applied = 0;
   for (const invoice of openInvoices) {
     const fee = invoice.feePolicy!;
-    if (fee.kind === 'none') continue;
-
-    // The terms (and the t+7 email) say the fee applies if unpaid AFTER the
-    // deadline, so it lands the morning after — never on the deadline itself.
+    if (fee.kind === 'none' || invoice.feeStatus === 'waived') continue;
     const due = new Date(invoice.dueDate);
-    if (!isPastFeeDeadline(now, due, fee.graceDays)) continue;
+    if (feeStep({ now, due, graceDays: fee.graceDays, headsUpAt: null }) === 'wait') continue;
 
     // The job runs daily on a scheduler, so everything below must be safe to
-    // repeat: a waived fee is never re-charged, and the owner is asked once.
-    const priorEvents = new Set(
-      (
-        await prisma.auditEvent.findMany({
-          where: { invoiceId: invoice.id, event: { in: ['fee_waived', 'fee_pending_approval'] } },
-          select: { event: true },
-        })
-      ).map((e) => e.event)
-    );
-    if (priorEvents.has('fee_waived')) continue;
-
-    const feeCents = agreedFeeCents(invoice.amount, fee);
-    if (feeCents <= 0) continue;
-
-    // owner approval gate: only auto-apply if the account has opted in,
-    // otherwise it waits in the dashboard for approve / change / waive.
-    const settings = await prisma.settings.findUnique({
-      where: { accountId: invoice.accountId },
+    // repeat: a waived fee is never re-charged, and the owner is told once.
+    const events = await prisma.auditEvent.findMany({
+      where: { invoiceId: invoice.id, event: { in: ['fee_waived', ...HEADS_UP_EVENTS] } },
+      orderBy: { createdAt: 'asc' },
     });
-    if (!settings?.autoApplyFees) {
-      if (invoice.feeStatus !== 'pending') {
-        await prisma.invoice.update({
-          where: { id: invoice.id },
-          data: { feeStatus: 'pending', feeAmountCents: feeCents },
-        });
-      }
-      if (priorEvents.has('fee_pending_approval')) continue; // already asked
+    if (events.some((e) => e.event === 'fee_waived')) continue;
+
+    const agreed = agreedFeeCents(invoice.amount, fee);
+    if (agreed <= 0) continue;
+    const number = invoice.stripeNumber ?? invoice.stripeInvoiceId;
+
+    const headsUp = events.find((e) => HEADS_UP_EVENTS.includes(e.event));
+    const step = feeStep({ now, due, graceDays: fee.graceDays, headsUpAt: headsUp?.createdAt ?? null });
+    if (step === 'heads_up') {
+      await prisma.invoice.update({
+        where: { id: invoice.id },
+        data: { feeStatus: 'pending', feeAmountCents: agreed },
+      });
+      const when = isPastFeeDeadline(now, due, fee.graceDays) ? 'tomorrow morning' : `tomorrow (${feeDayLabel(due, fee.graceDays)})`;
       await prisma.auditEvent.create({
-        data: {
-          invoiceId: invoice.id,
-          event: 'fee_pending_approval',
-          detail: `${feeLabel(fee)} = ${money(feeCents)} after ${fee.graceDays}d grace (auto-apply off)`,
-        },
+        data: { invoiceId: invoice.id, event: 'fee_heads_up', detail: `${feeLabel(fee)} = ${money(agreed)} lands ${when}` },
       });
       await notifyOwner(
         invoice.accountId,
-        `Late fee ready for your approval — invoice ${invoice.stripeNumber ?? invoice.stripeInvoiceId}`,
-        `${invoice.client?.name ?? invoice.client?.email} is ${Math.round((now.getTime() - due.getTime()) / 86_400_000)} days late. The ${money(feeCents)} late fee is ready. Nothing is charged until you approve it — you can also lower it or waive it in the dashboard.`
+        `Tomorrow: ${money(agreed)} late fee on invoice ${number}`,
+        `${invoice.client?.name ?? invoice.client?.email} hasn't paid invoice ${number} (${money(invoice.amount)}).\n\n` +
+          `If it's still unpaid, Dunn adds the ${money(agreed)} late fee ${when} and emails them the new bill. The fee is in the invoice terms they received.\n\n` +
+          `Want to lower it or skip it? Do it before then: ${appUrl()}/dashboard\n\nNothing to do if you want the fee added.`
       );
       continue;
     }
+
+    if (step !== 'apply') continue;
+
+    // The owner may have lowered it after the heads-up (never above the terms).
+    const feeCents = invoice.feeStatus === 'pending' && invoice.feeAmountCents != null
+      ? Math.min(invoice.feeAmountCents, agreed)
+      : agreed;
+    if (feeCents <= 0) continue;
 
     try {
       if (await applyFee(invoice, feeCents, now, { byOwner: false })) applied++;
@@ -87,7 +91,6 @@ export async function runFeeJob(now = new Date()) {
           detail: (err as Error).message,
         },
       });
-      const number = invoice.stripeNumber ?? invoice.stripeInvoiceId;
       await reportProblem({
         kind: 'Late fee not added',
         key: `fee_error:${invoice.id}`,
@@ -105,6 +108,38 @@ export async function runFeeJob(now = new Date()) {
   return applied;
 }
 
+// What the morning run does for one unpaid invoice with a fee:
+//   wait     — the fee doesn't land tomorrow yet
+//   heads_up — tell the owner (once) that it lands tomorrow
+//   hold     — owner was told, but the fee day hasn't come, or they were
+//              only told today (a catch-up run): give them the day
+//   apply    — add the fee
+export function feeStep(o: { now: Date; due: Date; graceDays: number; headsUpAt: Date | null }): 'wait' | 'heads_up' | 'hold' | 'apply' {
+  if (!isPastFeeDeadline(addDays(o.now, 1), o.due, o.graceDays)) return 'wait';
+  if (!o.headsUpAt) return 'heads_up';
+  if (!isPastFeeDeadline(o.now, o.due, o.graceDays)) return 'hold';
+  if (nyDay(o.headsUpAt) === nyDay(o.now)) return 'hold';
+  return 'apply';
+}
+
+function addDays(d: Date, days: number): Date {
+  return new Date(d.getTime() + days * 86_400_000);
+}
+
+export function nyDay(d: Date): string {
+  return d.toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+}
+
+// "Sunday, Oct 4": the morning the fee lands (the day after due + grace).
+function feeDayLabel(due: Date, graceDays: number): string {
+  const day = new Date(Date.UTC(due.getUTCFullYear(), due.getUTCMonth(), due.getUTCDate() + graceDays + 1, 12));
+  return day.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', timeZone: 'UTC' });
+}
+
+function appUrl(): string {
+  return process.env.APP_URL || 'https://getdunn.org';
+}
+
 // ---- Owner actions (dashboard) ----
 
 export class FeeActionError extends Error {
@@ -113,18 +148,35 @@ export class FeeActionError extends Error {
   }
 }
 
-// Approve a pending fee — at the amount in the terms, or lower.
+// A fee that's coming (after the heads-up, before it lands): the owner can
+// lower it, and the morning run adds that amount instead. "Add it now" (no
+// amount) bills it right away, but only once the fee deadline has passed.
 export async function approveFee(invoiceId: string, accountId: string, amountCents?: number, now = new Date()) {
   const invoice = await loadForAccount(invoiceId, accountId);
   const fee = requireFeePolicy(invoice);
   if (invoice.status !== 'open') throw new FeeActionError(409, 'This invoice is no longer open.');
   if (invoice.feeApplied) throw new FeeActionError(409, 'The late fee is already on the bill.');
   if (invoice.feeStatus === 'waived') throw new FeeActionError(409, 'This late fee was waived.');
+  const agreed = agreedFeeCents(invoice.amount, fee);
+
+  if (amountCents !== undefined && invoice.feeStatus === 'pending') {
+    const problem = checkFeeChange(amountCents, agreed);
+    if (problem) throw new FeeActionError(400, problem);
+    await prisma.invoice.update({ where: { id: invoice.id }, data: { feeAmountCents: amountCents } });
+    await prisma.auditEvent.create({
+      data: {
+        invoiceId: invoice.id,
+        event: 'fee_lowered',
+        detail: `You set the late fee to ${money(amountCents)}${amountCents < agreed ? ` (terms: ${money(agreed)})` : ''}; Dunn adds it if the invoice is still unpaid`,
+      },
+    });
+    return { scheduled: true as const, feeCents: amountCents };
+  }
+
   if (!isPastFeeDeadline(now, invoice.dueDate, fee.graceDays)) {
     throw new FeeActionError(409, "The fee deadline hasn't passed yet.");
   }
-  const agreed = agreedFeeCents(invoice.amount, fee);
-  const feeCents = amountCents ?? agreed;
+  const feeCents = amountCents ?? (invoice.feeStatus === 'pending' && invoice.feeAmountCents != null ? Math.min(invoice.feeAmountCents, agreed) : agreed);
   const problem = checkFeeChange(feeCents, agreed);
   if (problem) throw new FeeActionError(400, problem);
 

@@ -11,6 +11,7 @@ const EVENT_TEXT: Record<string, { kind: TimelineEntry['kind']; text: string } |
   invoice_created: { kind: 'sent', text: 'Invoice created and sent' },
   template_invoice_created: { kind: 'sent', text: 'Recurring invoice created and sent' },
   fee_pending_approval: { kind: 'fee', text: 'Late fee due, waiting for your approval' },
+  fee_heads_up: { kind: 'fee', text: 'Late fee coming tomorrow: Dunn let you know' },
   fee_applied: { kind: 'fee', text: 'Late fee added to the bill' },
   fee_lowered: { kind: 'fee', text: 'Late fee changed' },
   fee_waived: { kind: 'fee', text: 'Late fee waived' },
