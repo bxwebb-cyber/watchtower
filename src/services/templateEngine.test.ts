@@ -105,3 +105,13 @@ describe('computeInitialNextRun', () => {
     expect(next.toISOString().slice(0, 10)).toBe('2026-02-28');
   });
 });
+describe('custom "last day of the month" (customDay 31)', () => {
+  it('lands on the last day of short months and back on the 31st', () => {
+    expect(computeInitialNextRun(new Date('2026-02-03T00:00:00Z'), 'custom', 31).toISOString().slice(0, 10)).toBe('2026-02-28');
+    expect(computeInitialNextRun(new Date('2028-02-03T00:00:00Z'), 'custom', 31).toISOString().slice(0, 10)).toBe('2028-02-29');
+    const feb = advanceRunDate(new Date('2026-01-31T00:00:00Z'), 'custom', 31);
+    expect(feb.toISOString().slice(0, 10)).toBe('2026-02-28');
+    expect(advanceRunDate(feb, 'custom', 31).toISOString().slice(0, 10)).toBe('2026-03-31');
+    expect(advanceRunDate(new Date('2026-03-31T00:00:00Z'), 'custom', 31).toISOString().slice(0, 10)).toBe('2026-04-30');
+  });
+});

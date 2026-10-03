@@ -16,6 +16,8 @@ async function api(method, path, body) {
   return ct.includes('json') ? res.json() : res.text();
 }
 
+function ordinal(n) { const t = n % 100, o = n % 10; return n + (t >= 11 && t <= 13 ? 'th' : o === 1 ? 'st' : o === 2 ? 'nd' : o === 3 ? 'rd' : 'th'); }
+
 function money(cents) { return ((cents || 0) / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD' }); }
 
 // The grace period is the owner's choice — never default it. 0 = the late fee
@@ -336,7 +338,7 @@ async function loadRecurring() {
     }));
   }
   renderList('recurring', templates, (t) => {
-    const freq = t.frequency === 'monthly' ? 'Monthly' : t.frequency === 'weekly' ? 'Weekly' : t.frequency === 'biweekly' ? 'Every 2 weeks' : ('Monthly, ' + (t.customDay || '') + (t.customDay === 1 ? 'st' : t.customDay === 2 ? 'nd' : t.customDay === 3 ? 'rd' : 'th'));
+    const freq = t.frequency === 'monthly' ? 'Monthly' : t.frequency === 'weekly' ? 'Weekly' : t.frequency === 'biweekly' ? 'Every 2 weeks' : (t.customDay >= 29 ? 'Monthly, last day' : 'Monthly on the ' + ordinal(t.customDay || 1));
     const feeLabel = t.feeKind === 'none' ? 'No late fee' : t.feeKind === 'percent' ? (t.feeAmount + '% late fee') : ('$' + t.feeAmount + ' late fee');
     return {
       id: t.id,
@@ -624,7 +626,8 @@ document.addEventListener('wt:recurring-save', async e => {
     clientEmail: d.client_email,
     amount: parseMoney(d.amount),
     frequency: d.frequency,
-    customDay: d.custom_day === 'last' ? 28 : (parseInt(d.custom_day) || undefined),
+    // "last day" is 31: the run date clamps to each month's length (30th, Feb 28/29).
+    customDay: d.custom_day === 'last' ? 31 : (parseInt(d.custom_day) || undefined),
     startDate: d.next_invoice_date,
     dueDays: parseInt(d.due_days, 10) || undefined,
     feeKind,
@@ -664,7 +667,7 @@ document.addEventListener('wt:recurring-edit', async e => {
     form.querySelector('[name="frequency"]').value = t.frequency;
     const dueSel = form.querySelector('[name="due_days"]');
     if (dueSel) { dueSel.value = String([7, 14, 30].includes(t.dueDays) ? t.dueDays : 30); dueSel.dataset.touched = '1'; }
-    form.querySelector('[name="custom_day"]').value = t.customDay || 1;
+    form.querySelector('[name="custom_day"]').value = t.customDay >= 29 ? 'last' : (t.customDay || 1);
     form.querySelector('[name="next_invoice_date"]').value = (t.nextRunDate || '').slice(0, 10);
     form.querySelector('[name="grace_days"]').value = t.graceDays != null ? t.graceDays : '';
     if (t.feeKind === 'flat') { form.querySelector('[name="fee_flat"]').value = t.feeAmount; }

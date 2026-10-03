@@ -73,8 +73,8 @@ templatesRouter.post('/', async (req, res) => {
     return res.status(400).json({ error: `frequency must be one of: ${validFrequencies.join(', ')}` });
   }
 
-  if (freq === 'custom' && (customDay == null || customDay < 1 || customDay > 28)) {
-    return res.status(400).json({ error: 'customDay is required (1-28) for custom frequency' });
+  if (freq === 'custom' && (customDay == null || customDay < 1 || customDay > 31)) {
+    return res.status(400).json({ error: 'customDay is required (1-31; 31 = last day of the month) for custom frequency' });
   }
 
   const today = new Date();
