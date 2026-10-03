@@ -626,6 +626,7 @@ document.addEventListener('wt:recurring-save', async e => {
     frequency: d.frequency,
     customDay: d.custom_day === 'last' ? 28 : (parseInt(d.custom_day) || undefined),
     startDate: d.next_invoice_date,
+    dueDays: parseInt(d.due_days, 10) || undefined,
     feeKind,
     feeAmount: feeKind === 'flat' ? (parseMoney(d.fee_flat) || 0) : feeKind === 'percent' ? (parseFloat(d.fee_pct) || 0) : 0,
   };
@@ -661,6 +662,8 @@ document.addEventListener('wt:recurring-edit', async e => {
     form.querySelector('[name="client_email"]').value = t.clientEmail;
     form.querySelector('[name="amount"]').value = (t.amount / 100).toFixed(2);
     form.querySelector('[name="frequency"]').value = t.frequency;
+    const dueSel = form.querySelector('[name="due_days"]');
+    if (dueSel) { dueSel.value = String([7, 14, 30].includes(t.dueDays) ? t.dueDays : 30); dueSel.dataset.touched = '1'; }
     form.querySelector('[name="custom_day"]').value = t.customDay || 1;
     form.querySelector('[name="next_invoice_date"]').value = (t.nextRunDate || '').slice(0, 10);
     form.querySelector('[name="grace_days"]').value = t.graceDays != null ? t.graceDays : '';
@@ -711,3 +714,33 @@ document.addEventListener('DOMContentLoaded', () => {
   const view = (window.location.hash || '').replace('#', '') || 'dashboard';
   document.dispatchEvent(new CustomEvent('wt:view', { detail: { view } }));
 });
+// Recurring form: "Payment due" follows the schedule (weekly → 7 days,
+// every 2 weeks → 14, monthly → 30) until the owner picks it themselves.
+document.addEventListener('change', (e) => {
+  const form = e.target.closest && e.target.closest('[data-recurring-form]');
+  if (!form) return;
+  const due = form.querySelector('[name="due_days"]');
+  if (!due) return;
+  if (e.target === due) { due.dataset.touched = '1'; return; }
+  if (e.target.name === 'frequency' && !due.dataset.touched) {
+    due.value = { weekly: '7', biweekly: '14' }[e.target.value] || '30';
+  }
+});
+
+// "New recurring invoice" always starts blank. Without this, the form kept the
+// last edited invoice (including its id), so saving overwrote that invoice.
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('[data-open-modal="wt-recurring-modal"]')) return;
+  const form = document.querySelector('[data-recurring-form]');
+  if (!form) return;
+  form.reset();
+  form.querySelector('[name="id"]').value = '';
+  const due = form.querySelector('[name="due_days"]');
+  if (due) { delete due.dataset.touched; due.value = '30'; }
+  const next = form.querySelector('[name="next_invoice_date"]');
+  if (next) { delete next.dataset.touched; next.value = ''; }
+  form.querySelectorAll('[data-edit-only]').forEach(el => { el.hidden = true; });
+  const title = document.getElementById('rec-modal-title');
+  if (title) title.textContent = 'New recurring invoice';
+  form.querySelector('[name="frequency"]')?.dispatchEvent(new Event('change', { bubbles: true }));
+}, true);

@@ -1016,6 +1016,14 @@
           <option value="custom">Custom day of the month</option>
         </select>
       </label>
+      <label class="wt-field">Payment due
+        <!-- Defaults to the schedule (weekly → 7, every 2 weeks → 14, monthly → 30) until the owner picks one. -->
+        <select class="wt-select" name="due_days">
+          <option value="7">7 days after it's sent</option>
+          <option value="14">14 days after it's sent</option>
+          <option value="30" selected>30 days after it's sent</option>
+        </select>
+      </label>
     </div>
 
     <div class="wt-custom-day" hidden>

@@ -88,7 +88,9 @@ templatesRouter.post('/', async (req, res) => {
       clientEmail,
       amount: amountCents,
       currency: currency ?? 'usd',
-      dueDays: dueDays != null ? Number(dueDays) : 30,
+      // Due date follows the schedule unless the owner picked one: a weekly
+      // invoice due in 30 days would pile up four open invoices at once.
+      dueDays: dueDays != null && Number.isFinite(Number(dueDays)) ? Math.min(90, Math.max(0, Math.round(Number(dueDays)))) : ({ weekly: 7, biweekly: 14 } as Record<string, number>)[String(frequency)] ?? 30,
       feeKind: feeKind ?? 'none',
       feeAmount: feeAmount != null ? Number(feeAmount) : 0,
       graceDays: grace ?? 0,
