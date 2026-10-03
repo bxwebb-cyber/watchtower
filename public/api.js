@@ -195,6 +195,8 @@ function renderInvoices() {
     }
     return true;
   });
+  // The "(8)" next to "Recent invoices" was the designer's sample number.
+  document.querySelectorAll('[data-bind="invoice_result_count"]').forEach(el => { el.textContent = String(list.length); });
 
   renderList('invoices', list, (inv, i) => {
     const s = invoiceStatus(inv, now);
