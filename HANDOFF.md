@@ -5,7 +5,7 @@ _Last updated: 2026-09-28 (v1.8 — scheduler + one-bill late fees + webhook fix
 
 ## ▶▶▶ 10/2–10/3/26 (late night) — ADDED SINCE THE STATUS BELOW. ALL DEPLOYED.
 - **Late fees are now AUTOMATIC with a heads-up (Bashira's call 10/3).** Day before the fee lands → owner email "Tomorrow: $X late fee on invoice N" + dashboard "Late fees coming up" (Lower / Waive). No action → fee added next morning, client emailed the new bill. Never added the same day as the heads-up. Reason: approval-first let clients pay the old fee-free link. `feeStep()` in feeEngine.ts, tests in feeStep.test.ts. The `autoApplyFees` setting is now unused.
-- **Cancel invoice** (invoice view → Cancel invoice): voids in Stripe, stops reminders/fees, optional client email (template 10-cancelled). Cancelled invoices currently FREE their 5-client slot — Bashira undecided on a 24-hour-only rule (risk: cancel after being paid outside Stripe).
+- **Cancel invoice** (invoice view → Cancel invoice): voids in Stripe, stops reminders/fees, optional client email (template 10-cancelled). A cancelled invoice frees its 5-client slot ONLY if cancelled within 24 hours of creation (Bashira 10/3; `countsTowardLimit` in planLimits.ts).
 - **Due dates:** Stripe gets the END of the due day in New York (was midnight UTC → "due_date in the past" for next-day invoices after 8pm ET). Day math is time-zone-proof (tests pass in NY and UTC).
 - **Recurring edit fixes:** edit no longer wipes the late fee; Active/Paused loads + saves; real sent count; "Edit" title; Next-invoice-date edits save; PATCH validates.
 - Invoice list: real "(N)" count; 13-char Stripe numbers no longer overlap; phone rows stack.

@@ -46,3 +46,14 @@ export function planRequired(env: NodeJS.ProcessEnv = process.env): boolean {
   return env.NODE_ENV === 'production' || !!env.RAILWAY_ENVIRONMENT_NAME;
 }
 export const NO_PLAN_MESSAGE = 'Choose a plan to start sending invoices: getdunn.org/#pricing';
+
+// A cancelled invoice gives its client slot back only if it was cancelled
+// within 24 hours of being created: that covers a typo (wrong amount or
+// email), not "let Dunn chase them for weeks, get paid in cash, cancel"
+// (Bashira 10/3). Voided or deleted in Stripe counts as cancelled too.
+export const FREE_CANCEL_HOURS = 24;
+export function countsTowardLimit(inv: { status: string; createdAt: Date; cancelledAt: Date | null }): boolean {
+  if (inv.status !== 'void' && inv.status !== 'deleted') return true;
+  if (!inv.cancelledAt) return true;
+  return inv.cancelledAt.getTime() - inv.createdAt.getTime() > FREE_CANCEL_HOURS * 3_600_000;
+}

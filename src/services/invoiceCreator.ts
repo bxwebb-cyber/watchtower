@@ -1,7 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import Stripe from 'stripe';
 import { sendClientEmail } from './reminderEngine';
-import { monthStart, soloLimitMessage, hasActivePlan, planRequired, NO_PLAN_MESSAGE } from './planLimits';
+import { monthStart, soloLimitMessage, hasActivePlan, planRequired, NO_PLAN_MESSAGE, countsTowardLimit } from './planLimits';
 import { feeWhen } from './feeRules';
 import { usd, usdDollars } from '../lib/money';
 
@@ -85,11 +85,7 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<CreateIn
   // Plan cap: Solo covers 5 clients a month, 10 invoices each. The cap sorts
   // owners by how many clients they have, not how often they bill.
   if (account.plan === 'solo') {
-    const thisMonth = await prisma.invoice.findMany({
-      where: { accountId: account.id, createdAt: { gte: monthStart(new Date()) }, status: { notIn: ['void', 'deleted'] } }, // cancelled invoices free up their slot
-      select: { client: { select: { email: true } } },
-    });
-    const message = soloLimitMessage(thisMonth.map((i) => i.client?.email), input.clientEmail);
+    const message = soloLimitMessage(await clientEmailsThisMonth(account.id), input.clientEmail);
     if (message) return { ok: false, code: 'plan_limit', message };
   }
 
@@ -279,4 +275,25 @@ function feeLabel(p: { kind: string; amount?: number; graceDays?: number }): str
 export function dueTimestamp(dueDate: Date): number {
   const day = Date.UTC(dueDate.getUTCFullYear(), dueDate.getUTCMonth(), dueDate.getUTCDate());
   return Math.floor(day / 1000) + 28 * 3600 - 1;
+}
+
+// The client emails that use a $39-plan slot this month.
+export async function clientEmailsThisMonth(accountId: string): Promise<(string | null | undefined)[]> {
+  const invs = await prisma.invoice.findMany({
+    where: { accountId, createdAt: { gte: monthStart(new Date()) } },
+    select: {
+      status: true,
+      createdAt: true,
+      client: { select: { email: true } },
+      auditLog: {
+        where: { event: { in: ['invoice_cancelled', 'invoice_voided', 'invoice_deleted'] } },
+        orderBy: { createdAt: 'asc' },
+        take: 1,
+        select: { createdAt: true },
+      },
+    },
+  });
+  return invs
+    .filter((i) => countsTowardLimit({ status: i.status, createdAt: i.createdAt, cancelledAt: i.auditLog[0]?.createdAt ?? null }))
+    .map((i) => i.client?.email);
 }

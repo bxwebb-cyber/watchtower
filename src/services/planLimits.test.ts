@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { soloLimitMessage, monthStart, clientsUsed, hasActivePlan, planRequired } from './planLimits';
+import { countsTowardLimit } from './planLimits';
 
 const weekly = (email: string, n: number) => Array.from({ length: n }, () => email);
 
@@ -59,5 +60,22 @@ describe('hasActivePlan / planRequired', () => {
     expect(planRequired({})).toBe(false);
     expect(planRequired({ REQUIRE_PLAN: 'on' })).toBe(true);
     expect(planRequired({ NODE_ENV: 'production', REQUIRE_PLAN: 'off' })).toBe(false);
+  });
+});
+
+describe('countsTowardLimit (24-hour rule for cancelled invoices)', () => {
+  const created = new Date('2026-10-03T14:00:00Z');
+  const hours = (h: number) => new Date(created.getTime() + h * 3_600_000);
+  it('open and paid invoices always count', () => {
+    expect(countsTowardLimit({ status: 'open', createdAt: created, cancelledAt: null })).toBe(true);
+    expect(countsTowardLimit({ status: 'paid', createdAt: created, cancelledAt: null })).toBe(true);
+  });
+  it('cancelled within 24 hours frees the slot', () => {
+    expect(countsTowardLimit({ status: 'void', createdAt: created, cancelledAt: hours(1) })).toBe(false);
+    expect(countsTowardLimit({ status: 'void', createdAt: created, cancelledAt: hours(24) })).toBe(false);
+  });
+  it('cancelled later still counts', () => {
+    expect(countsTowardLimit({ status: 'void', createdAt: created, cancelledAt: hours(25) })).toBe(true);
+    expect(countsTowardLimit({ status: 'deleted', createdAt: created, cancelledAt: hours(24 * 9) })).toBe(true);
   });
 });
