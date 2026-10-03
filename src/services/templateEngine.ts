@@ -23,6 +23,8 @@ export async function runTemplateJob(now = new Date()): Promise<number> {
   });
 
   let created = 0;
+  // Updates use updateMany: an owner can delete a template while the run is
+  // working on it, and that must not crash the run.
   for (const tmpl of templates) {
     try {
       // Due date: N days from the run date.
@@ -65,7 +67,7 @@ export async function runTemplateJob(now = new Date()): Promise<number> {
                   : 'Check that your Stripe account is still connected (Dunn → Settings). Dunn tries again every day until it goes through.')
           );
         }
-        await prisma.invoiceTemplate.update({
+        await prisma.invoiceTemplate.updateMany({
           where: { id: tmpl.id },
           data: { lastRunAt: now, lastRunOk: false, lastError: result.message },
         });
@@ -82,7 +84,7 @@ export async function runTemplateJob(now = new Date()): Promise<number> {
       // Advance the schedule.
       const nextRun = advanceRunDate(tmpl.nextRunDate, tmpl.frequency, tmpl.customDay ?? undefined);
 
-      await prisma.invoiceTemplate.update({
+      await prisma.invoiceTemplate.updateMany({
         where: { id: tmpl.id },
         data: {
           nextRunDate: nextRun,
@@ -112,7 +114,7 @@ export async function runTemplateJob(now = new Date()): Promise<number> {
       created++;
     } catch (err) {
       console.error(`[template] error processing ${tmpl.id}`, err);
-      await prisma.invoiceTemplate.update({
+      await prisma.invoiceTemplate.updateMany({
         where: { id: tmpl.id },
         data: { lastRunAt: now, lastRunOk: false, lastError: (err as Error).message },
       });

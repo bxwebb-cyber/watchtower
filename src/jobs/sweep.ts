@@ -38,7 +38,7 @@ export async function runSweep(now = new Date()): Promise<boolean> {
     ['fees', 'Late fees added', runFeeJob],
     ['templates', 'Recurring invoices created', runTemplateJob],
   ];
-  const day = now.toISOString().slice(0, 10);
+  const day = easternClock(now).day; // New York date, like the scheduler
   const lines: string[] = [];
   let ok = true;
   for (const [name, label, job] of jobs) {
