@@ -492,6 +492,14 @@ input::placeholder { color: var(--wt-faint); }
 .wt-inv__timeline li[data-kind="problem"]::before { background: var(--wt-brick-dark); }
 .wt-inv__when { display: block; font-size: 12px; color: var(--wt-subtle); margin-top: 2px; }
 .wt-inv__quote { margin: 6px 0 0; padding: 10px 12px; border-radius: 10px; background: var(--wt-paper); font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+.wt-inv__cancel-btn { margin-right: auto; color: var(--wt-brick); font-weight: 400; }
+.wt-inv__cancel { margin-top: 18px; padding: 16px; border-radius: 12px; border: 1px solid var(--wt-brick); background: var(--wt-paper); }
+.wt-inv__cancel-q { margin: 0 0 6px; font-weight: 600; color: var(--wt-ink); }
+.wt-inv__cancel-note { margin: 0 0 12px; font-size: 13.5px; line-height: 1.5; color: var(--wt-text-body); }
+.wt-inv__cancel-tell { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; color: var(--wt-text-body); }
+.wt-inv__cancel-tell input { margin-top: 3px; }
+.wt-inv__cancel-err { margin: 10px 0 0; font-size: 13.5px; color: var(--wt-brick-dark); }
+.wt-inv__cancel-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
 @media (max-width: 520px) { .wt-inv__facts { grid-template-columns: 1fr; } .wt-inv__amount { font-size: 34px; } .wt-modal__foot { flex-wrap: wrap; } }
 
 /* ---------- Who you waive fees for (Reports) ---------- */

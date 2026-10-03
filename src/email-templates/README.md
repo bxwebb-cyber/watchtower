@@ -15,6 +15,7 @@ Render with Handlebars and send the output as the HTML body. The subject line is
 | 06-fee-applied.hbs.html | When the owner approves a late fee (never sent if no fee) | A late fee has been added to invoice {{invoice_id}} |
 | 07-past-due-14-days-after.hbs.html | 14 days after due date | Invoice {{invoice_id}} is two weeks past due |
 | 08-paid.hbs.html | When payment clears | Payment received. Thank you |
+| 10-cancelled.hbs.html | The owner cancels the invoice in Dunn | Invoice {{invoice_id}} has been cancelled |
 
 `preview/` holds each email rendered with `sample-data.json`. Open them in a browser to check.
 

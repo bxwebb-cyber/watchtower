@@ -201,7 +201,7 @@ type EmailInvoice = Invoice & { client: Client | null; account: Account; feePoli
 // Plain names for the emails Dunn sends, for problem reports.
 const STEP_LABEL: Record<string, string> = {
   new_invoice: 'invoice email', 't-4': 'reminder', fee_warning: 'late-fee warning', 't+3': 'past-due notice',
-  't+14': 'final notice', fee_applied: 'late-fee notice', fee_updated: 'late-fee update',
+  't+14': 'final notice', fee_applied: 'late-fee notice', fee_updated: 'late-fee update', cancelled: 'cancellation notice',
 };
 
 export async function sendClientEmail(
@@ -227,7 +227,9 @@ export async function sendClientEmail(
     to,
     subject,
     html,
-    text: `Invoice ${data.invoiceId}: ${data.feeApplied ? data.balanceDue : data.amountDue} due. Pay here: ${data.payUrl}`,
+    text: step === 'cancelled'
+      ? `Invoice ${data.invoiceId} for ${data.amountDue} has been cancelled. You don't need to pay it.`
+      : `Invoice ${data.invoiceId}: ${data.feeApplied ? data.balanceDue : data.amountDue} due. Pay here: ${data.payUrl}`,
     replyTo: replyToFor(invoice.id),
   });
   if (msg.error) {

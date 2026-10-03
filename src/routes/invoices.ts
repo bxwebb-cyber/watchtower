@@ -7,6 +7,7 @@ import { agreedFeeCents, parseGraceDays, GRACE_REQUIRED } from '../services/feeR
 import { getAccount } from '../lib/account';
 import { buildTimeline } from '../services/invoiceTimeline';
 import { usd, usdDollars } from '../lib/money';
+import { sendClientEmail } from '../services/reminderEngine';
 
 const prisma = new PrismaClient();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -136,6 +137,56 @@ async function feeAction(res: Response, action: () => Promise<object>) {
     res.status(502).json({ error: 'Stripe or the email service had a problem — nothing was changed. Try again in a minute.' });
   }
 }
+
+// POST /invoices/:id/cancel { tellClient? } — the owner cancels an unpaid
+// invoice: it's voided in their Stripe (the pay link stops working), Dunn
+// stops every reminder and fee, and, unless told not to, the client gets a
+// "you don't need to pay this" email. Paid invoices can't be cancelled here
+// (that's a refund, done in Stripe).
+invoicesRouter.post('/:id/cancel', async (req, res) => {
+  const account = await getAccount(req);
+  if (!account) return res.status(401).json({ error: 'Not authenticated' });
+  const invoice = await prisma.invoice.findFirst({
+    where: { id: String(req.params.id), accountId: account.id },
+    include: { client: true, account: true, feePolicy: true },
+  });
+  if (!invoice) return res.status(404).json({ error: 'Invoice not found.' });
+  if (invoice.status !== 'open') {
+    return res.status(400).json({ error: invoice.status === 'paid' ? 'This invoice is paid. To give money back, refund it in Stripe.' : 'This invoice is already cancelled.' });
+  }
+
+  const opts = { stripeAccount: account.stripeAccountId };
+  try {
+    const si = await stripe.invoices.retrieve(invoice.stripeInvoiceId, {}, opts);
+    if (si.status === 'paid') {
+      return res.status(409).json({ error: 'The client just paid this invoice, so it can’t be cancelled. To give money back, refund it in Stripe.' });
+    }
+    if (si.status === 'draft') await stripe.invoices.del(si.id, {}, opts);
+    else if (si.status === 'open') await stripe.invoices.voidInvoice(si.id, {}, opts);
+    // A late fee billed under the old two-invoice model is a separate bill.
+    if (invoice.feeInvoiceId && invoice.feeInvoiceId !== invoice.stripeInvoiceId) {
+      await stripe.invoices.voidInvoice(invoice.feeInvoiceId, {}, opts).catch(() => {});
+    }
+  } catch (err) {
+    console.error('[invoices] cancel failed in Stripe', invoice.id, err);
+    return res.status(502).json({ error: 'Stripe had a problem, so nothing was cancelled. Try again in a minute.' });
+  }
+
+  await prisma.invoice.updateMany({
+    where: { id: invoice.id, status: { in: ['open', 'void'] } },
+    data: { status: 'void', ...(invoice.feeStatus === 'pending' ? { feeStatus: null } : {}) },
+  });
+  await prisma.auditEvent.create({
+    data: { invoiceId: invoice.id, event: 'invoice_cancelled', detail: 'cancelled by the owner; reminders stopped' },
+  });
+
+  let clientEmailed = false;
+  if (req.body?.tellClient !== false && invoice.client?.email) {
+    try { clientEmailed = await sendClientEmail(invoice, 'cancelled'); }
+    catch (err) { console.error('[invoices] cancel email failed', invoice.id, err); }
+  }
+  res.json({ ok: true, clientEmailed });
+});
 
 // POST /invoices/:id/escalate — owner responds to an escalation.
 // action = 'send' → trigger the T+14 final notice email to the client

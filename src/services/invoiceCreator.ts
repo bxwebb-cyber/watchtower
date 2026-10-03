@@ -86,7 +86,7 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<CreateIn
   // owners by how many clients they have, not how often they bill.
   if (account.plan === 'solo') {
     const thisMonth = await prisma.invoice.findMany({
-      where: { accountId: account.id, createdAt: { gte: monthStart(new Date()) } },
+      where: { accountId: account.id, createdAt: { gte: monthStart(new Date()) }, status: { notIn: ['void', 'deleted'] } }, // cancelled invoices free up their slot
       select: { client: { select: { email: true } } },
     });
     const message = soloLimitMessage(thisMonth.map((i) => i.client?.email), input.clientEmail);

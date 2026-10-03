@@ -76,7 +76,7 @@ function invoiceStatus(inv, now) {
   }
   // Cancelled in Stripe — no longer owed, so never "Pending" or "Overdue".
   if (inv.status === 'void' || inv.status === 'uncollectible' || inv.status === 'deleted') {
-    const label = inv.status === 'uncollectible' ? 'Uncollectible' : 'Void';
+    const label = inv.status === 'uncollectible' ? 'Uncollectible' : 'Cancelled';
     return { key: 'void', pill: 'wt-pill--pending', label, dueClass: '', dueText: label.toLowerCase() };
   }
   if (inv.feeApplied) {
@@ -109,7 +109,7 @@ document.addEventListener('wt:open-invoice', async (e) => {
   put('title', 'Invoice ' + (row.stripeNumber || ''));
   put('client', 'Loading…'); put('amount', row.amount); put('due', ''); put('sent', ''); put('fee', '');
   $i('timeline').replaceChildren();
-  $i('pdf').hidden = true; $i('copy').hidden = true;
+  $i('pdf').hidden = true; $i('copy').hidden = true; $i('cancel').hidden = true; $i('cancel-box').hidden = true;
   const s = invoiceStatus(row, new Date());
   $i('status').className = 'wt-pill wt-pill--dot ' + s.pill; put('status', s.label);
   window.WatchtowerUI.openModal('wt-invoice-modal');
@@ -141,6 +141,35 @@ document.addEventListener('wt:open-invoice', async (e) => {
   }
 
   if (d.pdfUrl) { $i('pdf').href = d.pdfUrl; $i('pdf').hidden = false; }
+  // Cancel: only unpaid invoices. Asks first, inside the box.
+  if (d.status === 'open') {
+    const who = d.client || 'the client';
+    $i('cancel').hidden = false;
+    $i('cancel').onclick = () => {
+      put('cancel-q', 'Cancel invoice ' + (d.number || '') + ' for ' + $i('amount').textContent + '?');
+      put('cancel-tell-label', 'Email ' + who + " that they don't need to pay it");
+      $i('cancel-tell').checked = !!d.clientEmail; $i('cancel-tell').disabled = !d.clientEmail;
+      $i('cancel-err').hidden = true;
+      $i('cancel-box').hidden = false; $i('cancel').hidden = true;
+      $i('cancel-box').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    };
+    $i('cancel-keep').onclick = () => { $i('cancel-box').hidden = true; $i('cancel').hidden = false; };
+    $i('cancel-yes').onclick = async () => {
+      const yes = $i('cancel-yes');
+      yes.disabled = true; yes.textContent = 'Cancelling…';
+      try {
+        await api('POST', '/invoices/' + d.id + '/cancel', { tellClient: $i('cancel-tell').checked });
+        // Refresh the list, then show this invoice again: now "Cancelled",
+        // with the cancel (and the client email) in its timeline.
+        await loadDashboard();
+        document.dispatchEvent(new CustomEvent('wt:open-invoice', { detail: { id: key } }));
+      } catch (err) {
+        put('cancel-err', err.message); $i('cancel-err').hidden = false;
+      } finally {
+        yes.disabled = false; yes.textContent = 'Yes, cancel invoice';
+      }
+    };
+  }
   if (d.hostedInvoiceUrl && d.status === 'open') {
     const btn = $i('copy');
     btn.hidden = false;

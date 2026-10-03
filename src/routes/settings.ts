@@ -27,7 +27,7 @@ settingsRouter.get('/', async (req, res) => {
   let clientsThisMonth: number | null = null;
   if (account.plan === 'solo') {
     const invs = await prisma.invoice.findMany({
-      where: { accountId: account.id, createdAt: { gte: monthStart(new Date()) } },
+      where: { accountId: account.id, createdAt: { gte: monthStart(new Date()) }, status: { notIn: ['void', 'deleted'] } }, // cancelled invoices free up their slot
       select: { client: { select: { email: true } } },
     });
     clientsThisMonth = clientsUsed(invs.map((i) => i.client?.email));

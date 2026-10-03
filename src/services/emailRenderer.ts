@@ -120,4 +120,5 @@ export const EMAIL_TEMPLATES: Record<string, string> = {
   fee_applied: '06-fee-applied',
   paid: '08-paid',
   fee_updated: '09-fee-updated',
+  cancelled: '10-cancelled',
 };

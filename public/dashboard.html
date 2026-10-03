@@ -980,7 +980,18 @@
     </dl>
     <h3 class="wt-inv__heading">What's happened</h3>
     <ol class="wt-inv__timeline" data-inv="timeline"></ol>
+    <div class="wt-inv__cancel" data-inv="cancel-box" hidden>
+      <p class="wt-inv__cancel-q" data-inv="cancel-q"></p>
+      <p class="wt-inv__cancel-note">The payment link stops working and Dunn sends no more reminders or late fees. This can't be undone.</p>
+      <label class="wt-inv__cancel-tell"><input type="checkbox" data-inv="cancel-tell" checked> <span data-inv="cancel-tell-label">Email the client that they don't need to pay it</span></label>
+      <p class="wt-inv__cancel-err" data-inv="cancel-err" role="alert" hidden></p>
+      <div class="wt-inv__cancel-actions">
+        <button class="wt-btn wt-btn--secondary wt-btn--sm" type="button" data-inv="cancel-keep">Keep invoice</button>
+        <button class="wt-btn wt-btn--danger wt-btn--sm" type="button" data-inv="cancel-yes">Yes, cancel invoice</button>
+      </div>
+    </div>
     <div class="wt-modal__foot">
+      <button class="wt-btn wt-btn--link wt-inv__cancel-btn" type="button" data-inv="cancel" hidden>Cancel invoice</button>
       <a class="wt-btn wt-btn--secondary" data-inv="pdf" href="#" download hidden>Download PDF</a>
       <button class="wt-btn wt-btn--secondary" type="button" data-inv="copy" hidden>Copy payment link</button>
       <button class="wt-btn wt-btn--primary" type="button" data-close-modal>Done</button>
