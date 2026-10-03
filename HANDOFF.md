@@ -3,6 +3,15 @@ _Last updated: 2026-09-28 (v1.8 — scheduler + one-bill late fees + webhook fix
 
 ---
 
+## ▶▶▶ 10/2–10/3/26 (late night) — ADDED SINCE THE STATUS BELOW. ALL DEPLOYED.
+- **Late fees are now AUTOMATIC with a heads-up (Bashira's call 10/3).** Day before the fee lands → owner email "Tomorrow: $X late fee on invoice N" + dashboard "Late fees coming up" (Lower / Waive). No action → fee added next morning, client emailed the new bill. Never added the same day as the heads-up. Reason: approval-first let clients pay the old fee-free link. `feeStep()` in feeEngine.ts, tests in feeStep.test.ts. The `autoApplyFees` setting is now unused.
+- **Cancel invoice** (invoice view → Cancel invoice): voids in Stripe, stops reminders/fees, optional client email (template 10-cancelled). Cancelled invoices currently FREE their 5-client slot — Bashira undecided on a 24-hour-only rule (risk: cancel after being paid outside Stripe).
+- **Due dates:** Stripe gets the END of the due day in New York (was midnight UTC → "due_date in the past" for next-day invoices after 8pm ET). Day math is time-zone-proof (tests pass in NY and UTC).
+- **Recurring edit fixes:** edit no longer wipes the late fee; Active/Paused loads + saves; real sent count; "Edit" title; Next-invoice-date edits save; PATCH validates.
+- Invoice list: real "(N)" count; 13-char Stripe numbers no longer overlap; phone rows stack.
+- **Known gap:** Settings → Alerts toggles (fee coming / overdue / paid) are saved but NOT honored anywhere — every alert always sends.
+- **Timed tests pending:** fee heads-up Oct 3 → fee Oct 4 (the $25,000 invoice due Oct 3, $10, 0 grace); reminder Oct 6 ($25 invoice due Oct 10); recurring next Oct 10. (Pre-due reminder is skipped when it would land ≤2 days after the invoice was sent.)
+
 ## ▶▶▶ READ FIRST — STATUS 10/2/26 (end of session). getdunn.org is LIVE, Stripe still TEST mode, scheduler ON (SCHEDULER_START=2026-10-02).
 
 **Verified live in test mode:** client pays invoice (+ webhooks) · subscribe monthly + yearly · Manage plan (switch, cancel, un-cancel) with customer + founder emails · plan required (sign-up picker, server check, 5-client limit blocks a 6th) · client replies end to end · hello@getdunn.org in/out (Gmail send-as) · bounce alerts · password reset · new user sign-up → plan → connect Stripe → invoices · phone layouts (landing, demo, sign-in) · Search Console + sitemap · DMARC.
