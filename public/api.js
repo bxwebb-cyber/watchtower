@@ -318,7 +318,7 @@ async function loadRecurring() {
   // real reason and retry date. textContent only.
   const fails = document.querySelector('[data-recurring-failures]');
   if (fails) {
-    const day = (d) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const day = (d) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
     fails.replaceChildren(...templates.filter(t => t.active && t.lastRunAt && !t.lastRunOk).map(t => {
       const box = document.createElement('div'); box.className = 'wt-banner wt-banner--error'; box.setAttribute('role', 'alert');
       const dot = document.createElement('span'); dot.className = 'wt-banner__dot';
@@ -344,7 +344,7 @@ async function loadRecurring() {
       amount: money(t.amount),
       fee_label: feeLabel,
       frequency_label: freq,
-      schedule_sub: t.active ? ('Next ' + new Date(t.nextRunDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })) : 'Paused',
+      schedule_sub: t.active ? ('Next ' + new Date(t.nextRunDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })) : 'Paused',
       last_run_date: t.lastRunAt ? new Date(t.lastRunAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'None yet',
       result_class: !t.lastRunAt ? 'wt-result--none' : (t.lastRunOk ? 'wt-result--sent' : 'wt-result--failed'),
       result_label: !t.lastRunAt ? '' : (t.lastRunOk ? 'Sent' : 'Failed, will retry'),
@@ -637,7 +637,7 @@ document.addEventListener('wt:recurring-save', async e => {
     if (d.id) { await api('PATCH', '/templates/' + d.id, body); }
     else { await api('POST', '/templates', body); }
     loadRecurring();
-    if (window.WatchtowerUI) WatchtowerUI.closeModal();
+    if (window.WatchtowerUI) WatchtowerUI.closeModal('wt-recurring-modal');
   } catch (err) { alert('Save failed: ' + err.message); }
 });
 

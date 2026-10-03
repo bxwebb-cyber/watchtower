@@ -104,7 +104,7 @@
 
   /* ---------- Modal ---------- */
   function openModal(id) { const m = document.getElementById(id); if (!m) return; m.hidden = false; m.querySelector('input, select, button')?.focus(); }
-  function closeModal(m) { m.hidden = true; }
+  function closeModal(m) { if (m) m.hidden = true; }
   window.WatchtowerUI = { openModal, closeModal: (id) => closeModal(document.getElementById(id)) };
   document.addEventListener('click', (e) => {
     const opener = e.target.closest('[data-open-modal]');
