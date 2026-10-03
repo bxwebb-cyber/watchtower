@@ -1,5 +1,6 @@
 # Watchtower — Handoff Sheet
-_Last updated: 2026-09-28 (v1.8 — scheduler + one-bill late fees + webhook fix DEPLOYED; scheduler switched OFF in production pending invoice review) · working name = "Watchtower"; real name = "Dunn" (accounting term). Keep calling it Watchtower in code/docs until the domain is bought._
+_Last updated: 2026-10-03, ~1am ET. Read "▶ TOMORROW" first._
+_(Older header:) 2026-09-28 (v1.8 — scheduler + one-bill late fees + webhook fix DEPLOYED; scheduler switched OFF in production pending invoice review) · working name = "Watchtower"; real name = "Dunn" (accounting term). Keep calling it Watchtower in code/docs until the domain is bought._
 
 ---
 
@@ -10,17 +11,26 @@ _Last updated: 2026-09-28 (v1.8 — scheduler + one-bill late fees + webhook fix
 - **Recurring edit fixes:** edit no longer wipes the late fee; Active/Paused loads + saves; real sent count; "Edit" title; Next-invoice-date edits save; PATCH validates.
 - Invoice list: real "(N)" count; 13-char Stripe numbers no longer overlap; phone rows stack.
 - **Alerts switches work (10/3):** "overdue" (once, morning after due date, only invoices without a late fee) and "a client pays" can be turned off. Fee heads-up, replies, problems always send (switch removed).
-- **Timed tests pending:** fee heads-up Oct 3 → fee Oct 4 (the $25,000 invoice due Oct 3, $10, 0 grace); reminder Oct 6 ($25 invoice due Oct 10); recurring next Oct 10. (Pre-due reminder is skipped when it would land ≤2 days after the invoice was sent.)
+
+### ▶ TOMORROW (Sat 10/3) — START HERE
+**Check what the 9am runs did (Resend + bmwxcf Gmail):**
+1. **Oct 3, 9am — fee heads-up:** "Tomorrow: $10 late fee on invoice EYXYUIAF-0008" email to the owner; the dashboard shows it under "Late fees coming up" (Lower / Waive). Try **Lower** (e.g. $5) on it.
+2. **Oct 3, 9am — founder daily summary** arrives.
+3. **Oct 4, 9am — fee added:** the invoice is replaced by one for amount + fee (the lowered one, if lowered), and the client email goes to delivered@resend.dev. The old pay link no longer works. Then try **Waive** on the billed fee → the client gets an updated bill → check Reports → "Who you waive fees for".
+4. **Oct 6, 9am — reminder** for the $25 invoice due Oct 10.
+5. **Oct 10, 9am — recurring** invoices send. To test sooner, edit one and set Next invoice date = tomorrow.
+6. **Custom-day recurring:** create one and check the "Next" date in the list.
+
+**Any-time tests still open:** failed client payment (card 4000 0000 0000 0002) · buhshyruh (no plan) blocked + banner · Reports CSV · dashboard on iPhone · disconnect + reconnect Stripe · cancel an invoice → slot returns only within 24h · Alerts: turn off "A client pays", pay an invoice → no "Invoice paid" email.
+
+**Then:** go-live steps below (Stripe live). Then AI distribution (MCP server).
 
 ## ▶▶▶ READ FIRST — STATUS 10/2/26 (end of session). getdunn.org is LIVE, Stripe still TEST mode, scheduler ON (SCHEDULER_START=2026-10-02).
 
 **Verified live in test mode:** client pays invoice (+ webhooks) · subscribe monthly + yearly · Manage plan (switch, cancel, un-cancel) with customer + founder emails · plan required (sign-up picker, server check, 5-client limit blocks a 6th) · client replies end to end · hello@getdunn.org in/out (Gmail send-as) · bounce alerts · password reset · new user sign-up → plan → connect Stripe → invoices · phone layouts (landing, demo, sign-in) · Search Console + sitemap · DMARC.
 
 **TEST NEXT (needs real days to pass):**
-1. Oct 2: create a recurring invoice starting today → next 9am run sends it (+ owner email).
-2. Oct 2: one-off invoice due Oct 3, late fee, 0 grace days → Oct 4 9am: fee waits for approval (owner email) → approve / lower / waive → client gets the updated bill.
-3. Any invoice due in 4 days → reminder email arrives at 9am.
-4. 9am founder daily summary arrives (first one Oct 2/3).
+(Superseded by "▶ TOMORROW" above: fees are now automatic with a heads-up, no approval step.)
 **TEST NEXT (can do any time):** failed client payment (card 4000 0000 0000 0002 → owner + founder emails) · no-plan account (buhshyruh) shows "Choose a plan" and can't invoice · waive a fee → Reports "Who you waive fees for" + "up to about $X a month" · dashboard on iPhone · disconnect + reconnect Stripe · Reports → Download CSV.
 
 **RIGHT AFTER GO-LIVE (Bashira 10/2): AI distribution.**
