@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import Stripe from 'stripe';
-import { createInvoice, stripeConfigured } from '../services/invoiceCreator';
+import { createInvoice, stripeConfigured, dueTimestamp } from '../services/invoiceCreator';
 import { approveFee, changeBilledFee, waiveFee, FeeActionError } from '../services/feeEngine';
 import { agreedFeeCents, parseGraceDays, GRACE_REQUIRED } from '../services/feeRules';
 import { getAccount } from '../lib/account';
@@ -53,6 +53,9 @@ invoicesRouter.post('/', async (req, res) => {
   const dueDate = new Date(`${dueDateStr}T00:00:00`);
   if (Number.isNaN(dueDate.getTime())) {
     return res.status(400).json({ error: 'A due date is required.' });
+  }
+  if (dueTimestamp(dueDate) * 1000 < Date.now()) {
+    return res.status(400).json({ error: "The due date can't be in the past." });
   }
 
   // The fee prompt — the heart of the product. Per invoice, per client.

@@ -130,7 +130,7 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<CreateIn
     }
 
     // 2. The Stripe invoice — draft first, then line item, then finalize.
-    const dueSec = Math.floor(input.dueDate.getTime() / 1000);
+    const dueSec = dueTimestamp(input.dueDate);
     const fee = input.fee;
     const feeDescription =
       fee && fee.kind !== 'none'
@@ -269,4 +269,14 @@ function feeLabel(p: { kind: string; amount?: number; graceDays?: number }): str
   if (p.kind === 'percent') return `${amount}%`;
   if (amount === 0) return 'no late fee';
   return `${usdDollars(amount)}`;
+}
+
+// Stripe wants a moment, not a date. Midnight UTC on the due date is already
+// in the past on the evening before in the US (8pm New York), so an invoice
+// "due tomorrow" made after 8pm was refused. Use the END of the due date in
+// New York (03:59:59 UTC the next morning in summer, 22:59:59 the day itself in
+// winter), which is still the same calendar date everywhere in the US.
+export function dueTimestamp(dueDate: Date): number {
+  const day = Date.UTC(dueDate.getUTCFullYear(), dueDate.getUTCMonth(), dueDate.getUTCDate());
+  return Math.floor(day / 1000) + 28 * 3600 - 1;
 }
