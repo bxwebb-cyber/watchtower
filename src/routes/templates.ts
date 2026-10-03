@@ -118,20 +118,61 @@ templatesRouter.patch('/:id', async (req, res) => {
 
   const updates: Record<string, unknown> = {};
   const fields = ['clientName', 'clientEmail', 'amount', 'currency', 'dueDays',
-    'feeKind', 'feeAmount', 'graceDays', 'frequency', 'customDay', 'active', 'nextRunDate'] as const;
+    'feeKind', 'feeAmount', 'graceDays', 'frequency', 'customDay', 'active'] as const;
 
   for (const field of fields) {
     if (req.body[field] !== undefined) {
       if (field === 'amount') {
-        updates.amount = Math.round(Number(req.body.amount) * 100);
+        const cents = Math.round(Number(req.body.amount) * 100);
+        if (!(cents > 0)) return res.status(400).json({ error: 'amount must be > 0' });
+        updates.amount = cents;
       } else if (field === 'graceDays') {
         const grace = parseGraceDays(req.body.graceDays);
         if (grace === null) return res.status(400).json({ error: GRACE_REQUIRED });
         updates.graceDays = grace;
+      } else if (field === 'dueDays') {
+        const n = Number(req.body.dueDays);
+        if (!Number.isFinite(n)) return res.status(400).json({ error: 'dueDays must be a number' });
+        updates.dueDays = Math.min(90, Math.max(0, Math.round(n)));
+      } else if (field === 'feeAmount') {
+        updates.feeAmount = Number(req.body.feeAmount) || 0;
+      } else if (field === 'active') {
+        updates.active = req.body.active === true;
       } else {
         updates[field] = req.body[field];
       }
     }
+  }
+
+  const freq = String(updates.frequency ?? existing.frequency);
+  if (!['monthly', 'weekly', 'biweekly', 'custom'].includes(freq)) {
+    return res.status(400).json({ error: 'frequency must be one of: monthly, weekly, biweekly, custom' });
+  }
+  if (updates.feeKind !== undefined && !['none', 'flat', 'percent'].includes(String(updates.feeKind))) {
+    return res.status(400).json({ error: 'feeKind must be none, flat or percent' });
+  }
+  if ((updates.feeKind ?? existing.feeKind) !== 'none' && updates.graceDays === undefined && existing.graceDays == null) {
+    return res.status(400).json({ error: GRACE_REQUIRED });
+  }
+  let customDay: number | null = existing.customDay;
+  if (freq === 'custom') {
+    customDay = Number(updates.customDay ?? existing.customDay);
+    if (!(customDay >= 1 && customDay <= 31)) {
+      return res.status(400).json({ error: 'customDay is required (1-31; 31 = last day of the month) for custom frequency' });
+    }
+  } else {
+    customDay = null;
+  }
+  updates.customDay = customDay;
+
+  // The edit form sends the "Next invoice date" as startDate. Re-place the
+  // next run whenever that date or the schedule changes (a custom day snaps
+  // to the next matching day on or after it).
+  const scheduleChanged = freq !== existing.frequency || customDay !== existing.customDay;
+  if (req.body.startDate || scheduleChanged) {
+    const start = req.body.startDate ? new Date(req.body.startDate) : existing.nextRunDate;
+    if (Number.isNaN(start.getTime())) return res.status(400).json({ error: 'Next invoice date is not a valid date' });
+    updates.nextRunDate = computeInitialNextRun(start, freq, customDay ?? undefined);
   }
 
   // If resuming a paused template whose nextRunDate has passed, skip to next cycle.

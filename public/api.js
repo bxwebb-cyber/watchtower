@@ -661,6 +661,7 @@ document.addEventListener('wt:recurring-save', async e => {
     dueDays: parseInt(d.due_days, 10) || undefined,
     feeKind,
     feeAmount: feeKind === 'flat' ? (parseMoney(d.fee_flat) || 0) : feeKind === 'percent' ? (parseFloat(d.fee_pct) || 0) : 0,
+    active: d.status !== 'paused',
   };
   // Only send the grace period when there's a fee — then it's required.
   const grace = graceValue(d.grace_days);
@@ -702,7 +703,20 @@ document.addEventListener('wt:recurring-edit', async e => {
     if (t.feeKind === 'flat') { form.querySelector('[name="fee_flat"]').value = t.feeAmount; }
     if (t.feeKind === 'percent') { form.querySelector('[name="fee_pct"]').value = t.feeAmount; }
     setFeeOption(form, t.feeKind === 'percent' ? 'pct' : t.feeKind);
-    document.querySelector('[data-edit-only]').hidden = false;
+    // Sync the fee panel: sets the hidden fee_type (else saving an edit
+    // dropped the fee) and the "Your client sees" line.
+    form.querySelector('.wt-fee-panel__grace')?.dispatchEvent(new Event('input', { bubbles: true }));
+    const status = t.active ? 'active' : 'paused';
+    form.querySelector('[name="status"]').value = status;
+    form.querySelectorAll('.wt-seg__opt').forEach(b => { const on = b.dataset.value === status; b.classList.toggle('is-active', on); b.setAttribute('aria-pressed', on); });
+    const title = document.getElementById('rec-modal-title');
+    if (title) title.textContent = 'Edit recurring invoice';
+    const sent = t.sentCount || 0;
+    const note = form.querySelector('[data-edit-only]');
+    note.textContent = sent
+      ? 'Changes apply to future invoices only. The ' + sent + ' already sent ' + (sent === 1 ? 'stays' : 'stay') + ' as ' + (sent === 1 ? 'it is.' : 'they are.')
+      : 'Changes apply to future invoices only.';
+    note.hidden = false;
   }
 });
 
@@ -774,5 +788,9 @@ document.addEventListener('click', (e) => {
   form.querySelectorAll('[data-edit-only]').forEach(el => { el.hidden = true; });
   const title = document.getElementById('rec-modal-title');
   if (title) title.textContent = 'New recurring invoice';
+  form.querySelector('[name="status"]').value = 'active'; // hidden inputs ignore reset()
+  form.querySelectorAll('.wt-seg__opt').forEach(b => { const on = b.dataset.value === 'active'; b.classList.toggle('is-active', on); b.setAttribute('aria-pressed', on); });
+  if (typeof setFeeOption === 'function') setFeeOption(form, 'none');
+  form.querySelector('.wt-fee-panel__grace')?.dispatchEvent(new Event('input', { bubbles: true }));
   form.querySelector('[name="frequency"]')?.dispatchEvent(new Event('change', { bubbles: true }));
 }, true);
