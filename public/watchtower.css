@@ -249,9 +249,9 @@ input::placeholder { color: var(--wt-faint); }
 .wt-truncate { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wt-money-cell { font-family: var(--wt-font-display); font-size: 17px; color: var(--wt-ink); font-variant-numeric: tabular-nums; text-align: right; }
 
-.wt-invoices .wt-table__head, .wt-invoices .wt-table__row { grid-template-columns: 72px minmax(0, 1fr) 96px 96px 110px; }
+.wt-invoices .wt-table__head, .wt-invoices .wt-table__row { grid-template-columns: 116px minmax(0, 1fr) 96px 96px 110px; } /* Stripe numbers are ~13 chars (EYXYUIAF-0009) */
 .wt-invoices .wt-table__row { cursor: pointer; }
-.wt-inv-id { font-size: 13px; font-weight: 500; color: var(--wt-muted); font-variant-numeric: tabular-nums; }
+.wt-inv-id { font-size: 12.5px; font-weight: 500; color: var(--wt-muted); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .wt-client { display: flex; align-items: center; gap: 11px; min-width: 0; }
 .wt-client__text { min-width: 0; }
 .wt-client__name { font-size: 14px; font-weight: 500; color: var(--wt-text); }
@@ -363,6 +363,16 @@ input::placeholder { color: var(--wt-faint); }
 .wt-late__bar--low { background: var(--wt-green); }
 .wt-late__label { font-size: 12.5px; color: var(--wt-muted); white-space: nowrap; }
 .wt-num { font-size: 13.5px; color: var(--wt-text); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Phone: client + amount on top, number · due · status underneath. */
+@media (max-width: 640px) {
+  .wt-invoices .wt-table__head { display: none; }
+  .wt-invoices .wt-table__row { grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "client client amount" "id due status"; gap: 6px 10px; padding-left: 16px; padding-right: 16px; }
+  .wt-invoices .wt-table__row > :nth-child(1) { grid-area: id; }
+  .wt-invoices .wt-table__row > :nth-child(2) { grid-area: client; }
+  .wt-invoices .wt-table__row > :nth-child(3) { grid-area: due; }
+  .wt-invoices .wt-table__row > :nth-child(4) { grid-area: amount; }
+  .wt-invoices .wt-table__row > :nth-child(5) { grid-area: status; }
+}
 @media (max-width: 760px) {
   .wt-clients .wt-table__head { display: none; }
   .wt-clients .wt-table__row { grid-template-columns: 1fr 1fr; }
