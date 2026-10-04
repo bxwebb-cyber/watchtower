@@ -45,7 +45,7 @@ export function planRequired(env: NodeJS.ProcessEnv = process.env): boolean {
   if (env.REQUIRE_PLAN === 'off') return false;
   return env.NODE_ENV === 'production' || !!env.RAILWAY_ENVIRONMENT_NAME;
 }
-export const NO_PLAN_MESSAGE = 'Choose a plan to start sending invoices: getdunn.org/#pricing';
+export const NO_PLAN_MESSAGE = 'Choose a plan to start sending invoices.';
 
 // A cancelled invoice gives its client slot back only if it was cancelled
 // within 24 hours of being created: that covers a typo (wrong amount or

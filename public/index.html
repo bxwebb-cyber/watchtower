@@ -50,6 +50,8 @@
   .wt-btn--primary:hover { background:#164543; transform:translateY(-1px); }
   .wt-btn--primary:disabled { background:#9AA5A2; cursor:not-allowed; transform:none; }
   .wt-btn--secondary { background:transparent; color:#0F302E; border:1px solid rgba(15,48,46,.22); }
+  .wt-error__links { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+  .wt-error__links a { display:inline-flex; align-items:center; height:34px; padding:0 12px; border-radius:8px; background:#0F302E; color:#F3F0E8; font-weight:600; font-size:13px; text-decoration:none; }
   .wt-error { display:none; background:rgba(178,58,46,.07); border:1px solid rgba(178,58,46,.3); border-radius:9px; padding:10px 14px; font-size:13px; color:#B23A2E; margin-bottom:16px; }
 </style>
 </head>
@@ -151,11 +153,30 @@ async function api(method, path, body) {
   if (body) opts.body = JSON.stringify(body);
   const res = await fetch(path, opts);
   if (res.status === 401) { window.location.href = '/'; throw new Error('Not signed in.'); }
-  if (!res.ok) { const e = await res.json().catch(() => ({ error: res.statusText })); throw new Error(e.error || ('HTTP ' + res.status)); }
+  if (!res.ok) { const e = await res.json().catch(() => ({ error: res.statusText })); const err = new Error(e.error || ('HTTP ' + res.status)); err.code = e.code; throw err; }
   return res.json();
 }
 
 function showError(msg) { const b = document.getElementById('error-box'); b.textContent = msg; b.style.display = msg ? 'block' : 'none'; }
+
+// No plan, or over the $39 plan's 5 clients: put the way out right in the box.
+const PLAN_LINKS = {
+  no_plan: [['Up to 5 clients · $39/mo', '/billing/start?plan=solo'], ['Up to 5 clients · $390/yr', '/billing/start?plan=solo&billing=yearly'],
+            ['Unlimited · $59/mo', '/billing/start?plan=business'], ['Unlimited · $540/yr', '/billing/start?plan=business&billing=yearly']],
+  plan_limit: [['Upgrade to Unlimited', '/billing/portal']],
+};
+function showPlanLinks(code) {
+  const links = PLAN_LINKS[code];
+  if (!links) return;
+  const row = document.createElement('div');
+  row.className = 'wt-error__links';
+  for (const [label, href] of links) {
+    const a = document.createElement('a');
+    a.href = href; a.textContent = label;
+    row.append(a);
+  }
+  document.getElementById('error-box').append(row);
+}
 
 // Prefill the fee prompt from the account's default late-fee terms.
 async function prefillDefault() {
@@ -216,6 +237,7 @@ document.getElementById('submit-btn').addEventListener('click', async () => {
     window.location.href = '/dashboard';
   } catch (err) {
     showError(err.message || 'Could not create the invoice.');
+    showPlanLinks(err.code);
     btn.disabled = false; btn.textContent = 'Create invoice';
   }
 });
