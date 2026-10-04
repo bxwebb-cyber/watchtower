@@ -106,9 +106,12 @@ input::placeholder { color: var(--wt-faint); }
   .wt-sidebar { position: static; height: auto; flex-direction: row; align-items: center; gap: 12px; padding: 12px 16px; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--wt-line); }
   .wt-brand { padding: 0; }
   .wt-brand__tag, .wt-profile { display: none; }
+  .wt-nav__item--signout { display: flex !important; } /* the profile (with Sign out) is hidden here */
   .wt-nav { flex-direction: row; }
   .wt-main { padding: 24px 16px 48px; }
 }
+
+.wt-nav__item--signout { display: none; }
 
 /* ---------- Page header ---------- */
 .wt-header { display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 20px 24px; margin-bottom: 28px; }
