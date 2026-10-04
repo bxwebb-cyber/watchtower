@@ -291,6 +291,16 @@ input::placeholder { color: var(--wt-faint); }
 
 /* ---------- Recurring invoices ---------- */
 .wt-recurring .wt-table__head, .wt-recurring .wt-table__row { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr) 72px 112px; gap: 12px; }
+/* Phone: client + status on top, schedule + last invoice under it, buttons last. */
+@media (max-width: 640px) {
+  .wt-recurring .wt-table__head { display: none; }
+  .wt-recurring .wt-table__row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "client status" "sched last" "actions actions"; gap: 10px 12px; padding-left: 16px; padding-right: 16px; }
+  .wt-recurring .wt-table__row > :nth-child(1) { grid-area: client; }
+  .wt-recurring .wt-table__row > :nth-child(2) { grid-area: sched; }
+  .wt-recurring .wt-table__row > :nth-child(3) { grid-area: last; }
+  .wt-recurring .wt-table__row > :nth-child(4) { grid-area: status; justify-self: end; align-self: start; }
+  .wt-recurring .wt-table__row > :nth-child(5) { grid-area: actions; justify-content: flex-end; }
+}
 .wt-recurring__item { border-bottom: 1px solid var(--wt-line-soft); transition: background var(--wt-fast); }
 .wt-recurring__item:hover { background: rgba(192, 122, 44, .05); }
 .wt-recurring__item .wt-table__row { border-bottom: 0; }
