@@ -1,5 +1,5 @@
 # Watchtower — Handoff Sheet
-_Last updated: 2026-10-03, ~1am ET. Read "▶ TOMORROW" first._
+_Last updated: 2026-10-05, ~2:30pm ET. Read "▶ NEXT" first._
 _(Older header:) 2026-09-28 (v1.8 — scheduler + one-bill late fees + webhook fix DEPLOYED; scheduler switched OFF in production pending invoice review) · working name = "Watchtower"; real name = "Dunn" (accounting term). Keep calling it Watchtower in code/docs until the domain is bought._
 
 ---
@@ -12,7 +12,14 @@ _(Older header:) 2026-09-28 (v1.8 — scheduler + one-bill late fees + webhook f
 - Invoice list: real "(N)" count; 13-char Stripe numbers no longer overlap; phone rows stack.
 - **Alerts switches work (10/3):** "overdue" (once, morning after due date, only invoices without a late fee) and "a client pays" can be turned off. Fee heads-up, replies, problems always send (switch removed).
 
-### ▶ TOMORROW (Sat 10/3) — START HERE
+### ✅ VERIFIED 10/5/26
+- Heads-up email came the day before → fee added Oct 5 9:08am → client emailed by Dunn → owner told → **Waive** reissued the bill at $25,000, client got the "waived" email, note saved, fee not re-added.
+- **Due-date readback bug fixed (46cc98e):** webhooks copied Stripe's end-of-day NY timestamp back as the NEXT day (Oct 3 → Oct 4). `dueDateFromStripe` in src/lib/dueDate.ts; `repairDueDates()` fixes old rows at startup. Invoice now shows Oct 3.
+- **Reports fixed (78af04d):** trend ran a month ahead (Nov in Oct); "Fees waived" only counted paid invoices ($0) — now every waived fee, dated by the waive (also both CSVs); month menu + bar clicks now work; under 3 months shows "$X so far", no yearly guess; waiver card padding. Bashira checked it live.
+- buhshyruh (no plan) blocked, with plan buttons. Recurring phone layout + phone Sign out OK.
+- Growth ideas: GROWTH-PAGES-PLAN.md (free tools + search pages). AppSumo plan: appsumo-go-deal-plan.md (Hermes).
+
+### ▶ NEXT — remaining checks (older list below, items 1–3 done)
 **Check what the 9am runs did (Resend + bmwxcf Gmail):**
 1. **Oct 3, 9am — fee heads-up:** "Tomorrow: $10 late fee on invoice EYXYUIAF-0008" email to the owner; the dashboard shows it under "Late fees coming up" (Lower / Waive). Try **Lower** (e.g. $5) on it.
 2. **Oct 3, 9am — founder daily summary** arrives.
@@ -21,7 +28,7 @@ _(Older header:) 2026-09-28 (v1.8 — scheduler + one-bill late fees + webhook f
 5. **Oct 10, 9am — recurring** invoices send. To test sooner, edit one and set Next invoice date = tomorrow.
 6. **Custom-day recurring:** create one and check the "Next" date in the list.
 
-**Any-time tests still open:** failed client payment (card 4000 0000 0000 0002) · buhshyruh (no plan) blocked + banner · Reports CSV · dashboard on iPhone · disconnect + reconnect Stripe · cancel an invoice → slot returns only within 24h · Alerts: turn off "A client pays", pay an invoice → no "Invoice paid" email.
+**Any-time tests still open:** failed client payment (card 4000 0000 0000 0002) · Reports CSV · dashboard on iPhone · disconnect + reconnect Stripe · cancel an invoice → slot returns only within 24h · Alerts: turn off "A client pays", pay an invoice → no "Invoice paid" email.
 
 **Then:** go-live steps below (Stripe live). Then AI distribution (MCP server).
 
