@@ -68,6 +68,14 @@ function initials(name) {
   return parts.map(p => p[0]).join('').toUpperCase();
 }
 
+// Whole calendar days from today to the due date: 0 = due today (still not
+// late until the day is over), -1 = was due yesterday.
+function daysUntilDue(inv, now) {
+  const due = new Date(inv.due + 'T00:00:00');
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.round((due.getTime() - today.getTime()) / 86400000);
+}
+
 // ---- Invoice status model (designer §3.3) ----
 // pending · due-soon · overdue · fee-applied · paid
 function invoiceStatus(inv, now) {
@@ -82,8 +90,7 @@ function invoiceStatus(inv, now) {
   if (inv.feeApplied) {
     return { key: 'fee-applied', pill: 'wt-pill--fee-applied', label: 'Fee applied', dueClass: 'wt-due--late', dueText: '' };
   }
-  const due = new Date(inv.due + 'T00:00:00');
-  const days = Math.round((due.getTime() - now.getTime()) / 86400000);
+  const days = daysUntilDue(inv, now);
   if (days < 0) {
     return { key: 'overdue', pill: 'wt-pill--overdue', label: 'Overdue', dueClass: 'wt-due--late', dueText: Math.abs(days) + ' days late' };
   }
@@ -229,8 +236,7 @@ function renderInvoices() {
 
 function _dueText(inv, s) {
   if (inv.status === 'paid') return s.dueText;
-  const due = new Date(inv.due + 'T00:00:00');
-  const days = Math.round((due.getTime() - Date.now()) / 86400000);
+  const days = daysUntilDue(inv, new Date());
   if (inv.feeApplied) return Math.abs(days) + ' days late';
   return s.dueText;
 }
@@ -268,12 +274,12 @@ async function loadDashboard() {
   const bizName = settings.businessName || 'there';
 
   // Only open invoices are owed (paid, void and uncollectible ones aren't).
-  const overdue = state.invoices.filter(i => i.status === 'open' && new Date(i.due) < now && !i.feeApplied);
+  const overdue = state.invoices.filter(i => i.status === 'open' && daysUntilDue(i, now) < 0 && !i.feeApplied);
   const feeApplied = state.invoices.filter(i => i.status === 'open' && i.feeApplied);
   const dueSoon = state.invoices.filter(i => {
     if (i.status !== 'open') return false;
-    const d = new Date(i.due);
-    return d >= now && d <= new Date(now.getTime() + 7 * 86400000);
+    const days = daysUntilDue(i, now);
+    return days >= 0 && days <= 7;
   });
   // Pending: past the fee deadline, waiting on the owner. Billed: on the
   // client's bill, still unpaid — can still be lowered or waived.
@@ -319,7 +325,7 @@ async function loadDashboard() {
     row_id: inv.id,
     invoice_id: inv.stripeNumber || inv.id,
     client_name: inv.client || '—',
-    days_late: Math.max(0, Math.floor((Date.now() - new Date(inv.due + 'T00:00:00').getTime()) / 86400000)),
+    days_late: Math.max(0, -daysUntilDue(inv, new Date())),
     fee_amount: money(inv.feeAmountCents || 0),
     fee_value: ((inv.feeAmountCents || 0) / 100).toFixed(2),
     fee_max: ((inv.feeTermsCents || 0) / 100).toFixed(2),
