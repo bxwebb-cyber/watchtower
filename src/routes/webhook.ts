@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import Stripe from 'stripe';
+import crypto from 'crypto';
 import { PrismaClient } from '@prisma/client';
 import { notifyFounder, notifyOwner } from '../services/notify';
 import { usd } from '../lib/money';
@@ -74,6 +75,9 @@ webhookRouter.post('/', async (req, res) => {
       case 'customer.subscription.deleted':
         await onSubscriptionDeleted(event.data.object as Stripe.Subscription);
         break;
+      case 'account.application.deauthorized':
+        await onDeauthorized(event.account);
+        break;
       default:
         // other events we don't act on yet
         break;
@@ -93,6 +97,36 @@ webhookRouter.post('/', async (req, res) => {
 });
 
 // ---- handlers ----
+
+// The owner disconnected Dunn from inside Stripe: same as Settings → Disconnect.
+async function onDeauthorized(connectedAccountId?: string) {
+  if (!connectedAccountId) return;
+  const account = await prisma.account.findUnique({ where: { stripeAccountId: connectedAccountId } });
+  if (!account) return;
+  await prisma.account.update({ where: { id: account.id }, data: { stripeAccountId: 'pending_' + crypto.randomUUID() } });
+  console.log(`[webhook] Stripe ${connectedAccountId} disconnected from account ${account.id}`);
+}
+
+// After a reconnect: Stripe sent Dunn nothing while disconnected, so ask it
+// about every invoice Dunn still has as open, and catch up on any that were
+// paid, voided or marked uncollectible in the meantime.
+export async function catchUpOpenInvoices(accountId: string, stripeAccountId: string): Promise<number> {
+  const open = await prisma.invoice.findMany({ where: { accountId, status: 'open' }, select: { stripeInvoiceId: true } });
+  let changed = 0;
+  for (const row of open) {
+    try {
+      const inv = await stripe.invoices.retrieve(row.stripeInvoiceId, {}, { stripeAccount: stripeAccountId });
+      if (inv.status === 'paid') await onInvoicePaid(inv);
+      else if (inv.status === 'void') await onInvoiceVoided(inv);
+      else if (inv.status === 'uncollectible') await onInvoiceMarkedUncollectible(inv);
+      else continue;
+      changed++;
+    } catch (err) {
+      console.error('[reconnect] could not check invoice', row.stripeInvoiceId, (err as Error).message);
+    }
+  }
+  return changed;
+}
 
 async function onInvoiceCreated(inv: Stripe.Invoice, connectedAccountId?: string) {
   if (inv.metadata?.watchtower === 'true') {

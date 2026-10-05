@@ -8,6 +8,7 @@ import { stripePublicName } from '../lib/stripeName';
 import { makeResetToken, checkResetToken, readResetAccount } from '../lib/resetToken';
 import { Resend } from 'resend';
 import { mailFrom } from '../services/notify';
+import { catchUpOpenInvoices } from './webhook';
 
 const prisma = new PrismaClient();
 
@@ -55,6 +56,31 @@ export function authRouter() {
     const state = jwt.sign({ accountId: signedIn, purpose: 'stripe_connect' }, jwtSecret, { expiresIn: '15m' });
     const url = `https://connect.stripe.com/oauth/authorize?response_type=code&client_id=${clientId}&scope=read_write&redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(state)}`;
     res.redirect(url);
+  });
+
+  // Settings → Disconnect. Revokes Dunn's access in Stripe, then marks the
+  // account not connected: reminders, fees and recurring invoices pause until
+  // the owner connects again (clients' pay links keep working — they're Stripe's).
+  router.post('/stripe/disconnect', async (req: Request, res: Response) => {
+    const accountId = resolveAccountId(req);
+    if (!accountId) return res.status(401).json({ error: 'Not signed in' });
+    const account = await prisma.account.findUnique({ where: { id: accountId } });
+    if (!account) return res.status(401).json({ error: 'Not signed in' });
+    if (account.stripeAccountId.startsWith('pending_')) return res.json({ ok: true });
+    try {
+      const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+      await stripe.oauth.deauthorize({ client_id: process.env.STRIPE_CLIENT_ID, stripe_user_id: account.stripeAccountId });
+    } catch (err) {
+      // Already revoked on Stripe's side is fine; anything else, stop here.
+      const msg = (err as Error).message || '';
+      if (!/not connected|no such|does not have access|invalid_client/i.test(msg)) {
+        console.error('[auth] Stripe disconnect failed', msg);
+        return res.status(502).json({ error: "Stripe didn't respond. Nothing was changed. Try again in a minute." });
+      }
+    }
+    await prisma.account.update({ where: { id: accountId }, data: { stripeAccountId: 'pending_' + crypto.randomUUID() } });
+    console.log(`[auth] account ${accountId} disconnected Stripe ${account.stripeAccountId}`);
+    res.json({ ok: true });
   });
 
   router.get('/stripe/callback', async (req: Request, res: Response) => {
@@ -114,6 +140,12 @@ export function authRouter() {
         where: { id: accountId },
         data: { stripeAccountId: connectedAccountId },
       });
+      // Reconnecting: catch up on payments made while Dunn was disconnected.
+      const caughtUp = await catchUpOpenInvoices(accountId, connectedAccountId).catch((err) => {
+        console.error('[auth] reconnect catch-up failed', (err as Error).message);
+        return 0;
+      });
+      if (caughtUp) console.log(`[auth] reconnect: ${caughtUp} invoice(s) updated from Stripe`);
 
       setAuthCookie(res, issueToken(accountId!));
 

@@ -5,7 +5,7 @@ import { clientMailFrom, replyToFor, notifyOwner, notifyEscalation } from './not
 import { renderEmail, EMAIL_TEMPLATES, EmailData } from './emailRenderer';
 import { agreedFeeCents, feeWhen } from './feeRules';
 import { usd, usdDollars } from '../lib/money';
-import { createdSinceStart } from '../jobs/startDate';
+import { createdSinceStart, stripeConnected } from '../jobs/startDate';
 import { reportProblem } from './problems';
 
 const prisma = new PrismaClient();
@@ -71,7 +71,7 @@ export async function runReminderJob(now = new Date()) {
   }
 
   const openInvoices = await prisma.invoice.findMany({
-    where: { status: 'open', repliedAt: null, ...createdSinceStart() },
+    where: { status: 'open', repliedAt: null, ...createdSinceStart(), ...stripeConnected },
     include: { client: true, account: true, feePolicy: true },
   });
 

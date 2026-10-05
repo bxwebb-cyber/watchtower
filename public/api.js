@@ -834,3 +834,16 @@ document.addEventListener('click', (e) => {
   form.querySelector('.wt-fee-panel__grace')?.dispatchEvent(new Event('input', { bubbles: true }));
   form.querySelector('[name="frequency"]')?.dispatchEvent(new Event('change', { bubbles: true }));
 }, true);
+
+// Settings → Disconnect Stripe. Dunn pauses reminders, late fees and recurring
+// invoices until Stripe is connected again; clients' pay links keep working.
+document.addEventListener('click', async e => {
+  const btn = e.target.closest('[data-action="stripe-disconnect"]');
+  if (!btn) return;
+  const ok = confirm('Disconnect Stripe?\n\nUntil you connect again, Dunn pauses reminders, late fees and recurring invoices, and you can\'t create new invoices. Your clients can still pay the invoices they already have.');
+  if (!ok) return;
+  btn.disabled = true;
+  try { await api('POST', '/auth/stripe/disconnect'); await loadSettings(); }
+  catch (err) { alert(err.message); }
+  finally { btn.disabled = false; }
+});

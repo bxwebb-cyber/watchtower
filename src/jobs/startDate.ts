@@ -14,3 +14,8 @@ export function createdSinceStart(env: NodeJS.ProcessEnv = process.env): { creat
   const start = jobsStartDate(env);
   return start ? { createdAt: { gte: start } } : {};
 }
+
+// Prisma `where` fragment for invoices/templates: skip accounts whose Stripe is
+// disconnected (stripeAccountId back to pending_). Dunn can't see payments
+// then, so a reminder could chase a bill that's already paid.
+export const stripeConnected = { account: { NOT: { stripeAccountId: { startsWith: 'pending_' } } } };

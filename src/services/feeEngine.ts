@@ -5,7 +5,7 @@ import { notifyOwner } from './notify';
 import { isPastFeeDeadline, sendClientEmail } from './reminderEngine';
 import { agreedFeeCents, checkFeeChange } from './feeRules';
 import { usd, usdDollars } from '../lib/money';
-import { createdSinceStart } from '../jobs/startDate';
+import { createdSinceStart, stripeConnected } from '../jobs/startDate';
 import { reportProblem } from './problems';
 import { dueDateFromStripe } from '../lib/dueDate';
 
@@ -29,7 +29,7 @@ export const HEADS_UP_EVENTS = ['fee_heads_up', 'fee_pending_approval'];
 
 export async function runFeeJob(now = new Date()) {
   const openInvoices = await prisma.invoice.findMany({
-    where: { status: 'open', feeApplied: false, feePolicy: { isNot: null }, ...createdSinceStart() },
+    where: { status: 'open', feeApplied: false, feePolicy: { isNot: null }, ...createdSinceStart(), ...stripeConnected },
     include: { feePolicy: true, client: true, account: true },
   });
 

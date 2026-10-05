@@ -2,7 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import { createInvoice, stripeConfigured } from './invoiceCreator';
 import { notifyOwner } from './notify';
 import { usd } from '../lib/money';
-import { createdSinceStart } from '../jobs/startDate';
+import { createdSinceStart, stripeConnected } from '../jobs/startDate';
 import { reportProblem } from './problems';
 
 const prisma = new PrismaClient();
@@ -18,7 +18,7 @@ export async function runTemplateJob(now = new Date()): Promise<number> {
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
   const templates = await prisma.invoiceTemplate.findMany({
-    where: { active: true, nextRunDate: { lte: today }, ...createdSinceStart() },
+    where: { active: true, nextRunDate: { lte: today }, ...createdSinceStart(), ...stripeConnected },
     include: { account: true },
   });
 
