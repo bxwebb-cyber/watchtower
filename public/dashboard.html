@@ -1000,6 +1000,39 @@
   </div>
 </div>
 
+<!-- Recurring view: opens when a recurring row is clicked (not its buttons).
+     Read-only: the facts and every invoice it sent. Filled by api.js. -->
+<div class="wt-modal" id="wt-recview-modal" role="dialog" aria-modal="true" aria-labelledby="recview-title" hidden>
+  <div class="wt-modal__backdrop" data-close-modal></div>
+  <div class="wt-modal__panel wt-inv">
+    <div class="wt-modal__head">
+      <div>
+        <h2 class="wt-modal__title" id="recview-title">Recurring invoice</h2>
+        <p class="wt-modal__sub" data-rv="client"></p>
+      </div>
+      <button class="wt-icon-btn" type="button" data-close-modal aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div class="wt-inv__top">
+      <div class="wt-inv__amount" data-rv="amount"></div>
+      <span class="wt-pill" data-rv="status"></span>
+    </div>
+    <dl class="wt-inv__facts">
+      <div><dt>Schedule</dt><dd data-rv="schedule"></dd></div>
+      <div><dt>Next invoice</dt><dd data-rv="next"></dd></div>
+      <div><dt>Late fee</dt><dd data-rv="fee"></dd></div>
+      <div><dt>Due</dt><dd data-rv="due"></dd></div>
+      <div><dt>Sent so far</dt><dd data-rv="count"></dd></div>
+      <div><dt>Started</dt><dd data-rv="started"></dd></div>
+    </dl>
+    <h3 class="wt-inv__heading">Invoices it sent</h3>
+    <ol class="wt-rv__list" data-rv="invoices"></ol>
+    <div class="wt-modal__foot">
+      <button class="wt-btn wt-btn--secondary" type="button" data-rv="edit">Edit</button>
+      <button class="wt-btn wt-btn--primary" type="button" data-close-modal>Done</button>
+    </div>
+  </div>
+</div>
+
 <div class="wt-modal" id="wt-recurring-modal" role="dialog" aria-modal="true" aria-labelledby="rec-modal-title" hidden>
   <div class="wt-modal__backdrop" data-close-modal></div>
   <form class="wt-modal__panel" data-recurring-form novalidate>

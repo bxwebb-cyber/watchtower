@@ -523,6 +523,17 @@ input::placeholder { color: var(--wt-faint); }
 .wt-inv__cancel-tell input { margin-top: 3px; }
 .wt-inv__cancel-err { margin: 10px 0 0; font-size: 13.5px; color: var(--wt-brick-dark); }
 .wt-inv__cancel-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+/* Recurring view (wt-recview-modal) */
+.wt-recurring__item .wt-table__row { cursor: pointer; }
+.wt-recurring__item .wt-table__row:hover { background: var(--wt-paper); }
+.wt-rv__list { list-style: none; margin: 0; padding: 0; }
+.wt-rv__list li + li { border-top: 1px solid var(--wt-line); }
+.wt-rv__row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 12px; align-items: center; width: 100%; padding: 10px 4px; border: 0; background: none; font: inherit; text-align: left; color: var(--wt-text-body); cursor: pointer; border-radius: 8px; }
+.wt-rv__row:hover { background: var(--wt-paper); }
+.wt-rv__num { font-size: 13px; color: var(--wt-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wt-rv__num small { display: block; font-size: 12px; color: var(--wt-subtle); }
+.wt-rv__amt { font-family: var(--wt-font-display); font-size: 17px; color: var(--wt-ink); }
+.wt-rv__empty { font-size: 14px; color: var(--wt-subtle); padding: 6px 0; }
 @media (max-width: 520px) { .wt-inv__facts { grid-template-columns: 1fr; } .wt-inv__amount { font-size: 34px; } .wt-modal__foot { flex-wrap: wrap; } }
 
 /* ---------- Who you waive fees for (Reports) ---------- */

@@ -358,6 +358,76 @@ function feeLandsText(inv) {
 }
 
 // ---- Recurring ----
+function recFrequency(t) {
+  return t.frequency === 'monthly' ? 'Monthly' : t.frequency === 'weekly' ? 'Weekly' : t.frequency === 'biweekly' ? 'Every 2 weeks' : (t.customDay >= 29 ? 'Monthly, last day' : 'Monthly on the ' + ordinal(t.customDay || 1));
+}
+function recFeeLabel(t) {
+  return t.feeKind === 'none' ? 'No late fee' : t.feeKind === 'percent' ? (t.feeAmount + '% late fee') : ('$' + t.feeAmount + ' late fee');
+}
+
+// Clicking a recurring row (not its Edit / Pause / Delete buttons) opens a
+// read-only view: the facts and every invoice it sent, each one clickable.
+document.addEventListener('click', e => {
+  const row = e.target.closest('.wt-recurring__item .wt-table__row');
+  if (!row || e.target.closest('.wt-actions, button, a')) return;
+  openRecurringView(row.closest('.wt-recurring__item').dataset.id);
+});
+
+async function openRecurringView(id) {
+  const modal = document.getElementById('wt-recview-modal');
+  const $r = k => modal.querySelector('[data-rv="' + k + '"]');
+  const put = (k, v) => { $r(k).textContent = v; };
+  ['amount', 'schedule', 'next', 'fee', 'due', 'count', 'started'].forEach(k => put(k, ''));
+  put('client', 'Loading…'); put('status', ''); $r('status').className = 'wt-pill';
+  $r('invoices').replaceChildren();
+  window.WatchtowerUI.openModal('wt-recview-modal');
+
+  let d;
+  try { d = await api('GET', '/templates/' + id); }
+  catch (err) { put('client', "Couldn't load this recurring invoice. " + err.message); return; }
+  const t = d.template;
+  const day = (iso, utc) => new Date(iso).toLocaleDateString('en-US', Object.assign({ month: 'short', day: 'numeric', year: 'numeric' }, utc ? { timeZone: 'UTC' } : {}));
+  put('client', t.clientName + ' · ' + t.clientEmail);
+  put('amount', money(t.amount));
+  put('status', t.active ? 'Active' : 'Paused');
+  $r('status').className = 'wt-pill ' + (t.active ? 'wt-pill--paid' : 'wt-pill--pending');
+  put('schedule', recFrequency(t));
+  put('next', t.active ? day(t.nextRunDate, true) : 'Paused');
+  put('fee', t.feeKind === 'none' ? 'None' : recFeeLabel(t).replace(' late fee', '') + (t.graceDays ? ', ' + t.graceDays + ' days after due' : ', day after due'));
+  put('due', t.dueDays === 0 ? 'Same day' : t.dueDays + ' days after sent');
+  put('count', String(t.sentCount || 0));
+  put('started', day(t.createdAt));
+
+  const list = $r('invoices');
+  if (!d.invoices.length) {
+    const li = document.createElement('li'); li.className = 'wt-rv__empty';
+    li.textContent = t.active ? 'None yet. The first one goes out ' + day(t.nextRunDate, true) + '.' : 'None yet.';
+    list.append(li);
+  }
+  for (const inv of d.invoices) {
+    const li = document.createElement('li');
+    const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'wt-rv__row';
+    const num = document.createElement('span'); num.className = 'wt-rv__num'; num.textContent = inv.stripeNumber || 'Invoice';
+    const sub = document.createElement('small'); sub.textContent = 'Sent ' + day(inv.createdAt) + ' · due ' + day(inv.due + 'T12:00:00'); num.append(sub);
+    const amt = document.createElement('span'); amt.className = 'wt-rv__amt'; amt.textContent = money(inv.amount);
+    const s = invoiceStatus(inv, new Date());
+    const pill = document.createElement('span'); pill.className = 'wt-pill wt-pill--dot ' + s.pill; pill.textContent = s.label;
+    btn.append(num, amt, pill);
+    btn.onclick = async () => {
+      // The invoice view looks rows up in the dashboard list: load it if this
+      // page hasn't yet, then swap boxes.
+      if (!state.invoices.some(i => i.id === inv.id)) await loadDashboard();
+      window.WatchtowerUI.closeModal('wt-recview-modal');
+      document.dispatchEvent(new CustomEvent('wt:open-invoice', { detail: { id: inv.stripeNumber || inv.id } }));
+    };
+    li.append(btn); list.append(li);
+  }
+  $r('edit').onclick = () => {
+    window.WatchtowerUI.closeModal('wt-recview-modal');
+    document.dispatchEvent(new CustomEvent('wt:recurring-edit', { detail: { id } }));
+    window.WatchtowerUI.openModal('wt-recurring-modal');
+  };
+}
 async function loadRecurring() {
   const data = await api('GET', '/templates').catch(() => ({ templates: [] }));
   const templates = data.templates || [];
@@ -385,8 +455,8 @@ async function loadRecurring() {
     }));
   }
   renderList('recurring', templates, (t) => {
-    const freq = t.frequency === 'monthly' ? 'Monthly' : t.frequency === 'weekly' ? 'Weekly' : t.frequency === 'biweekly' ? 'Every 2 weeks' : (t.customDay >= 29 ? 'Monthly, last day' : 'Monthly on the ' + ordinal(t.customDay || 1));
-    const feeLabel = t.feeKind === 'none' ? 'No late fee' : t.feeKind === 'percent' ? (t.feeAmount + '% late fee') : ('$' + t.feeAmount + ' late fee');
+    const freq = recFrequency(t);
+    const feeLabel = recFeeLabel(t);
     return {
       id: t.id,
       client_name: t.clientName,

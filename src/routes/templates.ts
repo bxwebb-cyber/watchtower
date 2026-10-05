@@ -27,6 +27,28 @@ templatesRouter.get('/', async (req, res) => {
   res.json({ templates });
 });
 
+// GET /templates/:id — one recurring invoice plus the invoices it sent
+// (newest first). Invoices from before templateId existed are found through
+// lastInvoiceId, so the latest one always shows.
+templatesRouter.get('/:id', async (req, res) => {
+  const account = await getAccount(req);
+  if (!account) return res.status(401).json({ error: 'Not authenticated' });
+  const template = await prisma.invoiceTemplate.findFirst({ where: { id: req.params.id, accountId: account.id } });
+  if (!template) return res.status(404).json({ error: 'Template not found' });
+  const invoices = await prisma.invoice.findMany({
+    where: {
+      accountId: account.id,
+      OR: [{ templateId: template.id }, ...(template.lastInvoiceId ? [{ id: template.lastInvoiceId }] : [])],
+    },
+    orderBy: { createdAt: 'desc' },
+    select: { id: true, stripeNumber: true, amount: true, dueDate: true, status: true, createdAt: true, feeApplied: true },
+  });
+  res.json({
+    template,
+    invoices: invoices.map((i) => ({ ...i, due: i.dueDate.toISOString().slice(0, 10) })),
+  });
+});
+
 // POST /templates — create a new recurring template.
 templatesRouter.post('/', async (req, res) => {
   if (!stripeConfigured()) {

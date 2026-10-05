@@ -75,6 +75,7 @@ model Invoice {
   client          Client?  @relation(fields: [clientId], references: [id])
   stripeInvoiceId String   @unique
   stripeNumber    String?  // human-facing invoice number (e.g. HUDSON-0007)
+  templateId      String?  // the recurring invoice that created it (null = one-off)
   hostedInvoiceUrl String? // the real Stripe payment link for the client
   amount          Int // cents
   currency        String   @default("usd")
@@ -99,6 +100,8 @@ model Invoice {
   reminders Reminder[]
   replies   Reply[]
   auditLog  AuditEvent[]
+
+  @@index([templateId])
 }
 
 // A client's reply to a reminder, captured via inbound email.

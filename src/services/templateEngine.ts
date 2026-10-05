@@ -81,6 +81,8 @@ export async function runTemplateJob(now = new Date()): Promise<number> {
         continue;
       }
 
+      await prisma.invoice.updateMany({ where: { id: result.invoice.id }, data: { templateId: tmpl.id } });
+
       // Advance the schedule.
       const nextRun = advanceRunDate(tmpl.nextRunDate, tmpl.frequency, tmpl.customDay ?? undefined);
 
