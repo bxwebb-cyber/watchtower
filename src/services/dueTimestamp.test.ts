@@ -22,3 +22,20 @@ describe('dueTimestamp', () => {
     expect(dueTimestamp(new Date('2026-10-10T13:00:00Z'))).toBe(dueTimestamp(new Date('2026-10-10T00:00:00Z')));
   });
 });
+
+import { dueDateFromStripe } from '../lib/dueDate';
+
+describe('dueDateFromStripe (Stripe → the date the owner picked)', () => {
+  const day = (d: Date) => d.toISOString().slice(0, 10);
+  it('round-trips Dunn\'s own due dates (end of the day in New York)', () => {
+    for (const d of ['2026-10-03', '2026-12-15', '2027-03-14', '2027-11-07']) {
+      expect(day(dueDateFromStripe(dueTimestamp(new Date(`${d}T00:00:00Z`))))).toBe(d);
+    }
+  });
+  it('the 10/3 bug: Oct 3 came back as Oct 4', () => {
+    expect(day(dueDateFromStripe(dueTimestamp(new Date('2026-10-03T00:00:00Z'))))).toBe('2026-10-03');
+  });
+  it('older invoices due at midnight UTC keep that date', () => {
+    expect(day(dueDateFromStripe(Date.UTC(2026, 9, 3) / 1000))).toBe('2026-10-03');
+  });
+});

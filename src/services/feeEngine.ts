@@ -7,6 +7,7 @@ import { agreedFeeCents, checkFeeChange } from './feeRules';
 import { usd, usdDollars } from '../lib/money';
 import { createdSinceStart } from '../jobs/startDate';
 import { reportProblem } from './problems';
+import { dueDateFromStripe } from '../lib/dueDate';
 
 const prisma = new PrismaClient();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -403,7 +404,7 @@ async function reissueBill(
       feeDueDate:
         feeCents > 0
           ? finalized.due_date
-            ? new Date(finalized.due_date * 1000)
+            ? dueDateFromStripe(finalized.due_date)
             : new Date(now.getTime() + 14 * 86_400_000)
           : null,
       ...o.fields,

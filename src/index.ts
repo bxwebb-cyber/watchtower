@@ -18,6 +18,7 @@ import { authMiddleware } from './middleware/auth';
 import { apiLimiter } from './middleware/rateLimit';
 import { httpsRedirect } from './middleware/https';
 import { schedulerEnabled, startScheduler } from './jobs/scheduler';
+import { repairDueDates } from './services/invoiceCreator';
 import { jobsStartDate } from './jobs/startDate';
 import { withJobLock, runSweep } from './jobs/sweep';
 
@@ -129,8 +130,10 @@ app.get('/onboarding', (_req: Request, res: Response) => {
 app.use(express.static(path.join(__dirname, '../public')));
 
 const port = Number(process.env.PORT || 4000);
-app.listen(port, () => {
+app.listen(port, async () => {
   console.log(`[watchtower] listening on :${port}`);
+  // Before any catch-up run reads them.
+  await repairDueDates().catch((err) => console.error('[startup] due-date repair failed', err));
   if (schedulerEnabled()) {
     startScheduler(() => withJobLock(() => runSweep()));
     const start = jobsStartDate();

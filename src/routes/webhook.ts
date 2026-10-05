@@ -4,6 +4,7 @@ import { PrismaClient } from '@prisma/client';
 import { notifyFounder, notifyOwner } from '../services/notify';
 import { usd } from '../lib/money';
 import { reportProblem } from '../services/problems';
+import { dueDateFromStripe } from '../lib/dueDate';
 
 const prisma = new PrismaClient();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -131,7 +132,7 @@ async function onInvoiceCreated(inv: Stripe.Invoice, connectedAccountId?: string
       stripeInvoiceId: inv.id,
       amount: inv.amount_due,
       currency: inv.currency,
-      dueDate: new Date(inv.due_date * 1000),
+      dueDate: dueDateFromStripe(inv.due_date),
       status: inv.status ?? 'open',
     },
   });
@@ -140,7 +141,7 @@ async function onInvoiceCreated(inv: Stripe.Invoice, connectedAccountId?: string
     data: {
       invoiceId: invoice.id,
       event: 'invoice_created',
-      detail: `${inv.amount_due / 100} ${inv.currency.toUpperCase()} due ${new Date(inv.due_date * 1000).toISOString().slice(0, 10)}`,
+      detail: `${inv.amount_due / 100} ${inv.currency.toUpperCase()} due ${dueDateFromStripe(inv.due_date).toISOString().slice(0, 10)}`,
     },
   });
 }
@@ -296,8 +297,8 @@ async function onInvoiceUpdated(inv: Stripe.Invoice) {
   // their own dedicated events (paid / voided / uncollectible), and `updated`
   // also fires on partial payments, where setting status without `paidAt`
   // would corrupt the lateness math.
-  const dueDate = inv.due_date ? new Date(inv.due_date * 1000) : undefined;
-  if (!dueDate) return;
+  const dueDate = inv.due_date ? dueDateFromStripe(inv.due_date) : undefined;
+  if (!dueDate || dueDate.getTime() === invoice.dueDate.getTime()) return; // unchanged (e.g. finalizing)
 
   await prisma.invoice.update({
     where: { id: invoice.id },

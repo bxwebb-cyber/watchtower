@@ -4,6 +4,8 @@ import { sendClientEmail } from './reminderEngine';
 import { monthStart, soloLimitMessage, hasActivePlan, planRequired, NO_PLAN_MESSAGE, countsTowardLimit } from './planLimits';
 import { feeWhen } from './feeRules';
 import { usd, usdDollars } from '../lib/money';
+import { dueTimestamp, dueDateFromStripe } from '../lib/dueDate';
+export { dueTimestamp, dueDateFromStripe };
 
 const prisma = new PrismaClient();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -267,16 +269,6 @@ function feeLabel(p: { kind: string; amount?: number; graceDays?: number }): str
   return `${usdDollars(amount)}`;
 }
 
-// Stripe wants a moment, not a date. Midnight UTC on the due date is already
-// in the past on the evening before in the US (8pm New York), so an invoice
-// "due tomorrow" made after 8pm was refused. Use the END of the due date in
-// New York (03:59:59 UTC the next morning in summer, 22:59:59 the day itself in
-// winter), which is still the same calendar date everywhere in the US.
-export function dueTimestamp(dueDate: Date): number {
-  const day = Date.UTC(dueDate.getUTCFullYear(), dueDate.getUTCMonth(), dueDate.getUTCDate());
-  return Math.floor(day / 1000) + 28 * 3600 - 1;
-}
-
 // The client emails that use a $39-plan slot this month.
 export async function clientEmailsThisMonth(accountId: string): Promise<(string | null | undefined)[]> {
   const invs = await prisma.invoice.findMany({
@@ -296,4 +288,21 @@ export async function clientEmailsThisMonth(accountId: string): Promise<(string 
   return invs
     .filter((i) => countsTowardLimit({ status: i.status, createdAt: i.createdAt, cancelledAt: i.auditLog[0]?.createdAt ?? null }))
     .map((i) => i.client?.email);
+}
+
+// One-time repair at start-up (safe to repeat): due dates saved from Stripe
+// between 10/3 and this fix landed a day late. Every stored due date should be
+// midnight UTC; anything else is re-read the same way.
+export async function repairDueDates(): Promise<number> {
+  const rows = await prisma.invoice.findMany({ select: { id: true, dueDate: true } });
+  let fixed = 0;
+  for (const r of rows) {
+    const t = r.dueDate;
+    if (t.getUTCHours() === 0 && t.getUTCMinutes() === 0 && t.getUTCSeconds() === 0) continue;
+    const dueDate = dueDateFromStripe(Math.floor(t.getTime() / 1000));
+    await prisma.invoice.update({ where: { id: r.id }, data: { dueDate } });
+    fixed++;
+  }
+  if (fixed) console.log(`[startup] repaired ${fixed} due date(s) to their calendar date`);
+  return fixed;
 }
