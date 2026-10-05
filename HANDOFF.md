@@ -1,5 +1,5 @@
 # Watchtower — Handoff Sheet
-_Last updated: 2026-10-05, ~2:30pm ET. Read "▶ NEXT" first._
+_Last updated: 2026-10-05, ~7pm ET. Read "▶ NEXT" first._
 _(Older header:) 2026-09-28 (v1.8 — scheduler + one-bill late fees + webhook fix DEPLOYED; scheduler switched OFF in production pending invoice review) · working name = "Watchtower"; real name = "Dunn" (accounting term). Keep calling it Watchtower in code/docs until the domain is bought._
 
 ---
@@ -17,6 +17,9 @@ _(Older header:) 2026-09-28 (v1.8 — scheduler + one-bill late fees + webhook f
 - **Due-date readback bug fixed (46cc98e):** webhooks copied Stripe's end-of-day NY timestamp back as the NEXT day (Oct 3 → Oct 4). `dueDateFromStripe` in src/lib/dueDate.ts; `repairDueDates()` fixes old rows at startup. Invoice now shows Oct 3.
 - **Reports fixed (78af04d):** trend ran a month ahead (Nov in Oct); "Fees waived" only counted paid invoices ($0) — now every waived fee, dated by the waive (also both CSVs); month menu + bar clicks now work; under 3 months shows "$X so far", no yearly guess; waiver card padding. Bashira checked it live.
 - buhshyruh (no plan) blocked, with plan buttons. Recurring phone layout + phone Sign out OK.
+- **Also verified 10/5 (afternoon):** failed card (owner emailed; founder now gets declined cards in the daily summary only) · cancel + client email · 5-client limit blocks a new client (cancelled one not counted) · "A client pays" switch off = no email, on = email · Reports CSV · **Stripe Disconnect (new, 030f2a7):** button was never wired; now revokes access, pauses reminders/fees/recurring, blocks new invoices; reconnect asks Stripe about open invoices — paid-while-disconnected invoice turned Paid + email ✅.
+- Fixed 10/5: invoice due today showed Overdue (hours vs days) · trailing comma in client email.
+- **Go-live TODO:** in Stripe → Webhooks → the Connected-accounts destination, add event `account.application.deauthorized` (handles "disconnect from inside Stripe"). Do it for the LIVE webhook too.
 - Growth ideas: GROWTH-PAGES-PLAN.md (free tools + search pages). AppSumo plan: appsumo-go-deal-plan.md (Hermes).
 
 ### ▶ NEXT — remaining checks (older list below, items 1–3 done)
@@ -28,7 +31,7 @@ _(Older header:) 2026-09-28 (v1.8 — scheduler + one-bill late fees + webhook f
 5. **Oct 10, 9am — recurring** invoices send. To test sooner, edit one and set Next invoice date = tomorrow.
 6. **Custom-day recurring:** create one and check the "Next" date in the list.
 
-**Any-time tests still open:** failed client payment (card 4000 0000 0000 0002) · Reports CSV · dashboard on iPhone · disconnect + reconnect Stripe · cancel an invoice → slot returns only within 24h · Alerts: turn off "A client pays", pay an invoice → no "Invoice paid" email.
+**Any-time tests still open:** (all done 10/5 except iPhone dashboard pass) · dashboard on iPhone · disconnect + reconnect Stripe · cancel an invoice → slot returns only within 24h · Alerts: turn off "A client pays", pay an invoice → no "Invoice paid" email.
 
 **Then:** go-live steps below (Stripe live). Then AI distribution (MCP server).
 
