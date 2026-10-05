@@ -30,6 +30,16 @@ function averageDays(msDeltas: number[]): number | null {
   return Math.round((totalDays / msDeltas.length) * 10) / 10;
 }
 
+// Invoices whose late fee was waived, dated by the day it was waived. Most
+// waived invoices aren't paid yet, so these can't come from the paid list.
+async function waivedFees(accountId: string) {
+  const rows = await prisma.invoice.findMany({
+    where: { accountId, feeStatus: 'waived' },
+    include: { client: true, auditLog: { where: { event: 'fee_waived' }, orderBy: { createdAt: 'desc' }, take: 1 } },
+  });
+  return rows.map((i) => ({ ...i, waivedAt: i.auditLog[0]?.createdAt ?? i.createdAt }));
+}
+
 // ── GET /reports/waivers — "who do I waive a fee for" ──
 // Fees waived per month (by the day they were waived), and per client with
 // how often that client pays late and the owner's own notes on why.
@@ -68,11 +78,12 @@ reportsRouter.get('/revenue', async (req, res) => {
     where: { accountId: account.id, status: 'paid' },
     include: { client: true },
   });
+  const waived = await waivedFees(account.id);
 
   // ── Current month ──
   const paidThisMonth = invoices.filter(inv => inv.paidAt && inv.paidAt >= start && inv.paidAt < end);
   const feesThisMonth = invoices.filter(inv => inv.feeStatus === 'paid' && inv.feePaidAt && inv.feePaidAt >= start && inv.feePaidAt < end);
-  const waivedThisMonth = invoices.filter(inv => (inv.feeStatus === 'waived' || inv.waiveNote) && inv.createdAt >= start && inv.createdAt < end);
+  const waivedThisMonth = waived.filter(inv => inv.waivedAt >= start && inv.waivedAt < end);
 
   const moneyIn = paidThisMonth.reduce((s, i) => s + i.amount, 0);
   const feeRevenue = feesThisMonth.reduce((s, i) => s + (i.feeAmountCents ?? 0), 0);
@@ -96,7 +107,6 @@ reportsRouter.get('/revenue', async (req, res) => {
   const perClient = Array.from(perClientMap.entries()).map(([clientName, d]) => ({ clientName, ...d }));
 
   // ── Trend (month-by-month) ──
-  const trendEnd = new Date(month.getFullYear(), month.getMonth() + 1, 1);
   const trend: Array<{
     month: string; label: string;
     moneyInCents: number; feeRevenueCents: number; feesWaivedCents: number; totalCents: number;
@@ -105,13 +115,13 @@ reportsRouter.get('/revenue', async (req, res) => {
   }> = [];
 
   for (let i = 0; i < trendMonths; i++) {
-    const ms = new Date(trendEnd.getFullYear(), trendEnd.getMonth() - (trendMonths - 1 - i), 1);
+    const ms = new Date(month.getFullYear(), month.getMonth() - (trendMonths - 1 - i), 1);
     const me = new Date(ms.getFullYear(), ms.getMonth() + 1, 1);
     const label = ms.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
 
     const mInv = invoices.filter(x => x.paidAt && x.paidAt >= ms && x.paidAt < me);
     const mFee = invoices.filter(x => x.feeStatus === 'paid' && x.feePaidAt && x.feePaidAt >= ms && x.feePaidAt < me);
-    const mWv = invoices.filter(x => (x.feeStatus === 'waived' || x.waiveNote) && x.createdAt >= ms && x.createdAt < me);
+    const mWv = waived.filter(x => x.waivedAt >= ms && x.waivedAt < me);
 
     const tm = `${ms.getFullYear()}-${String(ms.getMonth() + 1).padStart(2, '0')}`;
     const mIn = mInv.reduce((s, i) => s + i.amount, 0);
@@ -181,20 +191,20 @@ reportsRouter.get('/revenue.csv', async (req, res) => {
     where: { accountId: account.id, status: 'paid' },
     include: { client: true },
   });
+  const waived = await waivedFees(account.id);
 
-  const trendEnd = new Date(month.getFullYear(), month.getMonth() + 1, 1);
   const rows: string[] = [];
   const header = 'Month,Client,Invoices Paid,Invoice Revenue,,Late Fee Count,Late Fee Revenue,Fees Waived,Total';
   rows.push(header);
 
   for (let i = 0; i < trendMonths; i++) {
-    const ms = new Date(trendEnd.getFullYear(), trendEnd.getMonth() - (trendMonths - 1 - i), 1);
+    const ms = new Date(month.getFullYear(), month.getMonth() - (trendMonths - 1 - i), 1);
     const me = new Date(ms.getFullYear(), ms.getMonth() + 1, 1);
     const label = ms.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
 
     const mInv = invoices.filter(x => x.paidAt && x.paidAt >= ms && x.paidAt < me);
     const mFee = invoices.filter(x => x.feeStatus === 'paid' && x.feePaidAt && x.feePaidAt >= ms && x.feePaidAt < me);
-    const mWv = invoices.filter(x => (x.feeStatus === 'waived' || x.waiveNote) && x.createdAt >= ms && x.createdAt < me);
+    const mWv = waived.filter(x => x.waivedAt >= ms && x.waivedAt < me);
 
     const mIn = mInv.reduce((s, i) => s + i.amount, 0);
     const mFe = mFee.reduce((s, i) => s + (i.feeAmountCents ?? 0), 0);
@@ -238,6 +248,7 @@ reportsRouter.get('/export.csv', async (req, res) => {
     where: { accountId: account.id },
     include: { client: true },
   });
+  const waivedAll = await waivedFees(account.id);
 
   const rows: string[][] = [['Month', 'Invoices paid', 'Invoice revenue', 'Late fees collected', 'Fee revenue', 'Fees waived', 'Total']];
   const add = (m: string, invCount: number, invRevenue: number, feeCount: number, feeRevenue: number, waived: number, total: number) =>
@@ -252,7 +263,7 @@ reportsRouter.get('/export.csv', async (req, res) => {
   for (const m of months) {
     const invs = invoices.filter(inv => inv.paidAt && inv.paidAt >= m.start && inv.paidAt < m.end);
     const fees = invoices.filter(inv => inv.feeStatus === 'paid' && inv.feePaidAt && inv.feePaidAt >= m.start && inv.feePaidAt < m.end);
-    const waived = invoices.filter(inv => (inv.feeStatus === 'waived' || inv.waiveNote) && inv.createdAt >= m.start && inv.createdAt < m.end);
+    const waived = waivedAll.filter(inv => inv.waivedAt >= m.start && inv.waivedAt < m.end);
     add(m.label, invs.length, invs.reduce((s, i) => s + i.amount, 0), fees.length, fees.reduce((s, i) => s + (i.feeAmountCents ?? 0), 0), waived.reduce((s, i) => s + (i.feeAmountCents ?? 0), 0), invs.reduce((s, i) => s + i.amount, 0) + fees.reduce((s, i) => s + (i.feeAmountCents ?? 0), 0));
   }
 

@@ -526,6 +526,7 @@ input::placeholder { color: var(--wt-faint); }
 @media (max-width: 520px) { .wt-inv__facts { grid-template-columns: 1fr; } .wt-inv__amount { font-size: 34px; } .wt-modal__foot { flex-wrap: wrap; } }
 
 /* ---------- Who you waive fees for (Reports) ---------- */
+.wt-waivers { padding: 24px 26px; }
 .wt-waivers .wt-caption { margin: 4px 0 18px; max-width: 620px; }
 .wt-waivers__months { display: grid; grid-template-columns: repeat(12, 1fr); gap: 6px; margin-bottom: 22px; }
 .wt-waivers__month { padding: 8px 4px; border-radius: 9px; background: var(--wt-sidebar); text-align: center; }

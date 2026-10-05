@@ -428,16 +428,25 @@ async function loadClients() {
 }
 
 // ---- Reports ----
+// The 12-month trend always ends at this month; picking a month (the menu or
+// a bar) only changes the breakdown above it.
+let reportTrend = null;
 async function loadReports(month) {
-  const yyyymm = month || new Date().toISOString().slice(0, 7);
-  const data = await api('GET', '/reports/revenue?month=' + yyyymm + '&months=12').catch(() => ({}));
+  const now = new Date();
+  const current = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+  const yyyymm = month || current;
+  const get = m => api('GET', '/reports/revenue?month=' + m + '&months=12').catch(() => ({}));
+  const data = await get(yyyymm);
   const s = data.summary || {};
-  const trend = data.trend || [];
+  if (yyyymm === current) reportTrend = data.trend || [];
+  else if (!reportTrend) reportTrend = (await get(current)).trend || [];
+  const trend = reportTrend;
+  const at = trend.findIndex(t => t.month === yyyymm);
 
   // delta vs previous month
   let delta = '';
-  if (trend.length >= 2) {
-    const cur = trend[trend.length - 1], prev = trend[trend.length - 2];
+  if (at >= 1) {
+    const cur = trend[at], prev = trend[at - 1];
     if (prev.totalCents > 0) {
       const pct = Math.round((cur.totalCents - prev.totalCents) / prev.totalCents * 100);
       const prevLabel = (prev.label || '').split(' ')[0];
@@ -447,9 +456,8 @@ async function loadReports(month) {
   const feeShare = s.totalCollectedCents > 0 ? (s.feeRevenueCents / s.totalCollectedCents * 100).toFixed(1) : '0.0';
   const shareNote = (s.feeRevenueCents || 0) > 0 ? ('Late fees were ' + feeShare + '% of what came in.') : 'No late fees this month.';
 
-  // fees collected count from the current trend month
-  let feeCount = 0;
-  if (trend.length) feeCount = trend[trend.length - 1].feeCount || 0;
+  // fees collected count for the picked month
+  const feeCount = at >= 0 ? trend[at].feeCount || 0 : 0;
 
   bind({
     invoice_revenue: money(s.moneyInCents || 0),
@@ -462,9 +470,17 @@ async function loadReports(month) {
     fees_waived_amount: money(s.feesWaivedCents || 0),
   });
 
-  renderTrend(trend);
+  renderTrend(trend, yyyymm);
   loadWaivers(yyyymm);
 }
+
+document.addEventListener('change', e => {
+  if (e.target.matches('[data-report-month]')) loadReports(e.target.value);
+});
+document.addEventListener('click', e => {
+  const bar = e.target.closest('.wt-bars [data-month]');
+  if (bar) loadReports(bar.dataset.month);
+});
 
 // Who you waive fees for: a 12-month strip + clients ranked by fees waived,
 // with how often they pay late and the owner's own notes. textContent only.
@@ -480,7 +496,17 @@ async function loadWaivers(selectedMonth) {
       const parts = [];
       if (o.waivedCents) parts.push(money(o.waivedCents) + ' waived');
       if (o.noFeeCents) parts.push('about ' + money(o.noFeeCents) + ' on ' + o.lateNoFeeCount + ' late ' + (o.lateNoFeeCount === 1 ? 'invoice' : 'invoices') + ' with no fee');
-      bind({ opp_month: money(o.perMonthCents), opp_year: money(o.perYearCents), opp_parts: parts.join(' + ') + (o.monthsSeen < 12 ? ' over ' + o.monthsSeen + (o.monthsSeen === 1 ? ' month' : ' months') : ' this year') });
+      // Under 3 months of history, a monthly average and a yearly guess would
+      // just multiply one fee: show the real total instead.
+      const early = o.monthsSeen < 3;
+      bind({
+        opp_month: money(early ? o.perMonthCents * o.monthsSeen : o.perMonthCents),
+        opp_unit: early ? ' so far' : ' a month',
+        opp_year: money(o.perYearCents),
+        opp_parts: parts.join(' + ') + (early ? '' : o.monthsSeen < 12 ? ' over ' + o.monthsSeen + ' months' : ' this year'),
+      });
+      const year = document.querySelector('[data-opp-year]');
+      if (year) year.hidden = early;
     }
   }
   bind({ fees_waived_count: sel ? (sel.count === 1 ? '1 fee' : sel.count + ' fees') : '0 fees' });
@@ -524,7 +550,7 @@ async function loadWaivers(selectedMonth) {
   }));
 }
 
-function renderTrend(trend) {
+function renderTrend(trend, picked) {
   const bars = document.querySelector('.wt-bars');
   const labels = document.querySelector('.wt-bar-labels');
   const select = document.querySelector('[data-report-month]');
@@ -532,25 +558,23 @@ function renderTrend(trend) {
   if (!trend.length) { bars.innerHTML = ''; labels.innerHTML = ''; return; }
 
   const max = Math.max.apply(null, trend.map(t => t.totalCents).concat([1]));
-  const monthLabels = ['O','N','D','J','F','M','A','M','J','J','A','S'];
-  const currentMonth = new Date().getMonth();
 
   bars.innerHTML = trend.map((t, i) => {
     const invH = max ? (t.moneyInCents / max * 100).toFixed(1) : 0;
     const feeH = max ? (t.feeRevenueCents / max * 100).toFixed(1) : 0;
-    const sel = t.month === trend[trend.length - 1].month ? ' is-selected' : '';
+    const sel = t.month === picked ? ' is-selected' : '';
     return '<button class="wt-bar' + sel + '" type="button" data-month="' + t.month + '" title="' + t.label + ': ' + money(t.moneyInCents) + ' + ' + money(t.feeRevenueCents) + ' fees"><span class="wt-bar__fee" style="height:' + feeH + '%"></span><span class="wt-bar__inv" style="height:' + invH + '%"></span></button>';
   }).join('');
 
   labels.innerHTML = trend.map(t => {
-    const d = new Date(t.month + '-01');
+    const d = new Date(t.month + '-15'); // mid-month: '-01' is the previous day in US time zones
     const letter = d.toLocaleDateString('en-US', { month: 'short' })[0];
-    const sel = t.month === trend[trend.length - 1].month ? ' is-selected' : '';
+    const sel = t.month === picked ? ' is-selected' : '';
     return '<span class="' + sel + '">' + letter + '</span>';
   }).join('');
 
   if (select) {
-    select.innerHTML = trend.slice().reverse().map(t => '<option value="' + t.month + '"' + (t.month === trend[trend.length - 1].month ? ' selected' : '') + '>' + t.label + '</option>').join('');
+    select.innerHTML = trend.slice().reverse().map(t => '<option value="' + t.month + '"' + (t.month === picked ? ' selected' : '') + '>' + t.label + '</option>').join('');
   }
 }
 
