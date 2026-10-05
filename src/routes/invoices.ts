@@ -37,14 +37,15 @@ invoicesRouter.post('/', async (req, res) => {
   }
 
   const clientName = String(body.clientName ?? '').trim();
-  const clientEmail = String(body.clientEmail ?? '').trim().toLowerCase();
+  // A stray comma or semicolon from a pasted list ("a@b.com,") is dropped.
+  const clientEmail = String(body.clientEmail ?? '').trim().toLowerCase().replace(/[\s,;]+$/, '');
   const amountDollars = Number(body.amount);
   const dueDateStr = String(body.dueDate ?? '');
 
   if (!clientName) {
     return res.status(400).json({ error: 'Client name is required.' });
   }
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(clientEmail)) {
+  if (!/^[^@\s,;<>]+@[^@\s,;<>]+\.[a-z]{2,}$/.test(clientEmail)) {
     return res.status(400).json({ error: 'A valid client email is required.' });
   }
   if (!Number.isFinite(amountDollars) || amountDollars <= 0) {
