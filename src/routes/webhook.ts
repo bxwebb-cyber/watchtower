@@ -235,6 +235,7 @@ async function onInvoicePaymentFailed(inv: Stripe.Invoice) {
   const number = invoice.stripeNumber ?? invoice.stripeInvoiceId;
   await reportProblem({
     kind: 'Client payment failed',
+    summaryOnly: true,
     key: `payment_failed:${inv.id}`,
     accountId: invoice.accountId,
     detail: `Invoice ${number}: ${inv.last_finalization_error?.message ?? 'payment attempt failed'}`,

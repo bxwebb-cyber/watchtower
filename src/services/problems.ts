@@ -19,6 +19,9 @@ export type Problem = {
   detail: string; // technical detail for the founder
   accountId?: string;
   owner?: { subject: string; text: string }; // omit for founder-only problems
+  // Normal business events (a client's card declined), not a Dunn problem:
+  // no instant founder email, just a line in the daily summary.
+  summaryOnly?: boolean;
 };
 
 export function shouldReport(key: string, now = Date.now(), seen = lastReported): boolean {
@@ -36,6 +39,7 @@ export async function reportProblem(p: Problem): Promise<void> {
     sinceSummary.push({ at: new Date(), kind: p.kind, who, detail: p.detail });
     console.error(`[problem] ${p.kind} — ${who} — ${p.detail}`);
     if (p.owner && p.accountId) await notifyOwner(p.accountId, p.owner.subject, p.owner.text);
+    if (p.summaryOnly) return;
     await notifyFounder(
       `Issue: ${p.kind} — ${account?.businessName ?? 'Dunn'}`,
       `${p.kind}\nAccount: ${who}${p.accountId ? ` (id ${p.accountId})` : ''}\n\n${p.detail}\n\n${p.owner ? `The owner was emailed: "${p.owner.subject}"` : 'Founder-only: the owner was not emailed.'}`
