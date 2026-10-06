@@ -22,6 +22,8 @@ _(Older header:) 2026-09-28 (v1.8 — scheduler + one-bill late fees + webhook f
 - **Tomorrow 10/6 9am:** $25 reminder (EYXYUIAF-0009) · dddd weekly $100 → +recurring Gmail, next should become Oct 13 · cccc monthly-on-the-6th → next Nov 6.
 - Fixed 10/5: invoice due today showed Overdue (hours vs days) · trailing comma in client email.
 - **Go-live TODO:** in Stripe → Webhooks → the Connected-accounts destination, add event `account.application.deauthorized` (handles "disconnect from inside Stripe"). Do it for the LIVE webhook too.
+- **AI distribution, phase 1 LIVE (14843e0):** free MCP server at https://getdunn.org/mcp (no login, stateless, src/mcp/; 4 read-only tools: invoice_due_date, late_fee_calculator, how_late_is_this_invoice, payment_reminder_email; tests in src/mcp/tools.test.ts). Docs page /ai; privacy policy has an "AI assistant tools" section. Name everywhere = **Dunn**. Research 10/5: ChatGPT rejects marketing-only apps, freemium upsells and things ChatGPT does natively → ChatGPT + Muse wait for **phase 2** (owners sign in with OAuth: "who owes me", lateness, create invoice). Claude directory accepts no-auth public tools (auto-listed as Community after a scan). Hermes: `hermes mcp add dunn --url https://getdunn.org/mcp`.
+  - **Claude listing copy:** Name "Dunn" · One-liner "Get paid on time: exact due dates, fair late fees, and the right reminder email for any late invoice." · Docs https://getdunn.org/ai · Privacy https://getdunn.org/privacy · Support hello@getdunn.org · Categories: Finance, Productivity · Auth: none · API: our own · reads only.
 - Growth ideas: GROWTH-PAGES-PLAN.md (free tools + search pages). AppSumo plan: appsumo-go-deal-plan.md (Hermes).
 
 ### ▶ NEXT — remaining checks (older list below, items 1–3 done)
