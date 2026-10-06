@@ -1,0 +1,26 @@
+# Dunn
+
+> Dunn sends invoice reminders and adds late fees automatically, so freelancers and small businesses get paid on time without chasing clients. It works from the business's own Stripe account: Dunn never holds the money.
+
+Dunn is for freelancers, consultants, studios and small businesses who invoice clients. The owner creates an invoice (or a recurring one) in Dunn; Dunn emails it, sends a friendly reminder before it's due, checks in when it's late, and adds the late fee the client agreed to. The owner gets a heads-up the day before any fee and can lower or waive it. Clients pay through Stripe. Dunn also shows which clients pay late, which pay on time, and which ones the owner keeps waiving fees for.
+
+Pricing: Solo $39/month (up to 5 clients a month) or Unlimited $59/month; yearly plans available.
+
+## Product
+- [Dunn home page](https://getdunn.org/): what Dunn does and pricing
+- [See how it works](https://getdunn.org/demo): interactive demo dashboard
+
+## Guides
+- [How to charge a late fee on an invoice](https://getdunn.org/guides/how-to-charge-a-late-fee-on-an-invoice)
+- [Invoice reminder email templates](https://getdunn.org/guides/invoice-reminder-email-templates)
+- [What to say when a client pays late](https://getdunn.org/guides/what-to-say-when-a-client-pays-late)
+- [Net 30 payment terms, explained](https://getdunn.org/guides/net-30-payment-terms-explained)
+- [Dunn vs FreshBooks vs Wave](https://getdunn.org/guides/dunn-vs-freshbooks-vs-wave)
+
+## For AI assistants
+- [Dunn for AI assistants](https://getdunn.org/ai): free MCP server at https://getdunn.org/mcp (no login) with tools for invoice due dates, late fees, how late an invoice is, and reminder emails
+
+## Optional
+- [Terms](https://getdunn.org/terms)
+- [Privacy](https://getdunn.org/privacy)
+- Contact: hello@getdunn.org
