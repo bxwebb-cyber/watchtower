@@ -27,6 +27,12 @@ _(Older header:) 2026-09-28 (v1.8 — scheduler + one-bill late fees + webhook f
   - **Claude listing copy:** Name "Dunn" · One-liner "Get paid on time: exact due dates, fair late fees, and the right reminder email for any late invoice." · Docs https://getdunn.org/ai · Privacy https://getdunn.org/privacy · Support hello@getdunn.org · Categories: Finance, Productivity · Auth: none · API: our own · reads only.
 - Growth ideas: GROWTH-PAGES-PLAN.md (free tools + search pages). AppSumo plan: appsumo-go-deal-plan.md (Hermes).
 
+### ▶ POST-LAUNCH LIST (Bashira's yes, in order she agreed)
+1. **AI phase 2:** owners sign in to Dunn inside ChatGPT / Claude / Muse (OAuth): "who owes me", lateness, create invoice. Needed for ChatGPT + Muse approval.
+2. **Pay by bank (ACH), 10/6:** Settings option "Let clients pay by bank transfer (cheaper fees)", on by default for big invoices; set `payment_settings.payment_method_types` on created/reissued invoices (Dunn sets none today = the owner's Stripe defaults). Handle the pending state: ACH takes days → show "Payment pending" (invoice.payment_action_required / processing), don't send reminders or fees while a payment is processing, handle a failed ACH. Fees ~0.8% capped $5 vs ~3% card. No Plaid needed (Stripe Financial Connections). Owner payouts to their own bank already work via Stripe.
+3. Daily summary list survives restarts (store in DB, not memory).
+4. Free tools + search pages: GROWTH-PAGES-PLAN.md. Then AppSumo (appsumo-go-deal-plan.md).
+
 ### ▶ NEXT — remaining checks (older list below, items 1–3 done)
 **Check what the 9am runs did (Resend + bmwxcf Gmail):**
 1. **Oct 3, 9am — fee heads-up:** "Tomorrow: $10 late fee on invoice EYXYUIAF-0008" email to the owner; the dashboard shows it under "Late fees coming up" (Lower / Waive). Try **Lower** (e.g. $5) on it.
