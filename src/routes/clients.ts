@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { getAccount } from '../lib/account';
+import { daysLateAt } from '../lib/dueDate';
 
 const prisma = new PrismaClient();
 export const clientsRouter = Router();
@@ -33,14 +34,14 @@ clientsRouter.get('/', async (req, res) => {
   const rows = clients.map((client) => {
     const total = client.invoices.length;
     const lateInvoices = client.invoices.filter(
-      (inv) => inv.paidAt && inv.dueDate && inv.paidAt > inv.dueDate
+      (inv) => inv.paidAt && daysLateAt(inv.paidAt, inv.dueDate) > 0
     );
     const lateCount = lateInvoices.length;
     const avgDaysLate =
       lateCount > 0
         ? Math.round(
             lateInvoices.reduce((s, inv) => {
-              return s + (inv.paidAt!.getTime() - inv.dueDate.getTime()) / 86_400_000;
+              return s + daysLateAt(inv.paidAt!, inv.dueDate);
             }, 0) / lateCount
           )
         : 0;

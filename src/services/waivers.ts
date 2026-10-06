@@ -3,6 +3,7 @@
 // which clients, next to how often those clients pay late. Never guesses the
 // why; it shows the owner's own notes and lets them decide what it means.
 import { agreedFeeCents } from './feeRules';
+import { daysLateAt } from '../lib/dueDate';
 
 export type WaiverInvoice = {
   amount: number;
@@ -52,7 +53,7 @@ export function waiverReport(invoices: WaiverInvoice[], now: Date, months = 12) 
       clients.set(key, c);
     }
     if (i.feeStatus) c.feesDue++;
-    if (i.paidAt) { c.paidCount++; if (i.paidAt > i.dueDate) c.paidLateCount++; }
+    if (i.paidAt) { c.paidCount++; if (daysLateAt(i.paidAt, i.dueDate) > 0) c.paidLateCount++; }
     if (isWaived(i)) {
       c.waivedCount++;
       c.waivedCents += cents(i);
@@ -109,7 +110,7 @@ export function feeOpportunity(
 
   const waived = inWindow.filter((i) => i.feeStatus === 'waived');
   const waivedCents = waived.reduce((s, i) => s + (i.feeAmountCents ?? (i.feePolicy ? agreedFeeCents(i.amount, i.feePolicy) : 0)), 0);
-  const lateNoFee = inWindow.filter((i) => !hasFee(i) && i.paidAt && i.paidAt > i.dueDate);
+  const lateNoFee = inWindow.filter((i) => !hasFee(i) && i.paidAt && daysLateAt(i.paidAt, i.dueDate) > 0);
   const noFeeCents = lateNoFee.reduce((s, i) => s + estimate(i), 0);
 
   // Average over the months Dunn has actually seen, not a flat 12.

@@ -18,3 +18,13 @@ export function dueDateFromStripe(sec: number): Date {
   const [y, m, d] = moment.toLocaleDateString('en-CA', { timeZone: 'America/New_York' }).split('-').map(Number);
   return new Date(Date.UTC(y, m - 1, d));
 }
+
+// Whole days late as of a moment (a payment, or now): the New York calendar
+// day of the moment minus the due date. 0 = on or before the due date — a
+// payment at 3pm on the due day is on time, though it's after midnight UTC.
+export function daysLateAt(moment: Date, dueDate: Date): number {
+  const [y, m, d] = moment.toLocaleDateString('en-CA', { timeZone: 'America/New_York' }).split('-').map(Number);
+  const day = Date.UTC(y, m - 1, d);
+  const due = Date.UTC(dueDate.getUTCFullYear(), dueDate.getUTCMonth(), dueDate.getUTCDate());
+  return Math.max(0, Math.round((day - due) / 86_400_000));
+}

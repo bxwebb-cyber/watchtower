@@ -8,6 +8,7 @@ import { getAccount } from '../lib/account';
 import { buildTimeline } from '../services/invoiceTimeline';
 import { usd, usdDollars } from '../lib/money';
 import { sendClientEmail } from '../services/reminderEngine';
+import { daysLateAt } from '../lib/dueDate';
 
 const prisma = new PrismaClient();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -262,11 +263,10 @@ invoicesRouter.get('/escalations', async (req, res) => {
   const now = new Date();
   const escalations = invoices
     .filter((inv) => {
-      const daysLate = Math.round((now.getTime() - inv.dueDate.getTime()) / 86_400_000);
-      return daysLate >= 14;
+      return daysLateAt(now, inv.dueDate) >= 14;
     })
     .map((inv) => {
-      const daysLate = Math.round((now.getTime() - inv.dueDate.getTime()) / 86_400_000);
+      const daysLate = daysLateAt(now, inv.dueDate);
       return {
         id: inv.id,
         clientName: inv.client?.name ?? 'Unknown',
@@ -333,9 +333,9 @@ invoicesRouter.get('/', async (req, res) => {
     if (!inv.client) continue;
     const entry = clientLateness.get(inv.client.id) ?? { total: 0, lateCount: 0, avgDaysLate: 0 };
     entry.total++;
-    if (inv.paidAt && inv.dueDate && inv.paidAt > inv.dueDate) {
+    const daysLate = inv.paidAt ? daysLateAt(inv.paidAt, inv.dueDate) : 0;
+    if (daysLate > 0) {
       entry.lateCount++;
-      const daysLate = Math.round((inv.paidAt.getTime() - inv.dueDate.getTime()) / 86_400_000);
       entry.avgDaysLate = (entry.avgDaysLate * (entry.lateCount - 1) + daysLate) / entry.lateCount;
     }
     clientLateness.set(inv.client.id, entry);

@@ -23,7 +23,7 @@ describe('dueTimestamp', () => {
   });
 });
 
-import { dueDateFromStripe } from '../lib/dueDate';
+import { dueDateFromStripe, daysLateAt } from '../lib/dueDate';
 
 describe('dueDateFromStripe (Stripe → the date the owner picked)', () => {
   const day = (d: Date) => d.toISOString().slice(0, 10);
@@ -38,4 +38,12 @@ describe('dueDateFromStripe (Stripe → the date the owner picked)', () => {
   it('older invoices due at midnight UTC keep that date', () => {
     expect(day(dueDateFromStripe(Date.UTC(2026, 9, 3) / 1000))).toBe('2026-10-03');
   });
+});
+
+describe('daysLateAt', () => {
+  const due = new Date('2026-10-05T00:00:00Z');
+  it('paid at 3pm New York on the due date is on time', () => expect(daysLateAt(new Date('2026-10-05T19:00:00Z'), due)).toBe(0));
+  it('paid at 11pm New York on the due date is on time (already Oct 6 in UTC)', () => expect(daysLateAt(new Date('2026-10-06T03:00:00Z'), due)).toBe(0));
+  it('paid the next day is 1 day late', () => expect(daysLateAt(new Date('2026-10-06T14:00:00Z'), due)).toBe(1));
+  it('paid early is 0', () => expect(daysLateAt(new Date('2026-10-01T14:00:00Z'), due)).toBe(0));
 });
