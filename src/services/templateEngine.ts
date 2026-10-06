@@ -4,6 +4,7 @@ import { notifyOwner } from './notify';
 import { usd } from '../lib/money';
 import { createdSinceStart, stripeConnected } from '../jobs/startDate';
 import { reportProblem } from './problems';
+import { nyDayStart, addDays } from './reminderEngine';
 
 const prisma = new PrismaClient();
 
@@ -15,7 +16,10 @@ export async function runTemplateJob(now = new Date()): Promise<number> {
     return 0;
   }
 
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  // The New York date, as midnight UTC like stored dates. Not the server's
+  // own date: a catch-up run after an evening deploy (8pm+ ET) is already
+  // "tomorrow" in UTC, and sent the next morning's invoices a night early.
+  const today = nyDayStart(now);
 
   const templates = await prisma.invoiceTemplate.findMany({
     where: { active: true, nextRunDate: { lte: today }, ...createdSinceStart(), ...stripeConnected },
@@ -28,8 +32,7 @@ export async function runTemplateJob(now = new Date()): Promise<number> {
   for (const tmpl of templates) {
     try {
       // Due date: N days from the run date.
-      const dueDate = new Date(today);
-      dueDate.setDate(dueDate.getDate() + tmpl.dueDays);
+      const dueDate = addDays(today, tmpl.dueDays);
 
       const result = await createInvoice({
         accountId: tmpl.accountId,
