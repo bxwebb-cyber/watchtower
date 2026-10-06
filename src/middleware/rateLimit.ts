@@ -16,3 +16,10 @@ export const apiLimiter = rateLimit({
   standardHeaders: false,
   legacyHeaders: false,
 });
+// Public MCP server (/mcp): AI platforms call from shared IPs, so allow more.
+export const mcpLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  standardHeaders: false,
+  legacyHeaders: false,
+});

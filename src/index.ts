@@ -15,7 +15,8 @@ import { clientsRouter } from './routes/clients';
 import { billingRouter } from './routes/billing';
 import { inboundRouter } from './routes/inbound';
 import { authMiddleware } from './middleware/auth';
-import { apiLimiter } from './middleware/rateLimit';
+import { apiLimiter, mcpLimiter } from './middleware/rateLimit';
+import { mcpRouter } from './mcp/server';
 import { httpsRedirect } from './middleware/https';
 import { schedulerEnabled, startScheduler } from './jobs/scheduler';
 import { repairDueDates } from './services/invoiceCreator';
@@ -33,6 +34,10 @@ app.use(httpsRedirect);
 const jwtSecret: string = process.env.JWT_SECRET ?? (() => {
   throw new Error('JWT_SECRET environment variable is required');
 })();
+
+// Public MCP server for AI assistants: open to any origin (browser-based
+// MCP clients send a CORS preflight), mounted before the site's own CORS.
+app.use('/mcp', cors({ origin: '*', methods: ['GET', 'POST', 'DELETE', 'OPTIONS'], allowedHeaders: ['Content-Type', 'Authorization', 'Mcp-Session-Id', 'Mcp-Protocol-Version', 'Accept', 'Last-Event-ID'], exposedHeaders: ['Mcp-Session-Id'] }), mcpLimiter, express.json({ limit: '100kb' }), mcpRouter);
 
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'http://localhost:4000').split(',').map(o => o.trim());
 app.use(cors({
@@ -107,6 +112,9 @@ app.get('/terms', (_req: Request, res: Response) => {
 });
 app.get('/privacy', (_req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, '../public/privacy.html'));
+});
+app.get('/ai', (_req: Request, res: Response) => {
+  res.sendFile(path.join(__dirname, '../public/ai.html'));
 });
 
 // Guides at clean URLs (/guides, /guides/<slug>). Slugs are checked against

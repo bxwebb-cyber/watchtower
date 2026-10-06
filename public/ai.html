@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dunn for AI assistants · Dunn</title>
+<meta name="description" content="Free Dunn tools for Claude, ChatGPT, Hermes and other AI assistants: exact invoice due dates, late-fee calculator, how late an invoice is, and payment reminder emails.">
+<link rel="canonical" href="https://getdunn.org/ai">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://getdunn.org/ai">
+<meta property="og:title" content="Dunn for AI assistants">
+<meta property="og:description" content="Free tools for getting paid on time, inside your AI assistant.">
+<meta property="og:image" content="https://getdunn.org/lighthouse-transparent.png">
+<link rel="icon" href="/lighthouse-transparent.png">
+<link rel="stylesheet" href="/legal.css">
+</head>
+<body>
+<header class="lg-head"><a href="/" class="lg-brand"><img src="/lighthouse-transparent.png" alt="">Dunn</a></header>
+<main class="lg">
+<h1>Dunn for AI assistants</h1>
+<p class="lg-date">Updated October 5, 2026</p>
+<p class="lg-lede">Free tools for getting paid on time, inside Claude, ChatGPT, Hermes or any assistant that supports MCP. No account, no sign-in.</p>
+<div class="lg-answer"><strong>Server address:</strong> <code>https://getdunn.org/mcp</code></div>
+
+<h2>What it does</h2>
+<ul>
+<li><strong>Due date from payment terms.</strong> The exact due date for "net 30", "due on receipt", "EOM", "net 30 EOM" or "2/10 net 30", including the early-payment discount date.</li>
+<li><strong>Late fee calculator.</strong> The fee, the new total, the exact day it applies, a line to put on the invoice, and whether the fee is in the usual range.</li>
+<li><strong>How late is this invoice?</strong> Days late (or until due), what to send the client now, and what comes next.</li>
+<li><strong>Payment reminder email.</strong> The right reminder for where the invoice is: before it's due, due today, late, or a final notice. Polite by default, firm if you ask.</li>
+</ul>
+<p>Try asking: <em>"My client's $1,200 invoice was due September 20. How late is it and what should I send?"</em> or <em>"What's a fair late fee on a $3,000 invoice due October 31, with a week's grace?"</em></p>
+
+<h2>Add it to your assistant</h2>
+<ul>
+<li><strong>Claude:</strong> Settings → Connectors → Add custom connector. Name it Dunn and paste <code>https://getdunn.org/mcp</code>.</li>
+<li><strong>Hermes Agent:</strong> run <code>hermes mcp add dunn --url https://getdunn.org/mcp</code></li>
+<li><strong>Other MCP clients:</strong> add a remote (Streamable HTTP) server at <code>https://getdunn.org/mcp</code>. No authentication.</li>
+</ul>
+
+<h2>Your data</h2>
+<p>The tools only do math and write text from what you send. Dunn doesn't store your requests, doesn't need an account, and never sees your clients' data through these tools. Our server keeps standard technical logs (such as time and IP address) for security, as described in our <a href="/privacy">privacy policy</a>.</p>
+
+<h2>Want it done for you?</h2>
+<p>These tools tell you what to send. <a href="/">Dunn</a> sends the reminders on schedule and adds the late fee automatically, from your own Stripe account, so you don't have to chase anyone.</p>
+
+<h2>Help</h2>
+<p>Questions or problems: <a href="mailto:hello@getdunn.org">hello@getdunn.org</a></p>
+</main>
+<footer class="lg-foot">© 2026 Defiance Media LLC · <a href="/">Dunn</a> · <a href="/guides">Guides</a> · <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a></footer>
+</body>
+</html>
