@@ -289,7 +289,10 @@ function emailDataFor(invoice: EmailInvoice): EmailData {
     businessAddress: '',
     ownerName: ownerName ?? businessName,
     ownerFirstName: ownerName ? ownerName.split(/\s+/)[0] : businessName,
-    clientFirstName: invoice.client?.name?.split(/\s+/)[0] ?? 'there',
+    // The client name exactly as the owner typed it: Dunn can't tell a person
+    // ("Dana") from a business ("Harbor and Vine"), and the first word alone
+    // turned "Harbor and Vine" into "Hi Harbor".
+    clientFirstName: invoice.client?.name?.trim() || 'there',
     invoiceId: invoice.stripeNumber || invoice.stripeInvoiceId,
     amountDue: `${usd(invoice.amount)}`,
     feeAmount: feeCents > 0 ? `${usd(feeCents)}` : null,
@@ -354,8 +357,8 @@ function buildFeeClause(invoice: {
 }
 
 function greetingFor(name?: string | null): string {
-  const first = name?.trim().split(/\s+/)[0];
-  return first ? `Hi ${first},` : 'Hi there,';
+  const full = name?.trim();
+  return full ? `Hi ${full},` : 'Hi there,';
 }
 
 function signatureFor(businessName?: string | null): string {
