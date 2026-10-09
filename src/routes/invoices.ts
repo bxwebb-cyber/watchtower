@@ -180,6 +180,9 @@ invoicesRouter.post('/:id/cancel', async (req, res) => {
   if (invoice.status !== 'open') {
     return res.status(400).json({ error: invoice.status === 'paid' ? 'This invoice is paid. To give money back, refund it in Stripe.' : 'This invoice is already cancelled.' });
   }
+  if (invoice.paymentPendingAt) {
+    return res.status(409).json({ error: "A bank payment for this invoice is clearing (3–5 business days), so it can't be cancelled now. If it clears, refund it in Stripe; if it fails, you can cancel it then." });
+  }
 
   const opts = { stripeAccount: account.stripeAccountId };
   try {
@@ -380,6 +383,7 @@ invoicesRouter.get('/', async (req, res) => {
       graceDays: inv.feePolicy?.graceDays ?? null,
       feeApplied: inv.feeApplied,
       feeStatus: inv.feeStatus ?? null,
+      paymentPending: !!inv.paymentPendingAt,
       feeAmountCents: inv.feeAmountCents ?? null,
       // The fee in the invoice terms — the most the owner can set it to.
       feeTermsCents: inv.feePolicy ? agreedFeeCents(inv.amount, inv.feePolicy) : 0,
@@ -430,6 +434,7 @@ invoicesRouter.get('/:id', async (req, res) => {
     fee: inv.feePolicy && inv.feePolicy.kind !== 'none' ? feeLabel(inv.feePolicy) : null,
     graceDays: inv.feePolicy?.graceDays ?? null,
     feeStatus: inv.feeStatus ?? null,
+    paymentPending: !!inv.paymentPendingAt,
     feeAmountCents: inv.feeAmountCents ?? null,
     hostedInvoiceUrl: inv.hostedInvoiceUrl ?? null,
     pdfUrl,

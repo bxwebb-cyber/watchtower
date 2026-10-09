@@ -93,6 +93,7 @@ model Invoice {
   templateId      String?  // the recurring invoice that created it (null = one-off)
   poNumber        String?  // the client's purchase-order number, if they gave one
   lines           Json?    // line items [{description, quantity, unitCents}]; null = one amount
+  paymentPendingAt DateTime? // a bank payment started and is clearing; no reminders or fees meanwhile
   hostedInvoiceUrl String? // the real Stripe payment link for the client
   amount          Int // cents
   currency        String   @default("usd")

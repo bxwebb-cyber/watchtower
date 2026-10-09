@@ -87,6 +87,10 @@ function invoiceStatus(inv, now) {
     const label = inv.status === 'uncollectible' ? 'Uncollectible' : 'Cancelled';
     return { key: 'void', pill: 'wt-pill--pending', label, dueClass: '', dueText: label.toLowerCase() };
   }
+  // A bank payment is clearing: not late, nothing to chase.
+  if (inv.paymentPending) {
+    return { key: 'clearing', pill: 'wt-pill--paid', label: 'Payment clearing', dueClass: '', dueText: 'bank payment clearing' };
+  }
   if (inv.feeApplied) {
     return { key: 'fee-applied', pill: 'wt-pill--fee-applied', label: 'Fee applied', dueClass: 'wt-due--late', dueText: '' };
   }
@@ -288,17 +292,17 @@ async function loadDashboard() {
   const bizName = settings.businessName || 'there';
 
   // Only open invoices are owed (paid, void and uncollectible ones aren't).
-  const overdue = state.invoices.filter(i => i.status === 'open' && daysUntilDue(i, now) < 0 && !i.feeApplied);
+  const overdue = state.invoices.filter(i => i.status === 'open' && !i.paymentPending && daysUntilDue(i, now) < 0 && !i.feeApplied);
   const feeApplied = state.invoices.filter(i => i.status === 'open' && i.feeApplied);
   const dueSoon = state.invoices.filter(i => {
-    if (i.status !== 'open') return false;
+    if (i.status !== 'open' || i.paymentPending) return false;
     const days = daysUntilDue(i, now);
     return days >= 0 && days <= 7;
   });
   // Pending: past the fee deadline, waiting on the owner. Billed: on the
   // client's bill, still unpaid — can still be lowered or waived.
-  const pendingFees = state.invoices.filter(i => i.status === 'open' && i.feeStatus === 'pending');
-  const billedFees = state.invoices.filter(i => i.status === 'open' && i.feeApplied && i.feeStatus === 'open');
+  const pendingFees = state.invoices.filter(i => i.status === 'open' && !i.paymentPending && i.feeStatus === 'pending');
+  const billedFees = state.invoices.filter(i => i.status === 'open' && !i.paymentPending && i.feeApplied && i.feeStatus === 'open');
 
   let statusLine;
   if (overdue.length && dueSoon.length) statusLine = overdue.length + ' overdue, ' + dueSoon.length + ' due this week.';

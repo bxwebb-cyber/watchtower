@@ -75,6 +75,9 @@ webhookRouter.post('/', async (req, res) => {
       case 'customer.subscription.deleted':
         await onSubscriptionDeleted(event.data.object as Stripe.Subscription);
         break;
+      case 'payment_intent.processing':
+        await onPaymentProcessing(event.data.object as Stripe.PaymentIntent, event.account);
+        break;
       case 'account.application.deauthorized':
         await onDeauthorized(event.account);
         break;
@@ -97,6 +100,38 @@ webhookRouter.post('/', async (req, res) => {
 });
 
 // ---- handlers ----
+
+// A bank (ACH) payment started: it takes 3-5 business days to clear, and
+// Stripe says "paid" only then. Until it clears or fails, Dunn must not send
+// a reminder or add a late fee to a client who has already paid.
+async function onPaymentProcessing(pi: Stripe.PaymentIntent, connectedAccountId?: string) {
+  if (!connectedAccountId) return;
+  // Which invoice is this payment for? (Payments link to invoices through
+  // invoice payments in this Stripe API version.)
+  const found = await stripe.invoicePayments.list(
+    { payment: { type: 'payment_intent', payment_intent: pi.id }, limit: 1 },
+    { stripeAccount: connectedAccountId }
+  );
+  const ip = found.data[0];
+  const stripeInvoiceId = typeof ip?.invoice === 'string' ? ip.invoice : ip?.invoice?.id;
+  if (!stripeInvoiceId) return;
+  const invoice = await prisma.invoice.findUnique({ where: { stripeInvoiceId } });
+  if (!invoice || invoice.status !== 'open' || invoice.paymentPendingAt) return;
+  await prisma.invoice.update({ where: { id: invoice.id }, data: { paymentPendingAt: new Date() } });
+  await prisma.auditEvent.create({
+    data: { invoiceId: invoice.id, event: 'payment_processing', detail: `${usd(pi.amount)} bank payment started; reminders and fees paused while it clears` },
+  });
+  const number = invoice.stripeNumber ?? invoice.stripeInvoiceId;
+  await notifyOwner(
+    invoice.accountId,
+    `Bank payment started — invoice ${number} (${usd(pi.amount)})`,
+    `Your client started a bank payment of ${usd(pi.amount)} for invoice ${number}. Bank payments take 3–5 business days to clear.
+
+Dunn has paused reminders and late fees for this invoice. You'll get an email when it clears, or if it fails.`,
+    undefined,
+    'payment'
+  );
+}
 
 // The owner disconnected Dunn from inside Stripe: same as Settings → Disconnect.
 async function onDeauthorized(connectedAccountId?: string) {
@@ -233,13 +268,16 @@ async function onInvoicePaid(inv: Stripe.Invoice) {
   // Not one of Dunn's invoices (e.g. Dunn's own plan billing): nothing to mark.
   const existing = await prisma.invoice.findUnique({ where: { stripeInvoiceId: inv.id } });
   if (!existing) return;
-  const paidAt = new Date();
+  // A bank payment counts as paid the day the client sent it, not the day it
+  // cleared (3-5 days later): "paid late" stays fair.
+  const paidAt = existing.paymentPendingAt ?? new Date();
   const paysFee = !!inv.metadata?.replaces_invoice && inv.metadata?.includes_fee !== 'false';
   const invoice = await prisma.invoice.update({
     where: { stripeInvoiceId: inv.id },
     data: {
       status: 'paid',
       paidAt,
+      paymentPendingAt: null,
       ...(paysFee ? { feeStatus: 'paid', feePaidAt: paidAt } : {}),
     },
   });
@@ -263,8 +301,14 @@ async function onInvoicePaymentFailed(inv: Stripe.Invoice) {
     where: { stripeInvoiceId: inv.id },
   });
   if (!invoice) return;
+  const wasClearing = !!invoice.paymentPendingAt;
+  if (wasClearing) await prisma.invoice.update({ where: { id: invoice.id }, data: { paymentPendingAt: null } });
   await prisma.auditEvent.create({
-    data: { invoiceId: invoice.id, event: 'payment_failed', detail: 'auto-charge failed; reminder schedule continues' },
+    data: {
+      invoiceId: invoice.id,
+      event: 'payment_failed',
+      detail: wasClearing ? 'bank payment failed; reminders and fees resume' : 'auto-charge failed; reminder schedule continues',
+    },
   });
   const number = invoice.stripeNumber ?? invoice.stripeInvoiceId;
   await reportProblem({
@@ -275,7 +319,9 @@ async function onInvoicePaymentFailed(inv: Stripe.Invoice) {
     detail: `Invoice ${number}: ${inv.last_finalization_error?.message ?? 'payment attempt failed'}`,
     owner: {
       subject: `A payment on invoice ${number} failed`,
-      text: `Your client tried to pay invoice ${number}, but the payment didn't go through (for example, a declined card).\n\nThe invoice is still open and Dunn keeps the reminders going. You may want to let your client know.`,
+      text: wasClearing
+        ? `Your client's bank payment for invoice ${number} didn't go through (for example, not enough money in the account, or the bank refused it).\n\nThe invoice is still open, so Dunn has resumed its reminders and late fee. You may want to let your client know.`
+        : `Your client tried to pay invoice ${number}, but the payment didn't go through (for example, a declined card).\n\nThe invoice is still open and Dunn keeps the reminders going. You may want to let your client know.`,
     },
   });
 }

@@ -19,6 +19,7 @@ const EVENT_TEXT: Record<string, { kind: TimelineEntry['kind']; text: string } |
   fee_error: { kind: 'problem', text: "Late fee couldn't be added" },
   invoice_paid: { kind: 'paid', text: 'Paid' },
   payment_failed: { kind: 'problem', text: 'A payment attempt failed' },
+  payment_processing: { kind: 'paid', text: 'Bank payment started: clears in 3–5 business days. Reminders and fees paused.' },
   invoice_voided: { kind: 'note', text: 'Invoice voided in Stripe' },
   invoice_cancelled: { kind: 'note', text: 'You cancelled this invoice' },
   invoice_uncollectible: { kind: 'problem', text: 'Marked uncollectible' },

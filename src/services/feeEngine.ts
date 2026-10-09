@@ -30,7 +30,7 @@ export const HEADS_UP_EVENTS = ['fee_heads_up', 'fee_pending_approval'];
 
 export async function runFeeJob(now = new Date()) {
   const openInvoices = await prisma.invoice.findMany({
-    where: { status: 'open', feeApplied: false, feePolicy: { isNot: null }, ...createdSinceStart(), ...stripeConnected },
+    where: { status: 'open', feeApplied: false, paymentPendingAt: null, feePolicy: { isNot: null }, ...createdSinceStart(), ...stripeConnected },
     include: { feePolicy: true, client: true, account: true },
   });
 
@@ -328,6 +328,12 @@ async function reissueBill(
   const opts = { stripeAccount: invoice.account.stripeAccountId };
   const number = invoice.stripeNumber || invoice.stripeInvoiceId;
   const customer = invoice.client!.stripeCustomerId;
+
+  // A bank payment is clearing on this bill: voiding it now would strand the
+  // client's money. Wait until it clears (paid) or fails.
+  if (invoice.paymentPendingAt) {
+    throw new FeeActionError(409, "A bank payment for this invoice is clearing (3–5 business days). The late fee can't change until it clears or fails.");
+  }
 
   // Only an open invoice can be changed. If Stripe says otherwise (e.g. a
   // paid webhook we missed), mirror that instead.

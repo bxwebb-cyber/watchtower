@@ -72,7 +72,7 @@ export async function runReminderJob(now = new Date()) {
   }
 
   const openInvoices = await prisma.invoice.findMany({
-    where: { status: 'open', repliedAt: null, ...createdSinceStart(), ...stripeConnected },
+    where: { status: 'open', repliedAt: null, paymentPendingAt: null, ...createdSinceStart(), ...stripeConnected },
     include: { client: true, account: true, feePolicy: true },
   });
 
