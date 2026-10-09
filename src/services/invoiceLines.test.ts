@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseLines, linesTotalCents, stripeItemFor } from './invoiceLines';
+import { parseLines, linesTotalCents, stripeItemFor, reissueItems } from './invoiceLines';
 import { usd } from '../lib/money';
 
 describe('parseLines', () => {
@@ -27,5 +27,19 @@ describe('stripeItemFor', () => {
   });
   it('shows the math otherwise', () => {
     expect(stripeItemFor({ description: 'Consulting', quantity: 1.5, unitCents: 9000 }, usd)).toEqual({ description: 'Consulting (1.5 × $90.00)', amount: 13500 });
+  });
+});
+
+describe('reissueItems', () => {
+  const lines = [{ description: 'Logo', quantity: 1, unitCents: 50000 }, { description: 'Hours', quantity: 2, unitCents: 9000 }];
+  it('keeps every line when they still add up to the balance', () => {
+    expect(reissueItems(lines, 68000, 'RS-0001', usd)).toEqual([
+      { description: 'Logo', amount: 50000 },
+      { description: 'Hours (2 × $90.00)', amount: 18000 },
+    ]);
+  });
+  it('one balance line when partly paid or no lines', () => {
+    expect(reissueItems(lines, 30000, 'RS-0001', usd)).toEqual([{ description: 'Invoice RS-0001', amount: 30000 }]);
+    expect(reissueItems(null, 25000, 'RS-0002', usd)).toEqual([{ description: 'Invoice RS-0002', amount: 25000 }]);
   });
 });

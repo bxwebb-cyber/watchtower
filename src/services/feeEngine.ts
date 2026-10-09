@@ -8,6 +8,7 @@ import { usd, usdDollars } from '../lib/money';
 import { createdSinceStart, stripeConnected } from '../jobs/startDate';
 import { reportProblem } from './problems';
 import { dueDateFromStripe } from '../lib/dueDate';
+import { reissueItems } from './invoiceLines';
 
 const prisma = new PrismaClient();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -372,10 +373,11 @@ async function reissueBill(
     },
     opts
   );
-  await stripe.invoiceItems.create(
-    { customer, invoice: replacement.id, amount: baseCents, currency: invoice.currency, description: `Invoice ${number}` },
-    opts
-  );
+  // The client's original lines (several services) when they still add up
+  // to what's owed; otherwise one line for the balance.
+  for (const item of reissueItems(invoice.lines, baseCents, number, usd)) {
+    await stripe.invoiceItems.create({ customer, invoice: replacement.id, currency: invoice.currency, ...item }, opts);
+  }
   if (feeCents > 0) {
     await stripe.invoiceItems.create(
       { customer, invoice: replacement.id, amount: feeCents, currency: invoice.currency, description: o.feeLine },

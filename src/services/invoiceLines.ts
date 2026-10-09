@@ -43,3 +43,13 @@ export function stripeItemFor(l: InvoiceLine, fmt: (cents: number) => string): {
   const description = l.quantity === 1 ? l.description : `${l.description} (${l.quantity} × ${fmt(l.unitCents)})`;
   return { description, amount: lineCents(l) };
 }
+
+// When a fee change reissues the bill: the original lines again, if they
+// still add up to what's owed (nothing partly paid); otherwise one line for
+// the balance, as before line items.
+export function reissueItems(stored: unknown, baseCents: number, number: string, fmt: (cents: number) => string): { description: string; amount: number }[] {
+  const lines = Array.isArray(stored) ? (stored as InvoiceLine[]) : [];
+  const valid = lines.length > 0 && lines.every((l) => l && typeof l.description === 'string' && l.quantity > 0 && l.unitCents > 0);
+  if (valid && linesTotalCents(lines) === baseCents) return lines.map((l) => stripeItemFor(l, fmt));
+  return [{ description: `Invoice ${number}`, amount: baseCents }];
+}
