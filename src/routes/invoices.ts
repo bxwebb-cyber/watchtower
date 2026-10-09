@@ -56,7 +56,7 @@ invoicesRouter.post('/', async (req, res) => {
   // Line items (the form), or one amount (older clients of this API).
   let lines: InvoiceLine[] | undefined;
   if (body.lines !== undefined) {
-    const parsed = parseLines(body.lines);
+    const parsed = parseLines(body.lines, `Invoice for ${clientName}`);
     if ('error' in parsed) return res.status(400).json({ error: parsed.error });
     lines = parsed.lines;
   } else if (!Number.isFinite(amountDollars) || amountDollars <= 0) {
@@ -107,7 +107,9 @@ invoicesRouter.post('/', async (req, res) => {
 
   // Save the lines as services for next time (the form's box, on by default).
   if (result.ok && lines && body.saveServices !== false) {
-    await saveServices(account.id, lines).catch((err) => console.error('[invoices] saving services failed', err));
+    // Not the made-up "Invoice for …" of a plain one-amount invoice.
+    const named = lines.filter((l) => l.description !== `Invoice for ${clientName}`);
+    await saveServices(account.id, named).catch((err) => console.error('[invoices] saving services failed', err));
   }
 
   if (!result.ok) {

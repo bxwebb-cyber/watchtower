@@ -51,10 +51,11 @@
     }
     function problem() {
       const lines = read();
-      if (!lines.length) return "Add what you're billing for: a description and a price.";
+      if (!lines.length) return 'Enter the amount.';
       for (let i = 0; i < lines.length; i++) {
         const l = lines[i], n = lines.length > 1 ? 'Line ' + (i + 1) + ': ' : '';
-        if (!l.description) return n + 'describe the service.';
+        // One line can skip the description (a plain invoice); a breakdown can't.
+        if (!l.description && lines.length > 1) return n + 'describe the service.';
         if (!Number.isFinite(l.quantity) || l.quantity <= 0) return n + 'the quantity must be more than 0.';
         if (!Number.isFinite(l.price) || l.price <= 0) return n + 'enter a price greater than $0.';
       }
@@ -70,6 +71,7 @@
         total += t;
         r.querySelector('.wt-line__total').textContent = '$' + formatMoney(t);
         r.querySelector('.wt-line__remove').hidden = all.length === 1;
+        r.querySelector('.wt-line__desc').placeholder = all.length === 1 ? "What's it for? (optional)" : 'Describe this service';
       });
       totalEl.textContent = '$' + formatMoney(total);
     }

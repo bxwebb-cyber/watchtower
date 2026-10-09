@@ -15,13 +15,15 @@ export function linesTotalCents(lines: InvoiceLine[]): number {
 
 // Checks what the form sent. Quantity can be fractional (1.5 hours); price is
 // dollars as typed. Returns cleaned lines or a plain-English error.
-export function parseLines(raw: unknown): { lines: InvoiceLine[] } | { error: string } {
+// A single line may have no description (a plain invoice, no breakdown): it
+// gets `fallback` ("Invoice for Harbor & Vine"). With 2+ lines each needs one.
+export function parseLines(raw: unknown, fallback = 'Invoice'): { lines: InvoiceLine[] } | { error: string } {
   if (!Array.isArray(raw) || raw.length === 0) return { error: 'Add at least one line to the invoice.' };
   if (raw.length > MAX_LINES) return { error: `An invoice can have up to ${MAX_LINES} lines.` };
   const lines: InvoiceLine[] = [];
   for (const [i, r] of raw.entries()) {
     const n = i + 1;
-    const description = String((r as any)?.description ?? '').trim().replace(/\s+/g, ' ');
+    const description = String((r as any)?.description ?? '').trim().replace(/\s+/g, ' ') || (raw.length === 1 ? fallback : '');
     const quantity = Number((r as any)?.quantity ?? 1);
     const price = Number((r as any)?.price);
     if (!description) return { error: `Line ${n}: describe the service.` };

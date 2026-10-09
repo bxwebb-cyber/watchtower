@@ -14,6 +14,7 @@ describe('parseLines', () => {
   });
   it('rejects empty, blank and bad lines with the line number', () => {
     expect(parseLines([])).toHaveProperty('error');
+    expect(parseLines([{ description: '', price: 1200 }], 'Invoice for Sam')).toEqual({ lines: [{ description: 'Invoice for Sam', quantity: 1, unitCents: 120000 }] });
     expect(parseLines([{ description: 'A', price: 10 }, { description: '', price: 5 }])).toEqual({ error: 'Line 2: describe the service.' });
     expect(parseLines([{ description: 'A', price: 0 }])).toEqual({ error: 'Line 1: the price must be more than $0.' });
     expect(parseLines([{ description: 'A', quantity: -1, price: 5 }])).toHaveProperty('error');

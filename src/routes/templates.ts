@@ -83,7 +83,7 @@ templatesRouter.post('/', async (req, res) => {
   // Line items (the form), or one amount.
   let lines;
   if (req.body.lines !== undefined) {
-    const parsed = parseLines(req.body.lines);
+    const parsed = parseLines(req.body.lines, `Invoice for ${clientName}`);
     if ('error' in parsed) return res.status(400).json({ error: parsed.error });
     lines = parsed.lines;
   }
@@ -135,7 +135,7 @@ templatesRouter.post('/', async (req, res) => {
   });
 
   if (lines && req.body.saveServices !== false) {
-    await saveServices(account.id, lines).catch((err) => console.error('[templates] saving services failed', err));
+    await saveServices(account.id, lines.filter((l) => l.description !== `Invoice for ${clientName}`)).catch((err) => console.error('[templates] saving services failed', err));
   }
   res.status(201).json({ template });
 });
@@ -184,12 +184,13 @@ templatesRouter.patch('/:id', async (req, res) => {
   }
 
   if (req.body.lines !== undefined) {
-    const parsed = parseLines(req.body.lines);
+    const name = String(req.body.clientName ?? existing.clientName);
+    const parsed = parseLines(req.body.lines, `Invoice for ${name}`);
     if ('error' in parsed) return res.status(400).json({ error: parsed.error });
     updates.lines = parsed.lines;
     updates.amount = linesTotalCents(parsed.lines);
     if (req.body.saveServices !== false) {
-      await saveServices(account.id, parsed.lines).catch((err) => console.error('[templates] saving services failed', err));
+      await saveServices(account.id, parsed.lines.filter((l) => l.description !== `Invoice for ${name}`)).catch((err) => console.error('[templates] saving services failed', err));
     }
   }
   if (req.body.poNumber !== undefined) updates.poNumber = String(req.body.poNumber ?? '').trim().slice(0, 140) || null;
