@@ -126,7 +126,7 @@ document.addEventListener('wt:open-invoice', async (e) => {
   catch (err) { put('client', "Couldn't load this invoice. " + err.message); return; }
 
   const day = (iso) => new Date(iso.length === 10 ? iso + 'T12:00:00' : iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  put('client', [d.client, d.clientEmail].filter(Boolean).join(' · '));
+  put('client', [d.client, d.clientEmail, d.poNumber ? 'PO ' + d.poNumber : ''].filter(Boolean).join(' · '));
   put('amount', money(d.amountCents + (d.feeStatus === 'open' || d.feeStatus === 'paid' ? (d.feeAmountCents || 0) : 0)));
   put('due', day(d.due));
   put('sent', day(d.createdAt));

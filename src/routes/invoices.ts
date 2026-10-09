@@ -42,6 +42,8 @@ invoicesRouter.post('/', async (req, res) => {
   const clientEmail = String(body.clientEmail ?? '').trim().toLowerCase().replace(/[\s,;]+$/, '');
   const amountDollars = Number(body.amount);
   const dueDateStr = String(body.dueDate ?? '');
+  // Optional; Stripe allows 140 characters in a custom field.
+  const poNumber = String(body.poNumber ?? '').trim().slice(0, 140);
 
   if (!clientName) {
     return res.status(400).json({ error: 'Client name is required.' });
@@ -89,6 +91,7 @@ invoicesRouter.post('/', async (req, res) => {
     amountCents: Math.round(amountDollars * 100),
     dueDate,
     fee: kind === 'none' ? { kind: 'none' } : { kind, amount: feeAmount, graceDays: graceDays! },
+    poNumber: poNumber || undefined,
   });
 
   if (!result.ok) {
@@ -402,6 +405,7 @@ invoicesRouter.get('/:id', async (req, res) => {
     amountCents: inv.amount,
     due: inv.dueDate.toISOString().slice(0, 10),
     createdAt: inv.createdAt.toISOString(),
+    poNumber: inv.poNumber ?? null,
     status: inv.status,
     paidAt: inv.paidAt ? inv.paidAt.toISOString() : null,
     fee: inv.feePolicy && inv.feePolicy.kind !== 'none' ? feeLabel(inv.feePolicy) : null,

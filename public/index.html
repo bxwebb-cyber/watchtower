@@ -83,6 +83,10 @@
         <input class="wt-input" id="due-date" type="date">
       </div>
     </div>
+    <div class="wt-field" style="margin-top:14px">
+      <label class="wt-lbl" for="po-number">PO number <span style="font-weight:400;text-transform:none;letter-spacing:0">(optional)</span></label>
+      <input class="wt-input" id="po-number" maxlength="140" placeholder="Only if your client gave you one">
+    </div>
   </div>
 
   <div class="wt-card">
@@ -218,6 +222,7 @@ document.getElementById('submit-btn').addEventListener('click', async () => {
   const clientEmail = document.getElementById('client-email').value.trim();
   const amount = parseMoney(document.getElementById('amount').value);
   const dueDate = document.getElementById('due-date').value;
+  const poNumber = document.getElementById('po-number').value.trim();
 
   if (!clientName) { showError('Add the client name.'); return; }
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(clientEmail)) { showError('Enter a valid client email.'); return; }
@@ -233,7 +238,7 @@ document.getElementById('submit-btn').addEventListener('click', async () => {
   const btn = document.getElementById('submit-btn');
   btn.disabled = true; btn.textContent = 'Creating…';
   try {
-    await api('POST', '/invoices', { clientName, clientEmail, amount, dueDate, fee });
+    await api('POST', '/invoices', { clientName, clientEmail, amount, dueDate, fee, poNumber });
     window.location.href = '/dashboard';
   } catch (err) {
     showError(err.message || 'Could not create the invoice.');

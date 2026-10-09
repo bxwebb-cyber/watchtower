@@ -361,6 +361,8 @@ async function reissueBill(
       days_until_due: 14,
       auto_advance: false,
       description: o.description,
+      // Keep the PO number (and any other custom field) the client expects.
+      ...(current.custom_fields?.length ? { custom_fields: current.custom_fields.map(({ name, value }) => ({ name, value })) } : {}),
       metadata: {
         watchtower: 'true',
         replaces_invoice: current.id,

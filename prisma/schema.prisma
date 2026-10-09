@@ -76,6 +76,7 @@ model Invoice {
   stripeInvoiceId String   @unique
   stripeNumber    String?  // human-facing invoice number (e.g. HUDSON-0007)
   templateId      String?  // the recurring invoice that created it (null = one-off)
+  poNumber        String?  // the client's purchase-order number, if they gave one
   hostedInvoiceUrl String? // the real Stripe payment link for the client
   amount          Int // cents
   currency        String   @default("usd")

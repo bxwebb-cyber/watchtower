@@ -31,6 +31,9 @@ export interface CreateInvoiceInput {
     amount?: number; // flat: dollars; percent: 0-100
     graceDays?: number; // days after due before the fee applies — the owner's choice, 0 = the day after the due date
   };
+  // The client's purchase-order number: many larger clients won't pay an
+  // invoice without it. Printed on the Stripe invoice as a custom field.
+  poNumber?: string;
   // Set when a recurring template creates the invoice ("Your monthly invoice").
   recurring?: { frequencyLabel: string };
 }
@@ -142,6 +145,7 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<CreateIn
         auto_advance: false,
         due_date: dueSec,
         description: feeDescription,
+        ...(input.poNumber ? { custom_fields: [{ name: 'PO number', value: input.poNumber }] } : {}),
         metadata: { watchtower: 'true' },
       },
       { stripeAccount: account.stripeAccountId }
@@ -185,6 +189,7 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<CreateIn
         currency: input.currency ?? 'usd',
         dueDate: input.dueDate,
         status: 'open',
+        poNumber: input.poNumber || null,
       },
     });
 
