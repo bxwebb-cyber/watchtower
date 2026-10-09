@@ -34,6 +34,7 @@ _(Older header:) 2026-09-28 (v1.8 — scheduler + one-bill late fees + webhook f
 1. **AI phase 2:** owners sign in to Dunn inside ChatGPT / Claude / Muse (OAuth): "who owes me", lateness, create invoice. Needed for ChatGPT + Muse approval.
 2. **Pay by bank (ACH), 10/6:** Settings option "Let clients pay by bank transfer (cheaper fees)", on by default for big invoices; set `payment_settings.payment_method_types` on created/reissued invoices (Dunn sets none today = the owner's Stripe defaults). Handle the pending state: ACH takes days → show "Payment pending" (invoice.payment_action_required / processing), don't send reminders or fees while a payment is processing, handle a failed ACH. Fees ~0.8% capped $5 vs ~3% card. No Plaid needed (Stripe Financial Connections). Owner payouts to their own bank already work via Stripe.
 3. Daily summary list survives restarts (store in DB, not memory).
+3b. **Optional "PO number" on invoices (10/9):** a box on the new-invoice form, shown on the Stripe invoice (custom field) — big clients often won't pay without their PO number. ~1 hour. (customer-voice.md)
 4. Free tools + search pages: GROWTH-PAGES-PLAN.md. Then AppSumo (appsumo-go-deal-plan.md).
 
 ### ▶ NEXT — remaining checks (older list below, items 1–3 done)
