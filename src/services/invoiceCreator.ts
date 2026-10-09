@@ -1,10 +1,11 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 import Stripe from 'stripe';
 import { sendClientEmail } from './reminderEngine';
 import { monthStart, soloLimitMessage, hasActivePlan, planRequired, NO_PLAN_MESSAGE, countsTowardLimit } from './planLimits';
 import { feeWhen } from './feeRules';
 import { usd, usdDollars } from '../lib/money';
 import { dueTimestamp, dueDateFromStripe } from '../lib/dueDate';
+import { InvoiceLine, linesTotalCents, stripeItemFor } from './invoiceLines';
 export { dueTimestamp, dueDateFromStripe };
 
 const prisma = new PrismaClient();
@@ -22,7 +23,9 @@ export interface CreateInvoiceInput {
   accountId: string;
   clientName: string;
   clientEmail: string;
-  amountCents: number;
+  amountCents: number; // with lines, ignored: the total is the sum of the lines
+  // Several services on one invoice. Without lines, one line for amountCents.
+  lines?: InvoiceLine[];
   currency?: string;
   dueDate: Date;
   // The fee prompt — set by the owner at creation time, per invoice.
@@ -70,6 +73,8 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<CreateIn
       message: 'Stripe is not configured yet. Add your sk_test_... key to .env and restart the server.',
     };
   }
+
+  if (input.lines?.length) input = { ...input, amountCents: linesTotalCents(input.lines) };
 
   // Resolve the account whose Stripe connection we're invoicing under.
   const account = await prisma.account.findUnique({ where: { id: input.accountId } });
@@ -151,16 +156,15 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<CreateIn
       { stripeAccount: account.stripeAccountId }
     );
 
-    await stripe.invoiceItems.create(
-      {
-        customer: stripeCustomerId,
-        invoice: stripeInvoice.id,
-        amount: input.amountCents,
-        currency: input.currency ?? 'usd',
-        description: input.clientName ? `Invoice for ${input.clientName}` : 'Invoice',
-      },
-      { stripeAccount: account.stripeAccountId }
-    );
+    const items = input.lines?.length
+      ? input.lines.map((l) => stripeItemFor(l, usd))
+      : [{ amount: input.amountCents, description: input.clientName ? `Invoice for ${input.clientName}` : 'Invoice' }];
+    for (const item of items) {
+      await stripe.invoiceItems.create(
+        { customer: stripeCustomerId, invoice: stripeInvoice.id, currency: input.currency ?? 'usd', ...item },
+        { stripeAccount: account.stripeAccountId }
+      );
+    }
 
     const finalizedInvoice = await stripe.invoices.finalizeInvoice(stripeInvoice.id, undefined, {
       stripeAccount: account.stripeAccountId,
@@ -190,6 +194,7 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<CreateIn
         dueDate: input.dueDate,
         status: 'open',
         poNumber: input.poNumber || null,
+        lines: input.lines?.length ? (input.lines as unknown as Prisma.InputJsonValue) : undefined,
       },
     });
 

@@ -505,6 +505,9 @@ input::placeholder { color: var(--wt-faint); }
 .wt-inv__facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 0 0 22px; padding: 14px 16px; border-radius: 12px; background: var(--wt-sidebar); }
 .wt-inv__facts dt { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--wt-eyebrow); margin-bottom: 4px; }
 .wt-inv__facts dd { margin: 0; font-size: 14px; color: var(--wt-text-body); }
+.wt-inv__lines { list-style: none; margin: -10px 0 22px; padding: 0; }
+.wt-inv__lines li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 2px; border-bottom: 1px solid var(--wt-line); font-size: 14px; color: var(--wt-text-body); }
+.wt-inv__lines li span:last-child { flex: none; font-variant-numeric: tabular-nums; color: var(--wt-ink); }
 .wt-inv__heading { margin: 0 0 10px; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; font-weight: 500; color: var(--wt-eyebrow); }
 .wt-inv__timeline { list-style: none; margin: 0; padding: 0; }
 .wt-inv__timeline li { position: relative; padding: 0 0 14px 20px; font-size: 14px; color: var(--wt-text-body); }

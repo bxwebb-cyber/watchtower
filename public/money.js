@@ -12,7 +12,7 @@
   window.parseMoney = parseMoney;
   window.formatMoney = formatMoney;
 
-  const DOLLAR_BOXES = '#amount, #fee-flat, #flat-amount, input[name="amount"], input[name="fee_flat"]';
+  const DOLLAR_BOXES = '#amount, .wt-line__price, #fee-flat, #flat-amount, input[name="amount"], input[name="fee_flat"]';
   document.addEventListener('focusout', (e) => {
     const el = e.target;
     if (!el.matches || !el.matches(DOLLAR_BOXES) || el.value.trim() === '') return;

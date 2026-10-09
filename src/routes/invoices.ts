@@ -9,6 +9,7 @@ import { buildTimeline } from '../services/invoiceTimeline';
 import { usd, usdDollars } from '../lib/money';
 import { sendClientEmail } from '../services/reminderEngine';
 import { daysLateAt } from '../lib/dueDate';
+import { parseLines, InvoiceLine } from '../services/invoiceLines';
 
 const prisma = new PrismaClient();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -51,10 +52,18 @@ invoicesRouter.post('/', async (req, res) => {
   if (!/^[^@\s,;<>]+@[^@\s,;<>]+\.[a-z]{2,}$/.test(clientEmail)) {
     return res.status(400).json({ error: 'A valid client email is required.' });
   }
-  if (!Number.isFinite(amountDollars) || amountDollars <= 0) {
+  // Line items (the form), or one amount (older clients of this API).
+  let lines: InvoiceLine[] | undefined;
+  if (body.lines !== undefined) {
+    const parsed = parseLines(body.lines);
+    if ('error' in parsed) return res.status(400).json({ error: parsed.error });
+    lines = parsed.lines;
+  } else if (!Number.isFinite(amountDollars) || amountDollars <= 0) {
     return res.status(400).json({ error: 'Amount must be a positive number.' });
   }
-  const dueDate = new Date(`${dueDateStr}T00:00:00`);
+  // Midnight UTC of the picked date, like every stored due date (not the
+  // server's local midnight).
+  const dueDate = /^\d{4}-\d{2}-\d{2}$/.test(dueDateStr) ? new Date(`${dueDateStr}T00:00:00Z`) : new Date(NaN);
   if (Number.isNaN(dueDate.getTime())) {
     return res.status(400).json({ error: 'A due date is required.' });
   }
@@ -88,7 +97,8 @@ invoicesRouter.post('/', async (req, res) => {
     accountId: account.id,
     clientName,
     clientEmail,
-    amountCents: Math.round(amountDollars * 100),
+    amountCents: lines ? 0 : Math.round(amountDollars * 100),
+    lines,
     dueDate,
     fee: kind === 'none' ? { kind: 'none' } : { kind, amount: feeAmount, graceDays: graceDays! },
     poNumber: poNumber || undefined,
@@ -406,6 +416,7 @@ invoicesRouter.get('/:id', async (req, res) => {
     due: inv.dueDate.toISOString().slice(0, 10),
     createdAt: inv.createdAt.toISOString(),
     poNumber: inv.poNumber ?? null,
+    lines: Array.isArray(inv.lines) ? inv.lines : null,
     status: inv.status,
     paidAt: inv.paidAt ? inv.paidAt.toISOString() : null,
     fee: inv.feePolicy && inv.feePolicy.kind !== 'none' ? feeLabel(inv.feePolicy) : null,

@@ -116,6 +116,7 @@ document.addEventListener('wt:open-invoice', async (e) => {
   put('title', 'Invoice ' + (row.stripeNumber || ''));
   put('client', 'Loading…'); put('amount', row.amount); put('due', ''); put('sent', ''); put('fee', '');
   $i('timeline').replaceChildren();
+  $i('lines').replaceChildren(); $i('lines').hidden = true;
   $i('pdf').hidden = true; $i('copy').hidden = true; $i('cancel').hidden = true; $i('cancel-box').hidden = true;
   const s = invoiceStatus(row, new Date());
   $i('status').className = 'wt-pill wt-pill--dot ' + s.pill; put('status', s.label);
@@ -132,6 +133,19 @@ document.addEventListener('wt:open-invoice', async (e) => {
   put('sent', day(d.createdAt));
   const feeState = { pending: ' · added if still unpaid', open: ' · on the bill', paid: ' · paid', waived: ' · waived' }[d.feeStatus] || '';
   put('fee', d.fee ? d.fee + feeState : 'None');
+
+  // Line items, when the invoice has more than one (or a quantity).
+  const lines = d.lines || [];
+  if (lines.length > 1 || lines.some(l => l.quantity !== 1)) {
+    $i('lines').replaceChildren(...lines.map(l => {
+      const li = document.createElement('li');
+      const what = document.createElement('span');
+      what.textContent = l.description + (l.quantity !== 1 ? ' (' + l.quantity + ' × ' + money(l.unitCents) + ')' : '');
+      const amt = document.createElement('span'); amt.textContent = money(Math.round(l.quantity * l.unitCents));
+      li.append(what, amt); return li;
+    }));
+    $i('lines').hidden = false;
+  }
 
   const list = $i('timeline');
   if (!d.timeline.length) { const li = document.createElement('li'); li.textContent = 'Nothing yet.'; list.append(li); }
