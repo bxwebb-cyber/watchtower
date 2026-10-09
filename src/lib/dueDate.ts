@@ -8,6 +8,18 @@ export function dueTimestamp(dueDate: Date): number {
   return Math.floor(day / 1000) + 28 * 3600 - 1;
 }
 
+// The moment Dunn gives Stripe as the due date. Stripe prints its PDF dates
+// in UTC, so the end of the NY day (03:59 UTC the next day) showed "due
+// Oct 10" for an invoice due Oct 9. 23:59:59 UTC is the same calendar date
+// in UTC and every US time zone (7:59pm New York, 4:59pm Los Angeles), so
+// use it — unless it has already passed (an invoice due today, made after
+// 8pm New York time), then the end of the NY day, which Stripe accepts.
+export function stripeDueTimestamp(dueDate: Date, nowMs = Date.now()): number {
+  const day = Date.UTC(dueDate.getUTCFullYear(), dueDate.getUTCMonth(), dueDate.getUTCDate()) / 1000;
+  const endUtc = day + 86_399;
+  return endUtc * 1000 > nowMs + 60_000 ? endUtc : dueTimestamp(dueDate);
+}
+
 // The reverse: a due date as Stripe reports it → the calendar date (stored as
 // midnight UTC). Dunn's own invoices are due at the END of the day in New York
 // (dueTimestamp), which is already the next day in UTC; invoices made before

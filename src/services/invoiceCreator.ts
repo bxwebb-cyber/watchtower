@@ -4,7 +4,7 @@ import { sendClientEmail } from './reminderEngine';
 import { monthStart, soloLimitMessage, hasActivePlan, planRequired, NO_PLAN_MESSAGE, countsTowardLimit } from './planLimits';
 import { feeWhen } from './feeRules';
 import { usd, usdDollars } from '../lib/money';
-import { dueTimestamp, dueDateFromStripe } from '../lib/dueDate';
+import { dueTimestamp, dueDateFromStripe, stripeDueTimestamp } from '../lib/dueDate';
 import { InvoiceLine, linesTotalCents, stripeItemFor } from './invoiceLines';
 export { dueTimestamp, dueDateFromStripe };
 
@@ -136,7 +136,7 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<CreateIn
     }
 
     // 2. The Stripe invoice — draft first, then line item, then finalize.
-    const dueSec = dueTimestamp(input.dueDate);
+    const dueSec = stripeDueTimestamp(input.dueDate);
     const fee = input.fee;
     const feeDescription =
       fee && fee.kind !== 'none'

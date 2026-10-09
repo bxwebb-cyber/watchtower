@@ -23,7 +23,7 @@ describe('dueTimestamp', () => {
   });
 });
 
-import { dueDateFromStripe, daysLateAt } from '../lib/dueDate';
+import { dueDateFromStripe, daysLateAt, stripeDueTimestamp } from '../lib/dueDate';
 
 describe('dueDateFromStripe (Stripe → the date the owner picked)', () => {
   const day = (d: Date) => d.toISOString().slice(0, 10);
@@ -46,4 +46,23 @@ describe('daysLateAt', () => {
   it('paid at 11pm New York on the due date is on time (already Oct 6 in UTC)', () => expect(daysLateAt(new Date('2026-10-06T03:00:00Z'), due)).toBe(0));
   it('paid the next day is 1 day late', () => expect(daysLateAt(new Date('2026-10-06T14:00:00Z'), due)).toBe(1));
   it('paid early is 0', () => expect(daysLateAt(new Date('2026-10-01T14:00:00Z'), due)).toBe(0));
+});
+
+describe('stripeDueTimestamp', () => {
+  const utcDate = (sec: number) => new Date(sec * 1000).toISOString().slice(0, 10);
+  it('is the due date in UTC (Stripe PDF), New York and Los Angeles', () => {
+    const now = Date.UTC(2026, 9, 9, 16, 31); // Oct 9, 12:31pm EDT
+    const sec = stripeDueTimestamp(new Date('2026-10-09T00:00:00Z'), now);
+    expect([utcDate(sec), nyDate(sec), laDate(sec)]).toEqual(['2026-10-09', '2026-10-09', '2026-10-09']);
+  });
+  it('due today, made after 8pm New York: falls back to the end of the NY day (still in the future)', () => {
+    const now = Date.UTC(2026, 9, 10, 1, 30); // Oct 9, 9:30pm EDT
+    const sec = stripeDueTimestamp(new Date('2026-10-09T00:00:00Z'), now);
+    expect(sec * 1000).toBeGreaterThan(now);
+    expect(nyDate(sec)).toBe('2026-10-09');
+  });
+  it('reads back as the same date', () => {
+    const sec = stripeDueTimestamp(new Date('2026-10-09T00:00:00Z'), Date.UTC(2026, 9, 1));
+    expect(dueDateFromStripe(sec).toISOString().slice(0, 10)).toBe('2026-10-09');
+  });
 });
