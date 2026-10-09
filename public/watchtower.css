@@ -343,6 +343,7 @@ input::placeholder { color: var(--wt-faint); }
 .wt-modal[hidden] { display: none; }
 .wt-modal__backdrop { position: fixed; inset: 0; background: rgba(15, 48, 46, .32); animation: wt-fade .2s ease both; }
 .wt-modal__panel { position: relative; width: 560px; max-width: 100%; padding: 28px; border-radius: 16px; background: var(--wt-card); box-shadow: var(--wt-shadow-modal); animation: wt-pop .3s var(--wt-ease) both; }
+#wt-recurring-modal .wt-modal__panel { width: 720px; } /* room for the Services rows on a computer; phones still stack */
 .wt-modal__head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 20px; }
 .wt-modal__title { margin: 0 0 4px; font-family: var(--wt-font-display); font-weight: 400; font-size: 26px; color: var(--wt-ink); }
 .wt-modal__sub { margin: 0; font-size: 13px; color: var(--wt-subtle); }
