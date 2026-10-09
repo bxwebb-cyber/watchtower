@@ -6,6 +6,40 @@ Newest first. Quote exactly; note where it came from.
 
 ---
 
+---
+
+## Dunn's feature list (for the AppSumo page) — 10/9/26
+Positioning: not "Dunn vs your invoicing app" but "your invoicing app **+** Dunn". Lead with automatic late fees.
+
+- Automatic payment reminders on a proven schedule (before due, when late, final notice)
+- **Automatic late fees**, flat or percent, with the grace period you choose
+- A heads-up the day before any fee lands, so you can lower or waive it
+- Lower or waive a fee even after it's added; the client gets an updated bill automatically
+- Reminders pause the moment a client replies; the reply is forwarded to you
+- Every email in your business's name, signed by you
+- Recurring invoices: weekly, every 2 weeks, monthly, or on a set day
+- Get paid by card through your own Stripe; the money goes straight to you
+- **"Who's always late":** lateness history for every client
+- **"Who you waive fees for":** see the grace you give, and to whom
+- Monthly revenue and late-fee reports, plus a CSV for QuickBooks, Xero or Wave
+- A full timeline per invoice: every email, reply and fee, timestamped as proof
+- Alerts for overdue invoices, payments, failed cards and bounced emails
+- Cancel an invoice and tell the client in one click
+- PDF download and a copyable payment link
+- Free AI tools that work inside Claude and other assistants
+
+| | Your invoicing app | **+ Dunn** |
+|---|---|---|
+| Sends the invoice | ✅ | ✅ |
+| Reminds before it's late | Sometimes | ✅ |
+| Adds the late fee automatically | ❌ | ✅ |
+| Stops when the client replies | ❌ | ✅ |
+| Shows who's always late | ❌ | ✅ |
+
+Pricing idea (vs Invoiless $69 "unlimited everything"): Tier 1 $69 = 10 clients/month (not 5); Tier 2 $149 = unlimited with fair-use email limit; optional 1 code = 1 business, stackable.
+
+---
+
 ## Competitor reviews — AppSumo (collected 10/9/26)
 
 ### "Auto-addition of late fees" — a user's #1 wishlist item (Invoiless/InvoiceQuick reviews)
