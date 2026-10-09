@@ -1,6 +1,8 @@
 /* Line items editor (lines.js): new-invoice form + recurring form. */
 .wt-lines { margin-bottom: 16px; }
-.wt-lines__label { display: block; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: #8A7A55; margin-bottom: 6px; font-weight: 600; }
+/* One header row on computers (Services · Qty · Price · Total); the
+   column header is hidden on phones, so the plain label shows there. */
+.wt-lines__label { display: none; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: #8A7A55; margin-bottom: 6px; font-weight: 600; }
 .wt-lines__head, .wt-line { display: grid; grid-template-columns: minmax(0,1fr) 64px 104px 84px 32px; gap: 8px; align-items: center; }
 .wt-lines__head { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: #8A7A55; font-weight: 600; margin-bottom: 6px; }
 .wt-lines__head span:nth-child(2) { text-align: center; }
@@ -26,6 +28,7 @@
 .wt-lines__save { display: flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 13px; color: #5D6E6B; text-transform: none; letter-spacing: 0; font-weight: 400; }
 @media (max-width: 520px) {
   .wt-lines__head { display: none; }
+  .wt-lines__label { display: block; }
   .wt-line { grid-template-columns: 64px minmax(0,1fr) 72px 32px; padding-bottom: 10px; border-bottom: 1px solid rgba(15,48,46,.08); }
   .wt-line__desc-wrap { grid-column: 1 / -1; }
 }

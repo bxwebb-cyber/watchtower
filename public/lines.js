@@ -14,7 +14,7 @@
     root.classList.add('wt-lines');
     root.innerHTML =
       '<div class="wt-lines__label">Services</div>' +
-      '<div class="wt-lines__head" aria-hidden="true"><span>Description</span><span>Qty</span><span>Price</span><span>Total</span><span></span></div>' +
+      '<div class="wt-lines__head" aria-hidden="true"><span>Services</span><span>Qty</span><span>Price</span><span>Total</span><span></span></div>' +
       '<div class="wt-lines__rows"></div>' +
       '<div class="wt-lines__foot"><button class="wt-lines__add" type="button">+ Add a line</button>' +
       '<div class="wt-lines__total">Total <strong>$0.00</strong></div></div>' +
