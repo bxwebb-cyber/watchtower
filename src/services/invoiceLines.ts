@@ -55,3 +55,12 @@ export function reissueItems(stored: unknown, baseCents: number, number: string,
   if (valid && linesTotalCents(lines) === baseCents) return lines.map((l) => stripeItemFor(l, fmt));
   return [{ description: `Invoice ${number}`, amount: baseCents }];
 }
+
+// The services, as the invoice email lists them above "Amount due". Empty for
+// invoices without a breakdown (older ones, or one line Dunn named
+// "Invoice for …" because the owner gave no description).
+export function emailLines(stored: unknown, fmt: (cents: number) => string): { label: string; amount: string }[] {
+  const lines = Array.isArray(stored) ? (stored as InvoiceLine[]) : [];
+  if (lines.length === 1 && lines[0].quantity === 1 && /^Invoice( for |$)/.test(lines[0].description)) return [];
+  return lines.map((l) => ({ label: stripeItemFor(l, fmt).description, amount: fmt(lineCents(l)) }));
+}

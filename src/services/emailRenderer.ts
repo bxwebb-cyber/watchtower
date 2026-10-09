@@ -49,6 +49,7 @@ export interface EmailData {
   invoicePdfUrl?: string | null; // 00-new-invoice: Stripe's PDF
   isRecurring?: boolean; // 00-new-invoice: sent by a recurring template
   frequencyLabel?: string | null; // "monthly" / "weekly" / …
+  lines?: { label: string; amount: string }[]; // 00-new-invoice: the services, above "Amount due"
   mascotUrl: string;
 }
 
@@ -83,6 +84,7 @@ export function renderEmail(name: string, data: EmailData): { html: string; subj
     invoice_pdf_url: data.invoicePdfUrl ?? null,
     is_recurring: data.isRecurring ?? false,
     frequency_label: data.frequencyLabel ?? null,
+    lines: data.lines ?? [],
     mascot_url: data.mascotUrl,
   });
 

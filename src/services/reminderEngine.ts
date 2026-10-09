@@ -7,6 +7,7 @@ import { agreedFeeCents, feeWhen } from './feeRules';
 import { usd, usdDollars } from '../lib/money';
 import { createdSinceStart, stripeConnected } from '../jobs/startDate';
 import { reportProblem } from './problems';
+import { emailLines } from './invoiceLines';
 
 const prisma = new PrismaClient();
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
@@ -314,6 +315,7 @@ function emailDataFor(invoice: EmailInvoice): EmailData {
     feeWaived,
     termsFeeAmount: termsCents > 0 ? `${usd(termsCents)}` : null,
     feeWhen: feeWhen(graceDays),
+    lines: emailLines(invoice.lines, usd),
     mascotUrl:
       process.env.MASCOT_URL ??
       `${process.env.APP_URL ?? 'http://localhost:4000'}/lighthouse-transparent.png`,

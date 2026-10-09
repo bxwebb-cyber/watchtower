@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseLines, linesTotalCents, stripeItemFor, reissueItems } from './invoiceLines';
+import { parseLines, linesTotalCents, stripeItemFor, reissueItems, emailLines } from './invoiceLines';
 import { usd } from '../lib/money';
 
 describe('parseLines', () => {
@@ -42,5 +42,16 @@ describe('reissueItems', () => {
   it('one balance line when partly paid or no lines', () => {
     expect(reissueItems(lines, 30000, 'RS-0001', usd)).toEqual([{ description: 'Invoice RS-0001', amount: 30000 }]);
     expect(reissueItems(null, 25000, 'RS-0002', usd)).toEqual([{ description: 'Invoice RS-0002', amount: 25000 }]);
+  });
+});
+
+describe('emailLines', () => {
+  it('lists the services with their math', () => {
+    expect(emailLines([{ description: 'Food tracking', quantity: 1, unitCents: 10000 }, { description: 'Nose piercing', quantity: 2, unitCents: 500 }], usd))
+      .toEqual([{ label: 'Food tracking', amount: '$100.00' }, { label: 'Nose piercing (2 × $5.00)', amount: '$10.00' }]);
+  });
+  it('nothing for a plain invoice or none', () => {
+    expect(emailLines([{ description: 'Invoice for lisa lisa', quantity: 1, unitCents: 500 }], usd)).toEqual([]);
+    expect(emailLines(null, usd)).toEqual([]);
   });
 });
