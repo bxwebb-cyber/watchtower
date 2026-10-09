@@ -5,6 +5,7 @@ import { usd } from '../lib/money';
 import { createdSinceStart, stripeConnected } from '../jobs/startDate';
 import { reportProblem } from './problems';
 import { nyDayStart, addDays } from './reminderEngine';
+import type { InvoiceLine } from './invoiceLines';
 
 const prisma = new PrismaClient();
 
@@ -39,6 +40,8 @@ export async function runTemplateJob(now = new Date()): Promise<number> {
         clientName: tmpl.clientName,
         clientEmail: tmpl.clientEmail,
         amountCents: tmpl.amount,
+        lines: Array.isArray(tmpl.lines) ? (tmpl.lines as unknown as InvoiceLine[]) : undefined,
+        poNumber: tmpl.poNumber ?? undefined,
         currency: tmpl.currency,
         dueDate,
         fee:

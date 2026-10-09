@@ -190,7 +190,9 @@ model InvoiceTemplate {
   account         Account  @relation(fields: [accountId], references: [id])
   clientName      String
   clientEmail     String
-  amount          Int      // cents
+  amount          Int      // cents (with lines: their total)
+  lines           Json?    // line items [{description, quantity, unitCents}]; null = one amount
+  poNumber        String?  // the client's PO number, on every invoice in the series
   currency        String   @default("usd")
   dueDays         Int      @default(30) // days from today for the due date
   // Fee settings (denormalized — copied to each created invoice's FeePolicy)

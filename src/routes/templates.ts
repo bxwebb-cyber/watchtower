@@ -4,6 +4,8 @@ import { stripeConfigured } from '../services/invoiceCreator';
 import { computeInitialNextRun, skipToNextCycle } from '../services/templateEngine';
 import { getAccount } from '../lib/account';
 import { parseGraceDays, GRACE_REQUIRED } from '../services/feeRules';
+import { parseLines, linesTotalCents } from '../services/invoiceLines';
+import { saveServices } from './services';
 
 const prisma = new PrismaClient();
 export const templatesRouter = Router();
@@ -74,14 +76,22 @@ templatesRouter.post('/', async (req, res) => {
     startDate, // ISO date string or null (defaults to today)
   } = req.body;
 
-  if (!clientName || !clientEmail || amount == null) {
-    return res.status(400).json({ error: 'clientName, clientEmail, and amount are required' });
+  if (!clientName || !clientEmail || (amount == null && req.body.lines === undefined)) {
+    return res.status(400).json({ error: 'clientName, clientEmail, and lines (or amount) are required' });
   }
 
-  const amountCents = Math.round(Number(amount) * 100);
-  if (amountCents <= 0) {
+  // Line items (the form), or one amount.
+  let lines;
+  if (req.body.lines !== undefined) {
+    const parsed = parseLines(req.body.lines);
+    if ('error' in parsed) return res.status(400).json({ error: parsed.error });
+    lines = parsed.lines;
+  }
+  const amountCents = lines ? linesTotalCents(lines) : Math.round(Number(amount) * 100);
+  if (!(amountCents > 0)) {
     return res.status(400).json({ error: 'amount must be > 0' });
   }
+  const poNumber = String(req.body.poNumber ?? '').trim().slice(0, 140) || null;
 
   // The owner chooses when the fee applies (0 = the day after the due date).
   const grace = parseGraceDays(graceDays);
@@ -109,6 +119,8 @@ templatesRouter.post('/', async (req, res) => {
       clientName,
       clientEmail,
       amount: amountCents,
+      lines: lines ?? undefined,
+      poNumber,
       currency: currency ?? 'usd',
       // Due date follows the schedule unless the owner picked one: a weekly
       // invoice due in 30 days would pile up four open invoices at once.
@@ -122,6 +134,9 @@ templatesRouter.post('/', async (req, res) => {
     },
   });
 
+  if (lines && req.body.saveServices !== false) {
+    await saveServices(account.id, lines).catch((err) => console.error('[templates] saving services failed', err));
+  }
   res.status(201).json({ template });
 });
 
@@ -144,7 +159,9 @@ templatesRouter.patch('/:id', async (req, res) => {
 
   for (const field of fields) {
     if (req.body[field] !== undefined) {
-      if (field === 'amount') {
+      if (field === 'amount' && req.body.lines !== undefined) {
+        continue; // the lines set the amount below
+      } else if (field === 'amount') {
         const cents = Math.round(Number(req.body.amount) * 100);
         if (!(cents > 0)) return res.status(400).json({ error: 'amount must be > 0' });
         updates.amount = cents;
@@ -165,6 +182,17 @@ templatesRouter.patch('/:id', async (req, res) => {
       }
     }
   }
+
+  if (req.body.lines !== undefined) {
+    const parsed = parseLines(req.body.lines);
+    if ('error' in parsed) return res.status(400).json({ error: parsed.error });
+    updates.lines = parsed.lines;
+    updates.amount = linesTotalCents(parsed.lines);
+    if (req.body.saveServices !== false) {
+      await saveServices(account.id, parsed.lines).catch((err) => console.error('[templates] saving services failed', err));
+    }
+  }
+  if (req.body.poNumber !== undefined) updates.poNumber = String(req.body.poNumber ?? '').trim().slice(0, 140) || null;
 
   const freq = String(updates.frequency ?? existing.frequency);
   if (!['monthly', 'weekly', 'biweekly', 'custom'].includes(freq)) {

@@ -401,7 +401,16 @@ async function openRecurringView(id) {
   catch (err) { put('client', "Couldn't load this recurring invoice. " + err.message); return; }
   const t = d.template;
   const day = (iso, utc) => new Date(iso).toLocaleDateString('en-US', Object.assign({ month: 'short', day: 'numeric', year: 'numeric' }, utc ? { timeZone: 'UTC' } : {}));
-  put('client', t.clientName + ' · ' + t.clientEmail);
+  put('client', [t.clientName, t.clientEmail, t.poNumber ? 'PO ' + t.poNumber : ''].filter(Boolean).join(' · '));
+  const tl = Array.isArray(t.lines) ? t.lines : [];
+  $r('lines').hidden = !(tl.length > 1 || tl.some(l => l.quantity !== 1));
+  $r('lines').replaceChildren(...tl.map(l => {
+    const li = document.createElement('li');
+    const what = document.createElement('span');
+    what.textContent = l.description + (l.quantity !== 1 ? ' (' + l.quantity + ' × ' + money(l.unitCents) + ')' : '');
+    const amt = document.createElement('span'); amt.textContent = money(Math.round(l.quantity * l.unitCents));
+    li.append(what, amt); return li;
+  }));
   put('amount', money(t.amount));
   put('status', t.active ? 'Active' : 'Paused');
   $r('status').className = 'wt-pill ' + (t.active ? 'wt-pill--paid' : 'wt-pill--pending');
@@ -797,13 +806,20 @@ document.addEventListener('wt:waive-fee', async e => {
   loadDashboard();
 });
 
+// Recurring form's line items (lines.js).
+const recLines = document.querySelector('[data-rec-lines]') ? DunnLines.mount(document.querySelector('[data-rec-lines]'), { api }) : null;
+
 document.addEventListener('wt:recurring-save', async e => {
   const d = e.detail.data;
+  const bad = recLines && recLines.problem();
+  if (bad) { alert(bad); return; }
   const feeKind = d.fee_type === 'pct' ? 'percent' : (d.fee_type === 'flat' ? 'flat' : 'none');
   const body = {
     clientName: d.client_name,
     clientEmail: d.client_email,
-    amount: parseMoney(d.amount),
+    lines: recLines ? recLines.read() : undefined,
+    saveServices: recLines ? recLines.saveChecked() : undefined,
+    poNumber: (d.po_number || '').trim(),
     frequency: d.frequency,
     // "last day" is 31: the run date clamps to each month's length (30th, Feb 28/29).
     customDay: d.custom_day === 'last' ? 31 : (parseInt(d.custom_day) || undefined),
@@ -843,7 +859,9 @@ document.addEventListener('wt:recurring-edit', async e => {
     form.querySelector('[name="id"]').value = t.id;
     form.querySelector('[name="client_name"]').value = t.clientName;
     form.querySelector('[name="client_email"]').value = t.clientEmail;
-    form.querySelector('[name="amount"]').value = (t.amount / 100).toFixed(2);
+    // Older recurring invoices are one amount: show it as one line.
+    if (recLines) recLines.set(Array.isArray(t.lines) && t.lines.length ? t.lines : [{ description: 'Invoice for ' + t.clientName, quantity: 1, unitCents: t.amount }]);
+    form.querySelector('[name="po_number"]').value = t.poNumber || '';
     form.querySelector('[name="frequency"]').value = t.frequency;
     const dueSel = form.querySelector('[name="due_days"]');
     if (dueSel) { dueSel.value = String([7, 14, 30].includes(t.dueDays) ? t.dueDays : 30); dueSel.dataset.touched = '1'; }
@@ -930,6 +948,7 @@ document.addEventListener('click', (e) => {
   if (!form) return;
   form.reset();
   form.querySelector('[name="id"]').value = '';
+  if (recLines) { recLines.set([]); recLines.reloadServices(); }
   const due = form.querySelector('[name="due_days"]');
   if (due) { delete due.dataset.touched; due.value = '30'; }
   const next = form.querySelector('[name="next_invoice_date"]');
