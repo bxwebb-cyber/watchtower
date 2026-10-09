@@ -134,9 +134,9 @@ document.addEventListener('wt:open-invoice', async (e) => {
   const feeState = { pending: ' · added if still unpaid', open: ' · on the bill', paid: ' · paid', waived: ' · waived' }[d.feeStatus] || '';
   put('fee', d.fee ? d.fee + feeState : 'None');
 
-  // Line items, when the invoice has more than one (or a quantity).
+  // The services on the invoice (invoices made before line items have none).
   const lines = d.lines || [];
-  if (lines.length > 1 || lines.some(l => l.quantity !== 1)) {
+  if (lines.length) {
     $i('lines').replaceChildren(...lines.map(l => {
       const li = document.createElement('li');
       const what = document.createElement('span');
@@ -403,7 +403,7 @@ async function openRecurringView(id) {
   const day = (iso, utc) => new Date(iso).toLocaleDateString('en-US', Object.assign({ month: 'short', day: 'numeric', year: 'numeric' }, utc ? { timeZone: 'UTC' } : {}));
   put('client', [t.clientName, t.clientEmail, t.poNumber ? 'PO ' + t.poNumber : ''].filter(Boolean).join(' · '));
   const tl = Array.isArray(t.lines) ? t.lines : [];
-  $r('lines').hidden = !(tl.length > 1 || tl.some(l => l.quantity !== 1));
+  $r('lines').hidden = !tl.length;
   $r('lines').replaceChildren(...tl.map(l => {
     const li = document.createElement('li');
     const what = document.createElement('span');

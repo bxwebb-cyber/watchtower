@@ -126,8 +126,10 @@
     const pct = parseFloat(panel.querySelector('[name="fee_pct"]')?.value) || 0;
     const preview = panel.querySelector('.wt-fee-panel__preview');
     if (!preview) return;
-    if (type === 'flat' && flat > 0) preview.textContent = `Your client sees: "A $${flat.toFixed(0)} late fee applies if unpaid ${grace} days after the due date."`;
-    else if (type === 'pct' && pct > 0) preview.textContent = `Your client sees: "A ${pct}% late fee applies if unpaid ${grace} days after the due date."`;
+    // Same wording as the invoice itself (feeWhen in src/services/feeRules.ts).
+    const when = Number(grace) <= 0 ? "if it's not paid by the due date" : `if unpaid ${grace} day${Number(grace) === 1 ? '' : 's'} after the due date`;
+    if (type === 'flat' && flat > 0) preview.textContent = `Your client sees: "A $${flat % 1 ? flat.toFixed(2) : flat} late fee applies ${when}."`;
+    else if (type === 'pct' && pct > 0) preview.textContent = `Your client sees: "A ${pct}% late fee applies ${when}."`;
     else preview.textContent = 'Your client sees: No late fee.';
   }
   document.addEventListener('click', (e) => {
