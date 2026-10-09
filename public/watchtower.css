@@ -320,6 +320,7 @@ input::placeholder { color: var(--wt-faint); }
 .wt-result--sent { color: var(--wt-green); }
 .wt-result--failed { color: var(--wt-brick); }
 .wt-result--none { color: var(--wt-faint); }
+.wt-result--none::before { display: none; } /* "None yet": no status to show */
 .wt-actions { display: flex; justify-content: flex-end; gap: 6px; }
 .wt-confirm { display: none; align-items: center; flex-wrap: wrap; gap: 12px; margin: 0 24px 14px; padding: 12px 14px; border-radius: 10px; background: var(--wt-paper); animation: wt-pop .25s ease both; }
 .wt-confirm__text { flex: 1 1 280px; font-size: 13px; line-height: 1.5; color: var(--wt-text-body); }
