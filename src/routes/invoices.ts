@@ -10,6 +10,7 @@ import { usd, usdDollars } from '../lib/money';
 import { sendClientEmail } from '../services/reminderEngine';
 import { daysLateAt } from '../lib/dueDate';
 import { parseLines, InvoiceLine } from '../services/invoiceLines';
+import { saveServices } from './services';
 
 const prisma = new PrismaClient();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -103,6 +104,11 @@ invoicesRouter.post('/', async (req, res) => {
     fee: kind === 'none' ? { kind: 'none' } : { kind, amount: feeAmount, graceDays: graceDays! },
     poNumber: poNumber || undefined,
   });
+
+  // Save the lines as services for next time (the form's box, on by default).
+  if (result.ok && lines && body.saveServices !== false) {
+    await saveServices(account.id, lines).catch((err) => console.error('[invoices] saving services failed', err));
+  }
 
   if (!result.ok) {
     const status =

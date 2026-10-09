@@ -35,6 +35,21 @@ model Account {
   fees     FeePolicy[]
   settings Settings?
   templates InvoiceTemplate[]
+  services Service[]
+}
+
+// A saved service ("Logo design", $500): picked when building an invoice.
+// Saved from invoices automatically; the name is unique per account.
+model Service {
+  id        String   @id @default(cuid())
+  accountId String
+  account   Account  @relation(fields: [accountId], references: [id])
+  name      String
+  unitCents Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([accountId, name])
 }
 
 // A customer of the business (mirrored from Stripe)

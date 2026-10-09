@@ -36,12 +36,19 @@
   .wt-lines__head { display:grid; grid-template-columns:minmax(0,1fr) 64px 104px 84px 32px; gap:8px; font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:#8A7A55; font-weight:600; margin-bottom:6px; }
   .wt-lines__head span:nth-child(2) { text-align:center; } .wt-lines__head span:nth-child(4) { text-align:right; }
   .wt-lines__foot { display:flex; justify-content:space-between; align-items:center; margin-top:4px; }
+  .wt-line__desc-wrap { position:relative; }
+  .wt-suggest { position:absolute; left:0; top:46px; min-width:100%; width:max-content; max-width:min(420px, calc(100vw - 72px)); z-index:20; max-height:240px; overflow-y:auto; margin:0; padding:4px; list-style:none; background:#fff; border:1px solid rgba(15,48,46,.18); border-radius:10px; box-shadow:0 12px 24px -12px rgba(15,48,46,.35); }
+  .wt-suggest li { display:flex; justify-content:space-between; gap:10px; padding:9px 10px; border-radius:7px; font-size:14px; cursor:pointer; }
+  .wt-suggest li span:first-child { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .wt-suggest li span:last-child { color:#5D6E6B; font-variant-numeric:tabular-nums; flex:none; }
+  .wt-suggest li.is-active, .wt-suggest li:hover { background:#F3F0E8; }
+  .wt-lines__save { display:flex; align-items:center; gap:8px; margin-top:6px; font-size:13px; color:#5D6E6B; }
   .wt-lines__add { border:none; background:none; padding:6px 0; font:inherit; font-size:14px; font-weight:600; color:#0F302E; cursor:pointer; }
   .wt-lines__total { font-size:15px; color:#16302E; } .wt-lines__total strong { font-family:'Playfair Display',serif; font-size:20px; font-weight:400; margin-left:8px; }
   @media (max-width: 520px) {
     .wt-lines__head { display:none; }
     .wt-line { grid-template-columns:64px minmax(0,1fr) 72px 32px; padding-bottom:10px; border-bottom:1px solid rgba(15,48,46,.08); }
-    .wt-line__desc { grid-column:1 / -1; }
+    .wt-line__desc-wrap { grid-column:1 / -1; }
     .wt-grid { grid-template-columns:1fr; gap:0; }
   }
   .wt-recurring-link { display:block; text-align:center; font-size:13px; color:#0F302E; margin-top:4px; }
@@ -102,6 +109,7 @@
         <button class="wt-lines__add" type="button" id="add-line">+ Add a line</button>
         <div class="wt-lines__total">Total <strong id="lines-total">$0.00</strong></div>
       </div>
+      <label class="wt-lines__save"><input type="checkbox" id="save-services" checked> Save these services for next time</label>
     </div>
     <div class="wt-grid">
       <div class="wt-field">
@@ -265,7 +273,7 @@ document.getElementById('submit-btn').addEventListener('click', async () => {
   const btn = document.getElementById('submit-btn');
   btn.disabled = true; btn.textContent = 'Creating…';
   try {
-    await api('POST', '/invoices', { clientName, clientEmail, lines, dueDate, fee, poNumber });
+    await api('POST', '/invoices', { clientName, clientEmail, lines, dueDate, fee, poNumber, saveServices: document.getElementById('save-services').checked });
     window.location.href = '/dashboard';
   } catch (err) {
     showError(err.message || 'Could not create the invoice.');
@@ -280,7 +288,7 @@ function addLine(values) {
   const row = document.createElement('div');
   row.className = 'wt-line';
   row.innerHTML =
-    '<input class="wt-line__desc" placeholder="What you did, e.g. Logo design" aria-label="Description" maxlength="200">' +
+    '<div class="wt-line__desc-wrap"><input class="wt-line__desc" placeholder="What you did, e.g. Logo design" aria-label="Description" maxlength="200" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false"></div>' +
     '<input class="wt-line__qty" inputmode="decimal" value="1" aria-label="Quantity">' +
     '<input class="wt-line__price" inputmode="decimal" placeholder="0.00" aria-label="Price">' +
     '<div class="wt-line__total">$0.00</div>' +
@@ -326,6 +334,56 @@ function refreshLines() {
   document.getElementById('lines-total').textContent = '$' + formatMoney(total);
 }
 linesBox.addEventListener('input', refreshLines);
+
+// ---- Saved services: type to search, pick to fill description + price ----
+let services = [];
+api('GET', '/services').then(r => { services = r.services || []; }).catch(() => {});
+let suggest = null, activeIdx = -1;
+function closeSuggest() {
+  if (suggest) { suggest.previousElementSibling?.setAttribute('aria-expanded', 'false'); suggest.remove(); }
+  suggest = null; activeIdx = -1;
+}
+function openSuggest(input) {
+  closeSuggest();
+  const q = input.value.trim().toLowerCase();
+  const matches = services.filter(sv => !q || sv.name.toLowerCase().includes(q));
+  if (!matches.length || (matches.length === 1 && matches[0].name.toLowerCase() === q)) return;
+  suggest = document.createElement('ul');
+  suggest.className = 'wt-suggest'; suggest.setAttribute('role', 'listbox');
+  matches.forEach(sv => {
+    const li = document.createElement('li'); li.setAttribute('role', 'option');
+    const n = document.createElement('span'); n.textContent = sv.name;
+    const p = document.createElement('span'); p.textContent = '$' + formatMoney(sv.unitCents / 100);
+    li.append(n, p);
+    li.addEventListener('mousedown', e => { e.preventDefault(); pickService(input, sv); });
+    suggest.append(li);
+  });
+  input.after(suggest); input.setAttribute('aria-expanded', 'true');
+}
+function pickService(input, sv) {
+  const row = input.closest('.wt-line');
+  input.value = sv.name;
+  row.querySelector('.wt-line__price').value = formatMoney(sv.unitCents / 100);
+  closeSuggest(); refreshLines();
+  row.querySelector('.wt-line__qty').focus();
+}
+linesBox.addEventListener('focusin', e => { if (e.target.matches('.wt-line__desc')) openSuggest(e.target); });
+linesBox.addEventListener('input', e => { if (e.target.matches('.wt-line__desc')) openSuggest(e.target); });
+linesBox.addEventListener('focusout', e => { if (e.target.matches('.wt-line__desc')) setTimeout(closeSuggest, 100); });
+linesBox.addEventListener('keydown', e => {
+  if (!suggest || !e.target.matches('.wt-line__desc')) return;
+  const items = [...suggest.children];
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    activeIdx = (activeIdx + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
+    items.forEach((li, i) => li.classList.toggle('is-active', i === activeIdx));
+    items[activeIdx].scrollIntoView({ block: 'nearest' });
+  } else if (e.key === 'Enter' && activeIdx >= 0) {
+    e.preventDefault();
+    const name = items[activeIdx].firstChild.textContent;
+    pickService(e.target, services.find(sv => sv.name === name));
+  } else if (e.key === 'Escape') closeSuggest();
+});
 document.getElementById('add-line').addEventListener('click', () => addLine().querySelector('.wt-line__desc').focus());
 addLine();
 

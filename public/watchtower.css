@@ -442,6 +442,11 @@ input::placeholder { color: var(--wt-faint); }
 .wt-setting__row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
 .wt-setting__text { flex: 1 1 280px; min-width: 0; }
 .wt-setting__sub { margin: 4px 0 0; font-size: 13px; line-height: 1.55; color: var(--wt-subtle); }
+.wt-services { list-style: none; margin: 14px 0 0; padding: 0; max-height: 360px; overflow-y: auto; }
+.wt-services li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 10px 0; border-top: 1px solid var(--wt-line); font-size: 14px; color: var(--wt-text-body); }
+.wt-services li span:first-child { flex: 1 1 180px; min-width: 0; overflow-wrap: break-word; color: var(--wt-ink); }
+.wt-services li span:nth-child(2) { font-variant-numeric: tabular-nums; }
+.wt-services__empty { margin: 12px 0 0; font-size: 13px; color: var(--wt-subtle); }
 .wt-setting__body { margin-top: 20px; }
 .wt-status { display: block; margin-top: 8px; font-size: 13.5px; line-height: 1.5; color: var(--wt-text); }
 .wt-status::before { content: ''; display: inline-block; vertical-align: middle; width: 7px; height: 7px; margin: -2px 8px 0 0; border-radius: 50%; background: var(--wt-green); }

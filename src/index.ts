@@ -12,6 +12,7 @@ import { reportsRouter } from './routes/reports';
 import { templatesRouter } from './routes/templates';
 import { settingsRouter } from './routes/settings';
 import { clientsRouter } from './routes/clients';
+import { servicesRouter } from './routes/services';
 import { billingRouter } from './routes/billing';
 import { inboundRouter } from './routes/inbound';
 import { authMiddleware } from './middleware/auth';
@@ -68,6 +69,7 @@ app.use('/reports', apiLimiter, reportsRouter);
 app.use('/templates', apiLimiter, templatesRouter);
 app.use('/settings', apiLimiter, settingsRouter);
 app.use('/clients', apiLimiter, clientsRouter);
+app.use('/services', apiLimiter, servicesRouter);
 app.use('/billing', apiLimiter, billingRouter);
 app.use('/webhooks/resend/inbound', express.raw({ type: 'application/json' }), inboundRouter);
 

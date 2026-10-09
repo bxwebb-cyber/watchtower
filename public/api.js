@@ -668,8 +668,33 @@ function renderTrend(trend, picked) {
   }
 }
 
+// ---- Settings: saved services ----
+async function loadServices() {
+  const list = document.querySelector('[data-services]');
+  if (!list) return;
+  const data = await api('GET', '/services').catch(() => ({ services: [] }));
+  const services = data.services || [];
+  document.querySelector('[data-services-empty]').hidden = services.length > 0;
+  list.replaceChildren(...services.map(sv => {
+    const li = document.createElement('li');
+    const name = document.createElement('span'); name.textContent = sv.name;
+    const price = document.createElement('span'); price.textContent = money(sv.unitCents);
+    const rm = document.createElement('button');
+    rm.type = 'button'; rm.className = 'wt-btn wt-btn--secondary wt-btn--sm'; rm.textContent = 'Remove';
+    rm.setAttribute('aria-label', 'Remove ' + sv.name);
+    rm.addEventListener('click', async () => {
+      rm.disabled = true;
+      try { await api('DELETE', '/services/' + sv.id); li.remove(); document.querySelector('[data-services-empty]').hidden = list.children.length > 0; }
+      catch (err) { rm.disabled = false; alert(err.message); }
+    });
+    li.append(name, price, rm);
+    return li;
+  }));
+}
+
 // ---- Settings ----
 async function loadSettings() {
+  loadServices();
   const [settings, status] = await Promise.all([
     api('GET', '/settings').catch(() => ({})),
     api('GET', '/settings/status').catch(() => ({})),
