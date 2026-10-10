@@ -119,6 +119,7 @@ document.addEventListener('wt:open-invoice', async (e) => {
   const put = (k, v) => { $i(k).textContent = v; };
   put('title', 'Invoice ' + (row.stripeNumber || ''));
   put('client', 'Loading…'); put('amount', row.amount); put('due', ''); put('sent', ''); put('fee', '');
+  modal.querySelector('[data-inv-po]').hidden = true;
   $i('timeline').replaceChildren();
   $i('lines').replaceChildren(); $i('lines').hidden = true;
   $i('pdf').hidden = true; $i('copy').hidden = true; $i('cancel').hidden = true; $i('cancel-box').hidden = true;
@@ -131,7 +132,9 @@ document.addEventListener('wt:open-invoice', async (e) => {
   catch (err) { put('client', "Couldn't load this invoice. " + err.message); return; }
 
   const day = (iso) => new Date(iso.length === 10 ? iso + 'T12:00:00' : iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  put('client', [d.client, d.clientEmail, d.poNumber ? 'PO ' + d.poNumber : ''].filter(Boolean).join(' · '));
+  put('client', [d.client, d.clientEmail].filter(Boolean).join(' · '));
+  put('po', d.poNumber || '');
+  modal.querySelector('[data-inv-po]').hidden = !d.poNumber;
   put('amount', money(d.amountCents + (d.feeStatus === 'open' || d.feeStatus === 'paid' ? (d.feeAmountCents || 0) : 0)));
   put('due', day(d.due));
   put('sent', day(d.createdAt));

@@ -57,6 +57,12 @@
 <td style="padding:10px 0;border-bottom:1px solid #E4DFD2;font-family:Arial, Helvetica, sans-serif;font-size:14px;line-height:20px;mso-line-height-rule:exactly;color:#5D6E6B;" align="left">Invoice</td>
 <td style="padding:10px 0;border-bottom:1px solid #E4DFD2;font-family:Arial, Helvetica, sans-serif;font-size:14px;line-height:20px;mso-line-height-rule:exactly;color:#0F302E;font-weight:normal;" align="right">{{invoice_id}}</td>
 </tr>
+{{#if po_number}}
+<tr>
+<td style="padding:10px 0;border-bottom:1px solid #E4DFD2;font-family:Arial, Helvetica, sans-serif;font-size:14px;line-height:20px;mso-line-height-rule:exactly;color:#5D6E6B;" align="left">PO number</td>
+<td style="padding:10px 0;border-bottom:1px solid #E4DFD2;font-family:Arial, Helvetica, sans-serif;font-size:14px;line-height:20px;mso-line-height-rule:exactly;color:#0F302E;font-weight:normal;" align="right">{{po_number}}</td>
+</tr>
+{{/if}}
 {{#each lines}}
 <tr>
 <td style="padding:10px 0;border-bottom:1px solid #E4DFD2;font-family:Arial, Helvetica, sans-serif;font-size:14px;line-height:20px;mso-line-height-rule:exactly;color:#243B39;" align="left">{{label}}</td>

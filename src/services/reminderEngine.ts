@@ -316,6 +316,7 @@ function emailDataFor(invoice: EmailInvoice): EmailData {
     termsFeeAmount: termsCents > 0 ? `${usd(termsCents)}` : null,
     feeWhen: feeWhen(graceDays),
     lines: emailLines(invoice.lines, usd),
+    poNumber: invoice.poNumber ?? null,
     mascotUrl:
       process.env.MASCOT_URL ??
       `${process.env.APP_URL ?? 'http://localhost:4000'}/lighthouse-transparent.png`,
