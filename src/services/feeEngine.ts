@@ -368,6 +368,10 @@ async function reissueBill(
       days_until_due: 14,
       auto_advance: false,
       description: o.description,
+      // Same ways to pay as the bill it replaces (card, and bank if it had it).
+      ...(current.payment_settings?.payment_method_types?.length
+        ? { payment_settings: { payment_method_types: current.payment_settings.payment_method_types } }
+        : {}),
       // Keep the PO number (and any other custom field) the client expects.
       ...(current.custom_fields?.length ? { custom_fields: current.custom_fields.map(({ name, value }) => ({ name, value })) } : {}),
       metadata: {

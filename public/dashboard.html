@@ -876,10 +876,7 @@
           <span class="wt-tip__label">Tip</span>
           <span>Turn off Stripe's invoice reminder emails. Dunn handles reminders, so clients aren't emailed twice. <a href="https://dashboard.stripe.com/settings/billing/automatic" target="_blank" rel="noopener">Open Stripe email settings</a></span>
         </div>
-        <div class="wt-tip wt-tip--inline">
-          <span class="wt-tip__label">Tip</span>
-          <span>Let clients pay by bank transfer: it costs you far less than cards (about 0.8%, capped at $5). Turn on "ACH Direct Debit" in Stripe. Dunn pauses reminders while a bank payment clears. <a href="https://dashboard.stripe.com/settings/payment_methods" target="_blank" rel="noopener">Open Stripe payment methods</a></span>
-        </div>
+        <label class="wt-toggle-row" style="margin-top:14px"><input type="checkbox" name="allow_bank" checked><span class="wt-toggle-row__text"><span class="wt-toggle-row__label">Let clients pay by bank transfer</span><span class="wt-toggle-row__sub">Clients can pay by card or straight from their bank (ACH). Bank costs you far less: about 0.8%, capped at $5, vs about 3% for cards. Takes 3–5 days to clear; Dunn pauses reminders meanwhile. Applies to new invoices. Save at the bottom.</span></span></label>
         <div class="wt-tip wt-tip--inline">
           <span class="wt-tip__label">Tip</span>
           <span>Add your logo and colors in Stripe. Your invoices, PDFs and payment page will show them. <a href="https://dashboard.stripe.com/settings/branding" target="_blank" rel="noopener">Open Stripe branding</a></span>

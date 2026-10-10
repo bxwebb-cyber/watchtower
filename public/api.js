@@ -720,6 +720,7 @@ async function loadSettings() {
     form.querySelector('[name="owner_email"]').value = settings.ownerEmail || '';
     form.querySelector('[name="alert_overdue"]').checked = settings.alertOverdue !== false;
     form.querySelector('[name="alert_paid"]').checked = !!settings.alertPayment;
+    form.querySelector('[name="allow_bank"]').checked = settings.allowBankPayments !== false;
 
     // default fee terms
     const feeKind = settings.defaultFeeKind === 'percent' ? 'pct' : (settings.defaultFeeKind === 'flat' ? 'flat' : 'none');
@@ -901,6 +902,7 @@ document.addEventListener('wt:settings-save', async e => {
     ownerEmail: d.owner_email,
     alertOverdue: !!d.alert_overdue,
     alertPayment: !!d.alert_paid,
+    allowBankPayments: !!d.allow_bank,
     defaultFeeKind: feeKind,
     defaultFeeAmount: feeKind === 'flat' ? (parseMoney(d.fee_flat) || 0) : feeKind === 'percent' ? (parseFloat(d.fee_pct) || 0) : 0,
     defaultGraceDays: graceValue(d.grace_days),

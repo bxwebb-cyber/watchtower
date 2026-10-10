@@ -6,6 +6,7 @@ import { feeWhen } from './feeRules';
 import { usd, usdDollars } from '../lib/money';
 import { dueTimestamp, dueDateFromStripe, stripeDueTimestamp } from '../lib/dueDate';
 import { InvoiceLine, linesTotalCents, stripeItemFor } from './invoiceLines';
+import { reportProblem } from './problems';
 export { dueTimestamp, dueDateFromStripe };
 
 const prisma = new PrismaClient();
@@ -143,18 +144,43 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<CreateIn
         ? `Late fee: ${feeLabel(fee)} applies ${feeWhen(fee.graceDays ?? 0)}.`
         : undefined;
 
-    const stripeInvoice = await stripe.invoices.create(
-      {
-        customer: stripeCustomerId,
-        collection_method: 'send_invoice',
-        auto_advance: false,
-        due_date: dueSec,
-        description: feeDescription,
-        ...(input.poNumber ? { custom_fields: [{ name: 'PO number', value: input.poNumber }] } : {}),
-        metadata: { watchtower: 'true' },
-      },
-      { stripeAccount: account.stripeAccountId }
-    );
+    // Card, plus bank transfer (ACH) when the owner allows it (Settings, on
+    // by default). If their Stripe can't take bank payments yet, Stripe
+    // refuses: send the invoice card-only and tell the owner once.
+    const settings = await prisma.settings.findUnique({ where: { accountId: account.id } });
+    const wantBank = settings?.allowBankPayments ?? true;
+    const createDraft = (bank: boolean) =>
+      stripe.invoices.create(
+        {
+          customer: stripeCustomerId!,
+          collection_method: 'send_invoice',
+          auto_advance: false,
+          due_date: dueSec,
+          description: feeDescription,
+          payment_settings: { payment_method_types: bank ? ['card', 'us_bank_account'] : ['card'] },
+          ...(input.poNumber ? { custom_fields: [{ name: 'PO number', value: input.poNumber }] } : {}),
+          metadata: { watchtower: 'true' },
+        },
+        { stripeAccount: account.stripeAccountId }
+      );
+    let stripeInvoice: Stripe.Invoice;
+    try {
+      stripeInvoice = await createDraft(wantBank);
+    } catch (err) {
+      if (!wantBank) throw err;
+      stripeInvoice = await createDraft(false);
+      console.warn('[invoice] bank payments refused by Stripe; sent card-only', (err as Error).message);
+      await reportProblem({
+        kind: 'Bank payments not available',
+        key: `no_bank:${account.id}`,
+        accountId: account.id,
+        detail: (err as Error).message,
+        owner: {
+          subject: 'Turn on bank payments in Stripe',
+          text: `Dunn tried to let your client pay by bank transfer, but your Stripe account isn't set up for bank payments yet, so the invoice offers card only.\n\nTo turn it on: Stripe → Settings → Payment methods → ACH Direct Debit (https://dashboard.stripe.com/settings/payment_methods). Or, if you'd rather take cards only, switch off "Let clients pay by bank transfer" in Dunn → Settings.`,
+        },
+      });
+    }
 
     const items = input.lines?.length
       ? input.lines.map((l) => stripeItemFor(l, usd))

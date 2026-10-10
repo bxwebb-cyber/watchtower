@@ -177,6 +177,8 @@ model Settings {
   alertFeeApproval Boolean @default(true)  // a late fee needs my approval
   alertOverdue     Boolean @default(true)  // an invoice goes overdue
   alertPayment     Boolean @default(false) // a client pays
+  // Offer bank transfer (ACH) next to card on every invoice (cheaper for the owner).
+  allowBankPayments Boolean @default(true)
   // Default late-fee terms — prefill the invoice form + recurring templates.
   defaultFeeKind   String  @default("none") // "none" | "flat" | "percent"
   defaultFeeAmount Float   @default(0)      // flat: dollars; percent: 0-100

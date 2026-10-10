@@ -41,6 +41,7 @@ settingsRouter.get('/', async (req, res) => {
     alertFeeApproval: settings.alertFeeApproval,
     alertOverdue: settings.alertOverdue,
     alertPayment: settings.alertPayment,
+    allowBankPayments: settings.allowBankPayments,
     businessName: account.businessName,
     ownerName: account.ownerName,
     stripeConnected: !!account.stripeAccountId && !account.stripeAccountId.startsWith('pending_'),
@@ -78,6 +79,7 @@ settingsRouter.put('/', async (req, res) => {
   if (req.body.alertFeeApproval !== undefined) data.alertFeeApproval = Boolean(req.body.alertFeeApproval);
   if (req.body.alertOverdue !== undefined) data.alertOverdue = Boolean(req.body.alertOverdue);
   if (req.body.alertPayment !== undefined) data.alertPayment = Boolean(req.body.alertPayment);
+  if (req.body.allowBankPayments !== undefined) data.allowBankPayments = Boolean(req.body.allowBankPayments);
   if (req.body.defaultFeeKind !== undefined) data.defaultFeeKind = String(req.body.defaultFeeKind);
   if (req.body.defaultFeeAmount !== undefined) data.defaultFeeAmount = Number(req.body.defaultFeeAmount);
   if (req.body.defaultGraceDays !== undefined) {
@@ -101,6 +103,7 @@ settingsRouter.put('/', async (req, res) => {
     alertFeeApproval: settings.alertFeeApproval,
     alertOverdue: settings.alertOverdue,
     alertPayment: settings.alertPayment,
+    allowBankPayments: settings.allowBankPayments,
     defaultFeeKind: settings.defaultFeeKind,
     defaultFeeAmount: settings.defaultFeeAmount,
     defaultGraceDays: settings.defaultGraceDays,
