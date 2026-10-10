@@ -54,16 +54,17 @@ Invoicing apps (Invoiless, FreshBooks, Wave, InvoiceQuick) help you *send* invoi
 - Up to 5 clients/month: $39/mo or $390/yr
 - Unlimited clients: $59/mo or $540/yr
 
-## Proposed AppSumo deal (decide before submitting)
+## AppSumo deal (Bashira 10/9)
 | Tier | Price (one-time) | What's included |
 |---|---|---|
-| Tier 1 | $69 | Lifetime, up to 10 clients/month, 1 business |
-| Tier 2 | $149 | Lifetime, unlimited clients (fair-use email limit), 1 business |
+| Tier 1 | $69 | Lifetime, up to 15 clients/month, 1 business |
+| Tier 2 | $129 | Lifetime, unlimited clients (fair-use email limit), 1 business |
 
-- Stack codes for more businesses (1 code = 1 business).
+- 1 code = 1 business account. Another business = another code (its own Dunn account + its own Stripe). No multi-business build.
 - "Lifetime" = for the life of the product; future paid add-ons (e.g. AI account features) may be extra.
 - Both tiers are below the lowest price anywhere (AppSumo rule).
-- Codes needed: 500–10,000 one-time codes (AppSumo provides/requests these; Dunn's redemption page is being built).
+- Codes needed: 500–10,000 one-time codes; Dunn's redemption page to build while AppSumo reviews (code → account gets the tier's lifetime plan).
+- Comparison: Invoiless $69 single tier (unlimited, 3 businesses); GetInvoice $79/$159/$379/$549; most AppSumo deals $49–$99.
 
 ## Support plan
 - Help page + FAQ at getdunn.org (in progress)
@@ -86,7 +87,7 @@ Bashira Webb — founder of Defiance Media LLC (Bronx, NY). Background in operat
 - Demo page: https://getdunn.org/demo
 
 ## Open decisions for Bashira
-1. Tier prices/limits (above is the suggestion).
-2. Stacking yes/no.
+1. ~~Tier prices~~ decided: $69 (15 clients/mo) / $129 (unlimited).
+2. ~~Stacking~~ decided: 1 code = 1 business account.
 3. Founder bio wording.
 4. Who records the demo video (screen recording works).
