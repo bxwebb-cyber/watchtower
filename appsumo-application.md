@@ -91,3 +91,11 @@ Bashira Webb — founder of Defiance Media LLC (Bronx, NY). Background in operat
 2. ~~Stacking~~ decided: 1 code = 1 business account.
 3. Founder bio wording.
 4. Who records the demo video (screen recording works).
+
+## Demo video — how to record (Mac, ~2 min)
+Cmd+Shift+5 → Record Entire Screen → Options → Microphone: MacBook Microphone → Record. Stop with ⏹ in the menu bar. Saves to Desktop. Record AFTER go-live on a clean real account.
+1. (15s) Homepage — "If you invoice clients, the hardest part is getting paid. Dunn does the chasing for you."
+2. (30s) New invoice: 2 saved services, $25 fee after 7 days — "I add my services, set the late fee my client agreed to, and send."
+3. (30s) Invoice history — "Dunn reminds them before it's due, checks in if it's late, and stops the moment they reply."
+4. (30s) Late fees coming up (Lower / Waive) — "The day before a fee lands, Dunn tells me. I can lower or waive it; otherwise it's added automatically."
+5. (15s) Reports → Who you waive fees for — "And I can see who's always late."
