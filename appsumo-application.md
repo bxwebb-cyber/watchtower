@@ -63,7 +63,7 @@ Invoicing apps (Invoiless, FreshBooks, Wave, InvoiceQuick) help you *send* invoi
 - 1 code = 1 business account. Another business = another code (its own Dunn account + its own Stripe). No multi-business build.
 - "Lifetime" = for the life of the product; future paid add-ons (e.g. AI account features) may be extra.
 - Both tiers are below the lowest price anywhere (AppSumo rule).
-- Codes needed: 500–10,000 one-time codes; Dunn's redemption page to build while AppSumo reviews (code → account gets the tier's lifetime plan).
+- **Codes: 1,000 to start (Bashira 10/9): ~700 Tier 1 / ~300 Tier 2.** Dunn generates them (random one-time codes, e.g. DUNN-7KQ2-XM4P); upload in the Partner Portal; add more if they run low. AppSumo may instead use its licensing connection (no codes) — the portal will say. Build the matching redemption page while they review (code → account gets the tier's lifetime plan).
 - Comparison: Invoiless $69 single tier (unlimited, 3 businesses); GetInvoice $79/$159/$379/$549; most AppSumo deals $49–$99.
 
 ## Support plan
