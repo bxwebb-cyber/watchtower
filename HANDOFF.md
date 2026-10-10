@@ -43,7 +43,7 @@ Also 10/8: homepage SEO (scripts/seo-prerender.cjs — RE-RUN after any new land
 
 ### ▶ GO-LIVE PROGRESS (10/10)
 - ✅ Stripe live mode on (Defiance Media LLC); payout bank: Bashira handling.
-- ✅ Live prices (Railway vars, not secret): STRIPE_PRICE_SOLO = price_1UP68cRve8cRy3m3Ehb2Oheg ($39/mo) · STRIPE_PRICE_SOLO_YEARLY = price_1UP6CbRve8cRy3m3WhrQu9P5 ($390/yr — confirm) · STRIPE_PRICE_BUSINESS = price_1UP6FqRve8cRy3m3ct7LNBQ4 ($59/mo) · STRIPE_PRICE_BUSINESS_YEARLY = price_1UP6GiRve8cRy3m32nNhfJRr ($540/yr).
+- ✅ Live prices (Railway vars, not secret): STRIPE_PRICE_SOLO = price_1UP68cRve8cRy3m3Ehb2Oheg ($39/mo) · STRIPE_PRICE_SOLO_YEARLY = price_1UP6CbRve8cRy3m3WhrQu9P5 ($390/yr) · STRIPE_PRICE_BUSINESS = price_1UP6FqRve8cRy3m3ct7LNBQ4 ($59/mo) · STRIPE_PRICE_BUSINESS_YEARLY = price_1UP6GiRve8cRy3m32nNhfJRr ($540/yr).
 - Next: live Connect (client ID + redirect) → 2 live webhooks (+ processing/payment_failed/deauthorized on Connected) → live customer portal → Railway vars → SCHEDULER_START = go-live date → $1 real test.
 
 ### ▶ POST-LAUNCH LIST (Bashira's yes, in order she agreed)
