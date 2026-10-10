@@ -252,10 +252,12 @@ document.getElementById('submit-btn').addEventListener('click', async () => {
 // ---- Line items (lines.js) ----
 const lineEditor = DunnLines.mount(document.getElementById('lines'), { api });
 
-// Default due date = today + 14 days.
+// Default due date = today + 14 days, by the owner's own calendar
+// (toISOString is UTC: after 8pm in New York it's already tomorrow).
 (function () {
-  const d = new Date(Date.now() + 14 * 86400000);
-  document.getElementById('due-date').value = d.toISOString().slice(0, 10);
+  const d = new Date();
+  d.setDate(d.getDate() + 14);
+  document.getElementById('due-date').value = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 })();
 
 prefillDefault();
